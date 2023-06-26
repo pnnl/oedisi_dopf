@@ -1,0 +1,6 @@
+{
+	"Feeder":"feeder_federate/component_definition.json",
+	"Recorder":"recorder_federate/component_definition.json",
+	"Estimator":"estimator_federate/component_definition.json",
+	"Measurement":"measuring_federate/component_definition.json"
+}

@@ -1,0 +1,11 @@
+{
+    "directory": "recorder_federate",
+    "execute_function": "python recorder.py",
+    "static_inputs": [
+        {"type": "", "port_id": "filename"}
+    ],
+    "dynamic_inputs": [
+        {"type": "MeasurementArray", "port_id": "subscription"}
+    ],
+    "dynamic_outputs": []
+}
