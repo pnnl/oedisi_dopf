@@ -1,0 +1,4 @@
+oedisi==1.0.0
+helics[cli]==3.4.0
+helics-apps==3.4.0
+pydantic==1.10.8
