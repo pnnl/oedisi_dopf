@@ -1,0 +1,23 @@
+{
+	"name":"test_system",
+	"components":[
+		{
+			"name":"component_one",
+			"type":"ComponentOne",
+			"parameters":{}
+		},
+		{
+			"name":"component_two",
+			"type":"ComponentTwo",
+			"parameters":{}
+		}
+	],
+	"links":[
+		{
+			"source":"component_one",
+			"source_port":"test2",
+			"target":"component_two",
+			"target_port":"test1"
+		}
+	]
+}

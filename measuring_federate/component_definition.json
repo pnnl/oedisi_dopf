@@ -1,0 +1,15 @@
+{
+    "directory": "measuring_federate",
+    "execute_function": "python measuring.py",
+    "static_inputs": [
+        {"type": "", "port_id": "gaussian_variance"},
+        {"type": "", "port_id": "measurement_file"},
+        {"type": "", "port_id": "random_percent"}
+    ],
+    "dynamic_inputs": [
+        {"type": "MeasurementArray", "port_id": "subscription"}
+    ],
+    "dynamic_outputs": [
+        {"type": "MeasurementArray", "port_id": "publication"}
+    ]
+}
