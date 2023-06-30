@@ -1,0 +1,5 @@
+{
+  "flex_node_idx": ["load_p1ulv4110_2", "load_p1ulv4113_2",  "load_p1ulv4138_2",  "load_p1ulv7547_1"],
+  "flex_node_init": [3.729449, 2.420524,   3.296158,  8.959725],
+    "units": "kW"
+}
