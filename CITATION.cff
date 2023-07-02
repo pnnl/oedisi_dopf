@@ -1,5 +1,5 @@
 OpenEDI - System Integration (OEDI-SI) - PNNL Distributed Optimal Power Flow (DOPF)
-message: "If you use this software, please cite it as below."
+message: "If you use this repository, please cite it as below."
 preferred-citation:
 type: misc
 authors:
