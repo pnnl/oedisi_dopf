@@ -11,6 +11,6 @@ authors:
   given-names: "Bhaskar"
 title: "OpenEDI - System Integration (OEDI-SI) - PNNL Distributed Optimal Power Flow (DOPF)"
 version: 1.0.0
-doi: https://doi.org/10.11578/1986048
+doi: 10.11578/1986048
 date-released: 2023-06-30
 url: "https://github.com/pnnl/oedisi_dopf"
