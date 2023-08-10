@@ -123,6 +123,14 @@ class FeederSimulator(object):
             else:
                 self._feeder_file = os.path.join("opendss", "master.dss")
                 self.download_data("gadal")
+        elif not os.path.exists(config.existing_feeder_file):
+            if self._use_smartds:
+                self._feeder_file = os.path.join("opendss", "Master.dss")
+                self.download_data(
+                    "oedi-data-lake", update_loadshape_location=True)
+            else:
+                self._feeder_file = os.path.join("opendss", "master.dss")
+                self.download_data("gadal")
         else:
             self._feeder_file = config.existing_feeder_file
 

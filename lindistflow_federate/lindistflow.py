@@ -66,7 +66,8 @@ def dist_OPF(branch_sw_data_case, bus_info, source_bus, source_bus_idx, vsrc, pf
     # Number of Optimization Variables
     #                        Voltage                     PQ_inj                              PQ_flow
     variable_number = (nbus_ABC * 3 + nbus_s1s2) + (nbus_ABC * 6 + nbus_s1s2 * 2) + (nbranch_ABC * 6 + nbranch_s1s2 * 2) + \
-                      (nbus_ABC * 3 + nbus_s1s2) + nbus_ABC * 3 + nbus_s1s2  ## (introduce new variables for reactive power injections from inverters)
+                      (nbus_ABC * 3 + nbus_s1s2) + nbus_ABC * 3 + \
+        nbus_s1s2  # (introduce new variables for reactive power injections from inverters)
     #                            P_dg                  Q_dg
 
     # Number of equality/inequality constraints (Injection equations (ABC) at each bus)
@@ -110,11 +111,11 @@ def dist_OPF(branch_sw_data_case, bus_info, source_bus, source_bus_idx, vsrc, pf
         for k in range(n_bus):
             q_obj_vector[n_Qdg + k] = 0  # Just Voltage regulation
 
-
     # # Define BFM constraints for both real and reactive power: Power flow conservaion
     # Constraint 1: Flow equation
 
     # sum(Sij) - sum(Sjk) == -sj
+
     def power_balance(A, b, k_frm, k_to, counteq, col, val):
         for k in k_frm:
             A[counteq, col + k] = -1
@@ -158,7 +159,8 @@ def dist_OPF(branch_sw_data_case, bus_info, source_bus, source_bus_idx, vsrc, pf
                         k_to_1p.append(ind_to - nbranch_ABC)
                     ind_to += 1
                     ind_frm += 1
-                loc = (nbus_ABC * 3 + nbus_s1s2) + (nbus_ABC * 6 + nbus_s1s2 * 2) + nbranch_ABC * 6
+                loc = (nbus_ABC * 3 + nbus_s1s2) + \
+                    (nbus_ABC * 6 + nbus_s1s2 * 2) + nbranch_ABC * 6
                 A_eq, b_eq = power_balance(A_eq, b_eq, k_frm_1p, k_to_1p, counteq, loc,
                                            val_bus['idx'] + nbus_ABC * 3 + nbus_s1s2 + nbus_ABC * 5)
                 counteq += 1
@@ -174,14 +176,20 @@ def dist_OPF(branch_sw_data_case, bus_info, source_bus, source_bus_idx, vsrc, pf
                             k_frm_3p.append(ind_frm)
                         else:
                             if key[-1] == 'a':
-                                k_frm_1pa.append(nbranch_ABC * 6 + ind_frm - nbranch_ABC)
-                                k_frm_1qa.append(nbranch_ABC * 3 + ind_frm - nbranch_ABC + nbranch_s1s2)
+                                k_frm_1pa.append(
+                                    nbranch_ABC * 6 + ind_frm - nbranch_ABC)
+                                k_frm_1qa.append(
+                                    nbranch_ABC * 3 + ind_frm - nbranch_ABC + nbranch_s1s2)
                             if key[-1] == 'b':
-                                k_frm_1pb.append(nbranch_ABC * 5 + ind_frm - nbranch_ABC)
-                                k_frm_1qb.append(nbranch_ABC * 2 + ind_frm - nbranch_ABC + nbranch_s1s2)
+                                k_frm_1pb.append(
+                                    nbranch_ABC * 5 + ind_frm - nbranch_ABC)
+                                k_frm_1qb.append(
+                                    nbranch_ABC * 2 + ind_frm - nbranch_ABC + nbranch_s1s2)
                             if key[-1] == 'c':
-                                k_frm_1pc.append(nbranch_ABC * 4 + ind_frm - nbranch_ABC)
-                                k_frm_1qc.append(nbranch_ABC * 1 + ind_frm - nbranch_ABC + nbranch_s1s2)
+                                k_frm_1pc.append(
+                                    nbranch_ABC * 4 + ind_frm - nbranch_ABC)
+                                k_frm_1qc.append(
+                                    nbranch_ABC * 1 + ind_frm - nbranch_ABC + nbranch_s1s2)
 
                     if val_bus['idx'] == val_br['to']:
                         if bus_info[val_br['fr_bus']]['kv'] > primary_kv_level:
@@ -190,7 +198,8 @@ def dist_OPF(branch_sw_data_case, bus_info, source_bus, source_bus_idx, vsrc, pf
                             k_to_1p.append(ind_to - nbranch_ABC)
                     ind_to += 1
                     ind_frm += 1
-                loc = (nbus_ABC * 3 + nbus_s1s2) + (nbus_ABC * 6 + nbus_s1s2 * 2)
+                loc = (nbus_ABC * 3 + nbus_s1s2) + \
+                    (nbus_ABC * 6 + nbus_s1s2 * 2)
                 # Finding the kfrms
                 k_frm_A = k_frm_3p + k_frm_1pa
                 k_frm_B = k_frm_3p + k_frm_1pb
@@ -214,7 +223,8 @@ def dist_OPF(branch_sw_data_case, bus_info, source_bus, source_bus_idx, vsrc, pf
                 k_frm_C = k_frm_3p + k_frm_1qc
 
                 # Reactive Power balance equations
-                loc = (nbus_ABC * 3 + nbus_s1s2) + (nbus_ABC * 6 + nbus_s1s2 * 2) + nbranch_ABC * 3
+                loc = (nbus_ABC * 3 + nbus_s1s2) + \
+                    (nbus_ABC * 6 + nbus_s1s2 * 2) + nbranch_ABC * 3
                 # Phase A
                 A_eq, b_eq = reac_power_balance(A_eq, b_eq, k_frm_A, k_to_A, counteq, loc,
                                                 val_bus['idx'] + nbus_ABC * 3 + nbus_s1s2 + nbus_ABC * 3)
@@ -235,7 +245,8 @@ def dist_OPF(branch_sw_data_case, bus_info, source_bus, source_bus_idx, vsrc, pf
     def voltage_cons_pri(A, b, p, frm, to, counteq, pii, qii, pij, qij, pik, qik):
         A[counteq, frm] = 1
         A[counteq, to] = -1
-        n_flow_ABC = (nbus_ABC * 3 + nbus_s1s2) + (nbus_ABC * 6 + nbus_s1s2 * 2)
+        n_flow_ABC = (nbus_ABC * 3 + nbus_s1s2) + \
+            (nbus_ABC * 6 + nbus_s1s2 * 2)
         # real power drop
         A[counteq, p + n_flow_ABC + + nbranch_ABC * 0] = pii / baseZ
         A[counteq, p + n_flow_ABC + nbranch_ABC * 1] = pij / baseZ
@@ -259,18 +270,18 @@ def dist_OPF(branch_sw_data_case, bus_info, source_bus, source_bus_idx, vsrc, pf
             # Phase A
             paa, qaa = -2 * z[0, 0][0], -2 * z[0, 0][1]
             pab, qab = -(- z[0, 1][0] + math.sqrt(3) * z[0, 1][1]), -(
-                    - z[0, 1][1] - math.sqrt(3) * z[0, 1][0])
+                - z[0, 1][1] - math.sqrt(3) * z[0, 1][0])
             pac, qac = -(- z[0, 2][0] - math.sqrt(3) * z[0, 2][1]), -(
-                    - z[0, 2][1] + math.sqrt(3) * z[0, 2][0])
+                - z[0, 2][1] + math.sqrt(3) * z[0, 2][0])
             A_eq, b_eq = voltage_cons_pri(A_eq, b_eq, idx, val_br['from'], val_br['to'], counteq, paa, qaa, pab, qab,
                                           pac, qac)
             counteq += 1
             # Phase B
             pbb, qbb = -2 * z[1, 1][0], -2 * z[1, 1][1]
             pba, qba = -(- z[0, 1][0] - math.sqrt(3) * z[0, 1][1]), -(
-                    - z[0, 1][1] + math.sqrt(3) * z[0, 1][0])
+                - z[0, 1][1] + math.sqrt(3) * z[0, 1][0])
             pbc, qbc = -(- z[1, 2][0] + math.sqrt(3) * z[1, 2][1]), -(
-                    - z[1, 2][1] - math.sqrt(3) * z[1, 2][0])
+                - z[1, 2][1] - math.sqrt(3) * z[1, 2][0])
             A_eq, b_eq = voltage_cons_pri(A_eq, b_eq, idx, nbus_ABC + val_br['from'], nbus_ABC + val_br['to'], counteq,
                                           pba,
                                           qba,
@@ -279,9 +290,9 @@ def dist_OPF(branch_sw_data_case, bus_info, source_bus, source_bus_idx, vsrc, pf
             # Phase C
             pcc, qcc = -2 * z[2, 2][0], -2 * z[2, 2][1]
             pca, qca = -(- z[0, 2][0] + math.sqrt(3) * z[0, 2][1]), -(
-                    - z[0, 2][1] - math.sqrt(3) * z[0, 2][0])
+                - z[0, 2][1] - math.sqrt(3) * z[0, 2][0])
             pcb, qcb = -(- z[1, 2][0] - math.sqrt(3) * z[1, 2][1]), -(
-                    - z[0, 2][1] + math.sqrt(3) * z[1, 2][0])
+                - z[0, 2][1] + math.sqrt(3) * z[1, 2][0])
             A_eq, b_eq = voltage_cons_pri(A_eq, b_eq, idx, nbus_ABC * 2 + val_br['from'], nbus_ABC * 2 + val_br['to'],
                                           counteq,
                                           pca, qca, pcb, qcb, pcc, qcc)
@@ -292,7 +303,8 @@ def dist_OPF(branch_sw_data_case, bus_info, source_bus, source_bus_idx, vsrc, pf
     def voltage_cons_sec(A, b, p, frm, to, counteq, p_pri, q_pri, p_sec, q_sec):
         A[counteq, frm] = 1
         A[counteq, to] = -1
-        n_flow_s1s2 = (nbus_ABC * 3 + nbus_s1s2) + (nbus_ABC * 6 + nbus_s1s2 * 2) + nbranch_ABC * 6
+        n_flow_s1s2 = (nbus_ABC * 3 + nbus_s1s2) + \
+            (nbus_ABC * 6 + nbus_s1s2 * 2) + nbranch_ABC * 6
         # real power drop
         A[counteq, p + n_flow_s1s2] = p_pri + 0.5 * p_sec
         # reactive power drop
@@ -325,7 +337,7 @@ def dist_OPF(branch_sw_data_case, bus_info, source_bus, source_bus_idx, vsrc, pf
                 to_bus = val_br['to'] - nbus_ABC + nbus_ABC * 3
                 # A, b = voltage_cons(A, b, idx - nbus_ABC, from_bus, to_bus, counteq, p_pri, q_pri, p_sec, q_sec)
                 A_eq, b_eq = voltage_cons_sec(A_eq, b_eq, idx - nbranch_ABC, from_bus, to_bus, counteq, p_pri,
-                                              q_pri, p_sec, q_sec)  ## Monish
+                                              q_pri, p_sec, q_sec)  # Monish
                 counteq += 1
 
             # For triplex line, we assume there is no mutual coupling
@@ -343,7 +355,7 @@ def dist_OPF(branch_sw_data_case, bus_info, source_bus, source_bus_idx, vsrc, pf
                 to_bus = val_br['to'] - nbus_ABC + nbus_ABC * 3
                 # A, b = voltage_cons(A, b, idx - nbus_ABC, from_bus, to_bus, counteq, p_s1, q_s1, p_s2, q_s2)
                 A_eq, b_eq = voltage_cons_sec(A_eq, b_eq, idx - nbranch_ABC, from_bus, to_bus, counteq, p_s1, q_s1,
-                                              p_s2, q_s2)  ## Monish
+                                              p_s2, q_s2)  # Monish
                 counteq += 1
         idx += 1
 
@@ -374,53 +386,67 @@ def dist_OPF(branch_sw_data_case, bus_info, source_bus, source_bus_idx, vsrc, pf
                 if val_bus['kv'] > primary_kv_level:
                     # p_inj  + p_gen(control var) =  p_load
                     # Phase A Real Power
-                    A_eq[counteq, nbus_ABC * 3 + nbus_s1s2 + nbus_ABC * 0 + val_bus['idx']] = 1
-                    A_eq[counteq, state_variable_number + nbus_ABC * 0 + val_bus['idx']] = 1
+                    A_eq[counteq, nbus_ABC * 3 + nbus_s1s2 +
+                         nbus_ABC * 0 + val_bus['idx']] = 1
+                    A_eq[counteq, state_variable_number +
+                         nbus_ABC * 0 + val_bus['idx']] = 1
                     b_eq[counteq] = val_bus['pq'][0][0] * baseS * mult
                     counteq += 1
                     # Phase B Real Power
-                    A_eq[counteq, nbus_ABC * 3 + nbus_s1s2 + nbus_ABC * 1 + val_bus['idx']] = 1
-                    A_eq[counteq, state_variable_number + nbus_ABC * 1 + val_bus['idx']] = 1
+                    A_eq[counteq, nbus_ABC * 3 + nbus_s1s2 +
+                         nbus_ABC * 1 + val_bus['idx']] = 1
+                    A_eq[counteq, state_variable_number +
+                         nbus_ABC * 1 + val_bus['idx']] = 1
                     b_eq[counteq] = val_bus['pq'][1][0] * baseS * mult
                     counteq += 1
                     # Phase C Real Power
-                    A_eq[counteq, nbus_ABC * 3 + nbus_s1s2 + nbus_ABC * 2 + val_bus['idx']] = 1
-                    A_eq[counteq, state_variable_number + nbus_ABC * 2 + val_bus['idx']] = 1
+                    A_eq[counteq, nbus_ABC * 3 + nbus_s1s2 +
+                         nbus_ABC * 2 + val_bus['idx']] = 1
+                    A_eq[counteq, state_variable_number +
+                         nbus_ABC * 2 + val_bus['idx']] = 1
                     b_eq[counteq] = val_bus['pq'][2][0] * baseS * mult
                     counteq += 1
 
                     # DG upper limit set up:
-                    DG_up_lim[nbus_ABC * 0 + val_bus['idx']] = val_bus['pv'][0][0] * baseS
-                    DG_up_lim[nbus_ABC * 1 + val_bus['idx']] = val_bus['pv'][1][0] * baseS
-                    DG_up_lim[nbus_ABC * 2 + val_bus['idx']] = val_bus['pv'][2][0] * baseS
+                    DG_up_lim[nbus_ABC * 0 + val_bus['idx']
+                              ] = val_bus['pv'][0][0] * baseS
+                    DG_up_lim[nbus_ABC * 1 + val_bus['idx']
+                              ] = val_bus['pv'][1][0] * baseS
+                    DG_up_lim[nbus_ABC * 2 + val_bus['idx']
+                              ] = val_bus['pv'][2][0] * baseS
 
                     # Phase A Reactive power
-                    A_eq[counteq, nbus_ABC * 3 + nbus_s1s2 + nbus_ABC * 3 + val_bus['idx']] = 1
+                    A_eq[counteq, nbus_ABC * 3 + nbus_s1s2 +
+                         nbus_ABC * 3 + val_bus['idx']] = 1
                     b_eq[counteq] = val_bus['pq'][0][1] * baseS * mult
                     counteq += 1
                     # Phase B Reactive power
-                    A_eq[counteq, nbus_ABC * 3 + nbus_s1s2 + nbus_ABC * 4 + val_bus['idx']] = 1
+                    A_eq[counteq, nbus_ABC * 3 + nbus_s1s2 +
+                         nbus_ABC * 4 + val_bus['idx']] = 1
                     b_eq[counteq] = val_bus['pq'][1][1] * baseS * mult
                     counteq += 1
                     # Phase C Reactive power
-                    A_eq[counteq, nbus_ABC * 3 + nbus_s1s2 + nbus_ABC * 5 + val_bus['idx']] = 1
+                    A_eq[counteq, nbus_ABC * 3 + nbus_s1s2 +
+                         nbus_ABC * 5 + val_bus['idx']] = 1
                     b_eq[counteq] = val_bus['pq'][2][1] * baseS * mult
                     counteq += 1
 
-
                 # work on this for the secondary netowrks:
                 else:
-                    A_eq[counteq, nbus_ABC * 3 + nbus_s1s2 + nbus_ABC * 5 + val_bus['idx']] = 1
+                    A_eq[counteq, nbus_ABC * 3 + nbus_s1s2 +
+                         nbus_ABC * 5 + val_bus['idx']] = 1
                     A_eq[counteq, state_variable_number + val_bus['idx']] = 1
                     b_eq[counteq] = val_bus['pq'][0] * baseS * mult
                     counteq += 1
                     # Reactive power
-                    A_eq[counteq, nbus_ABC * 3 + nbus_s1s2 + nbus_ABC * 5 + nbus_s1s2 + val_bus['idx']] = 1
+                    A_eq[counteq, nbus_ABC * 3 + nbus_s1s2 +
+                         nbus_ABC * 5 + nbus_s1s2 + val_bus['idx']] = 1
                     A_eq[counteq, n_Qdg + nbus_ABC * 2 + val_bus['idx']] = -1
                     b_eq[counteq] = val_bus['pq'][1] * baseS
                     counteq += 1
 
-                    DG_up_lim[nbus_ABC * 3 + val_bus['idx']] = val_bus['pv'][0] * baseS
+                    DG_up_lim[nbus_ABC * 3 + val_bus['idx']
+                              ] = val_bus['pv'][0] * baseS
 
     elif P_control == False and Q_control == True:
         DG_up_lim = np.zeros((n_bus, 1))
@@ -430,31 +456,40 @@ def dist_OPF(branch_sw_data_case, bus_info, source_bus, source_bus_idx, vsrc, pf
                 if val_bus['kv'] > primary_kv_level:
                     # p_inj   =  - p_d_gen + p_load
                     # Phase A Real Power
-                    A_eq[counteq, nbus_ABC * 3 + nbus_s1s2 + nbus_ABC * 0 + val_bus['idx']] = 1
-                    b_eq[counteq] = - val_bus['pv'][0][0] * baseS + val_bus['pq'][0][0] * baseS * mult
+                    A_eq[counteq, nbus_ABC * 3 + nbus_s1s2 +
+                         nbus_ABC * 0 + val_bus['idx']] = 1
+                    b_eq[counteq] = - val_bus['pv'][0][0] * \
+                        baseS + val_bus['pq'][0][0] * baseS * mult
                     counteq += 1
                     # Phase B Real Power
-                    A_eq[counteq, nbus_ABC * 3 + nbus_s1s2 + nbus_ABC * 1 + val_bus['idx']] = 1
-                    b_eq[counteq] = - val_bus['pv'][1][0] * baseS + val_bus['pq'][1][0] * baseS * mult
+                    A_eq[counteq, nbus_ABC * 3 + nbus_s1s2 +
+                         nbus_ABC * 1 + val_bus['idx']] = 1
+                    b_eq[counteq] = - val_bus['pv'][1][0] * \
+                        baseS + val_bus['pq'][1][0] * baseS * mult
                     counteq += 1
                     # Phase C Real Power
-                    A_eq[counteq, nbus_ABC * 3 + nbus_s1s2 + nbus_ABC * 2 + val_bus['idx']] = 1
-                    b_eq[counteq] = - val_bus['pv'][2][0] * baseS + val_bus['pq'][2][0] * baseS * mult
+                    A_eq[counteq, nbus_ABC * 3 + nbus_s1s2 +
+                         nbus_ABC * 2 + val_bus['idx']] = 1
+                    b_eq[counteq] = - val_bus['pv'][2][0] * \
+                        baseS + val_bus['pq'][2][0] * baseS * mult
                     counteq += 1
 
                     # Q_inj  + Q_gen(control var) =  Q_load
                     # Phase A Reactive power
-                    A_eq[counteq, nbus_ABC * 3 + nbus_s1s2 + nbus_ABC * 3 + val_bus['idx']] = 1
+                    A_eq[counteq, nbus_ABC * 3 + nbus_s1s2 +
+                         nbus_ABC * 3 + val_bus['idx']] = 1
                     A_eq[counteq, n_Qdg + nbus_ABC * 0 + val_bus['idx']] = 1
                     b_eq[counteq] = val_bus['pq'][0][1] * baseS * mult
                     counteq += 1
                     # Phase B Reactive power
-                    A_eq[counteq, nbus_ABC * 3 + nbus_s1s2 + nbus_ABC * 4 + val_bus['idx']] = 1
+                    A_eq[counteq, nbus_ABC * 3 + nbus_s1s2 +
+                         nbus_ABC * 4 + val_bus['idx']] = 1
                     A_eq[counteq, n_Qdg + nbus_ABC * 1 + val_bus['idx']] = 1
                     b_eq[counteq] = val_bus['pq'][1][1] * baseS * mult
                     counteq += 1
                     # Phase C Reactive power
-                    A_eq[counteq, nbus_ABC * 3 + nbus_s1s2 + nbus_ABC * 5 + val_bus['idx']] = 1
+                    A_eq[counteq, nbus_ABC * 3 + nbus_s1s2 +
+                         nbus_ABC * 5 + val_bus['idx']] = 1
                     A_eq[counteq, n_Qdg + nbus_ABC * 2 + val_bus['idx']] = 1
                     b_eq[counteq] = val_bus['pq'][2][1] * baseS * mult
                     counteq += 1
@@ -467,20 +502,22 @@ def dist_OPF(branch_sw_data_case, bus_info, source_bus, source_bus_idx, vsrc, pf
                     DG_up_lim[nbus_ABC * 2 + val_bus['idx']] = np.sqrt(
                         ((S_capacity * val_bus['pv'][2][0] * baseS) ** 2) - ((val_bus['pv'][2][0] * baseS) ** 2))
 
-
                 # work on this for the secondary netowrks:
                 else:
-                    A_eq[counteq, nbus_ABC * 3 + nbus_s1s2 + nbus_ABC * 5 + val_bus['idx']] = 1
+                    A_eq[counteq, nbus_ABC * 3 + nbus_s1s2 +
+                         nbus_ABC * 5 + val_bus['idx']] = 1
                     A_eq[counteq, state_variable_number + val_bus['idx']] = 1
                     b_eq[counteq] = val_bus['pq'][0] * baseS * mult
                     counteq += 1
                     # Reactive power
-                    A_eq[counteq, nbus_ABC * 3 + nbus_s1s2 + nbus_ABC * 5 + nbus_s1s2 + val_bus['idx']] = 1
+                    A_eq[counteq, nbus_ABC * 3 + nbus_s1s2 +
+                         nbus_ABC * 5 + nbus_s1s2 + val_bus['idx']] = 1
                     A_eq[counteq, n_Qdg + nbus_ABC * 2 + val_bus['idx']] = -1
                     b_eq[counteq] = val_bus['pq'][1] * baseS
                     counteq += 1
 
-                    DG_up_lim[nbus_ABC * 3 + val_bus['idx']] = val_bus['pv'][0] * baseS
+                    DG_up_lim[nbus_ABC * 3 + val_bus['idx']
+                              ] = val_bus['pv'][0] * baseS
 
     # Reactive power as a function of real power and inverter rating
     countineq = 0
@@ -592,7 +629,8 @@ def dist_OPF(branch_sw_data_case, bus_info, source_bus, source_bus_idx, vsrc, pf
                        A_eq @ x == b_eq])
 
     if print_result:
-        prob.solve(solver=solver_name, verbose=True, feastol = 1e-10, max_iters = 300)
+        prob.solve(solver=solver_name, verbose=True,
+                   feastol=1e-10, max_iters=300)
     else:
         prob.solve(solver=cp.ECOS, verbose=False)
     # prob.solve(solver=cp.ECOS, verbose=True)
@@ -625,8 +663,10 @@ def dist_OPF(branch_sw_data_case, bus_info, source_bus, source_bus_idx, vsrc, pf
                      '{:.3f}'.format(x.value[k + nbranch_ABC * 4] * mul),
                      '{:.3f}'.format(x.value[k + nbranch_ABC * 5] * mul)])
         line_flow[name[i]] = {}
-        line_flow[name[i]]['A'] = [x.value[k] * mul * 1000, x.value[k + nbranch_ABC * 3] * mul * 1000]
-        line_flow[name[i]]['B'] = [x.value[k + nbranch_ABC] * mul * 1000, x.value[k + nbranch_ABC * 4] * mul * 1000]
+        line_flow[name[i]]['A'] = [x.value[k] * mul * 1000,
+                                   x.value[k + nbranch_ABC * 3] * mul * 1000]
+        line_flow[name[i]]['B'] = [x.value[k + nbranch_ABC] *
+                                   mul * 1000, x.value[k + nbranch_ABC * 4] * mul * 1000]
         line_flow[name[i]]['C'] = [x.value[k + nbranch_ABC * 2] * mul * 1000,
                                    x.value[k + nbranch_ABC * 5] * mul * 1000]
         i += 1
@@ -635,14 +675,16 @@ def dist_OPF(branch_sw_data_case, bus_info, source_bus, source_bus_idx, vsrc, pf
         print(tabulate(flow, headers=['Line Name', 'from', 'to', 'P_A (kW)', 'P_B (kW)', 'P_C (kW)', 'Q_A (kVar)',
                                       'Q_B (kVar)', 'Q_C (kVar)'],
                        tablefmt='psql'))
-    n_flow_s1s2 = (nbus_ABC * 3 + nbus_s1s2) + (nbus_ABC * 6 + nbus_s1s2 * 2) + nbranch_ABC * 6
+    n_flow_s1s2 = (nbus_ABC * 3 + nbus_s1s2) + \
+        (nbus_ABC * 6 + nbus_s1s2 * 2) + nbranch_ABC * 6
     flow = []
     for k in range(n_flow_s1s2, n_flow_s1s2 + nbranch_s1s2):
         flow.append([name[i], from_bus[i], to_bus[i], '{:.3f}'.format(x.value[k] * mul),
                      '{:.3f}'.format(x.value[k + nbranch_s1s2] * mul)])
         i += 1
     if print_LineFlows_Voltage == True:
-        print(tabulate(flow, headers=['Line Name', 'from', 'to', 'P_S1S2', 'Q_S1S2'], tablefmt='psql'))
+        print(tabulate(flow, headers=[
+              'Line Name', 'from', 'to', 'P_S1S2', 'Q_S1S2'], tablefmt='psql'))
 
         print('\n Voltages at buses:')
 
@@ -676,7 +718,7 @@ def dist_OPF(branch_sw_data_case, bus_info, source_bus, source_bus_idx, vsrc, pf
     # print(tabulate(volt, headers=['Bus Name', 'V_S'],
     #                 tablefmt='psql'))
 
-    ### Monish Edits
+    # Monish Edits
     for key, val_bus in bus_info.items():
         # volt.append(
         #     [name[k], '{:.4f}'.format(math.sqrt(abs(x.value[k]))),
@@ -684,8 +726,10 @@ def dist_OPF(branch_sw_data_case, bus_info, source_bus, source_bus_idx, vsrc, pf
         #      '{:.4f}'.format(math.sqrt(abs(x.value[nbus_ABC * 2 + k])))])
         bus_voltage[key] = {}
         bus_voltage[key]['A'] = math.sqrt(abs(x.value[val_bus['idx']]))
-        bus_voltage[key]['B'] = math.sqrt(abs(x.value[nbus_ABC + val_bus['idx']]))
-        bus_voltage[key]['C'] = math.sqrt(abs(x.value[nbus_ABC * 2 + val_bus['idx']]))
+        bus_voltage[key]['B'] = math.sqrt(
+            abs(x.value[nbus_ABC + val_bus['idx']]))
+        bus_voltage[key]['C'] = math.sqrt(
+            abs(x.value[nbus_ABC * 2 + val_bus['idx']]))
         i += 1
 
     # print('\n Injections at buses:')
@@ -704,19 +748,25 @@ def dist_OPF(branch_sw_data_case, bus_info, source_bus, source_bus_idx, vsrc, pf
         # injection.append([name[k], '{:.4f}'.format((x.value[k + state_variable_number]))])
         if DG_up_lim[k, 0]:
             if k < nbus_ABC:
-                generation_output[k, 0] = (x.value[k + control_variable_idx_start])
+                generation_output[k, 0] = (
+                    x.value[k + control_variable_idx_start])
             elif k < (nbus_ABC * 2):
-                generation_output[k - nbus_ABC, 1] = (x.value[k + control_variable_idx_start])
+                generation_output[k - nbus_ABC,
+                                  1] = (x.value[k + control_variable_idx_start])
             else:
-                generation_output[k - (nbus_ABC * 2), 2] = (x.value[k + control_variable_idx_start])
+                generation_output[k - (nbus_ABC * 2),
+                                  2] = (x.value[k + control_variable_idx_start])
     # %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
     opf_control_variable = {}
     for key, val_bus in bus_info.items():
         opf_control_variable[key] = {}
-        opf_control_variable[key]['A'] = x.value[val_bus['idx'] + control_variable_idx_start]
-        opf_control_variable[key]['B'] = x.value[nbus_ABC + val_bus['idx'] + control_variable_idx_start]
-        opf_control_variable[key]['C'] = x.value[nbus_ABC * 2 + val_bus['idx'] + control_variable_idx_start]
+        opf_control_variable[key]['A'] = x.value[val_bus['idx'] +
+                                                 control_variable_idx_start]
+        opf_control_variable[key]['B'] = x.value[nbus_ABC +
+                                                 val_bus['idx'] + control_variable_idx_start]
+        opf_control_variable[key]['C'] = x.value[nbus_ABC *
+                                                 2 + val_bus['idx'] + control_variable_idx_start]
 
     kw_converter = 1 / baseS / 1000
 
@@ -726,21 +776,24 @@ def dist_OPF(branch_sw_data_case, bus_info, source_bus, source_bus_idx, vsrc, pf
         print("---------------------------------------------------------")
         # print(sum(sum(control_variable)) / baseS + ' kW')
         if not pf_flag:
-            print("Optimal Power Flow Problem is "+ str.upper(prob.status))
+            print("Optimal Power Flow Problem is " + str.upper(prob.status))
         else:
             print("Power flow converged")
 
-        print("Objective Value: "+ str(prob.objective.value))
+        print("Objective Value: " + str(prob.objective.value))
 
         if P_control:
-            print("Total active power generation " + str(sum(sum(generation_output)) *kw_converter) + ' kW')
+            print("Total active power generation " +
+                  str(sum(sum(generation_output)) * kw_converter) + ' kW')
         elif Q_control:
-            print("Total reactive power generation " + str(sum(sum(generation_output))*kw_converter) + ' kVar')
+            print("Total reactive power generation " +
+                  str(sum(sum(generation_output))*kw_converter) + ' kVar')
         # print(   cp.installed_solvers())
-        print("Problem solved with '" + str(prob.solver_stats.solver_name) + "' solver")
+        print("Problem solved with '" +
+              str(prob.solver_stats.solver_name) + "' solver")
         print("Solver Time " + str(prob.solver_stats.setup_time) + " seconds")
-        print("Problem solved with " + str(prob.solver_stats.num_iters) + " iterations")
+        print("Problem solved with " +
+              str(prob.solver_stats.num_iters) + " iterations")
         print("---------------------------%%%%%--------------------------")
-
 
     return bus_voltage, line_flow, opf_control_variable, kw_converter

@@ -3,11 +3,24 @@ import helics as h
 import json
 from pathlib import Path
 from datetime import datetime
+from typing import Tuple
 from oedisi.types.data_types import (
+    AdmittanceMatrix,
+    AdmittanceSparse,
+    CommandList,
+    EquipmentNodeArray,
+    Injection,
+    InverterControlList,
+    MeasurementArray,
+    PowersImaginary,
+    PowersReal,
     Topology,
-    VoltagesReal,
-    VoltagesImaginary
+    VoltagesAngle,
+    VoltagesImaginary,
+    VoltagesMagnitude,
+    VoltagesReal
 )
+import adapter
 
 logger = logging.getLogger(__name__)
 logger.addHandler(logging.StreamHandler())
@@ -90,7 +103,7 @@ class EchoFederate(object):
                 continue
 
             topology = Topology.parse_obj(self.sub.topology.json)
-            logger.info(topology)
+            adapter.extract_info(topology)
 
             real = VoltagesReal.parse_obj(self.sub.voltages_real.json)
             logger.info(real)
