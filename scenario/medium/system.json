@@ -44,7 +44,7 @@
                 "profile_location": "SMART-DS/v1.0/2017/SFO/P6U/profiles",
                 "opendss_location": "SMART-DS/v1.0/2017/SFO/P6U/scenarios/solar_medium_batteries_none_timeseries/opendss/p6uhs10_1247/p6uhs10_1247--p6udt5293",
                 "start_date": "2017-05-01 00:00:00",
-                "number_of_timesteps": 96,
+                "number_of_timesteps": 1,
                 "run_freq_sec": 900,
                 "topology_output": "../../outputs/topology.json",
                 "use_sparse_admittance": true
