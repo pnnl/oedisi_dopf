@@ -10,7 +10,7 @@ pip install -r requirements.txt
 ```
 
 ## Build and Run
-Replace the "<path>" below to point to the desired scenario
+Replace the \<scenario\> below to point to the desired scenario folder name
 
 ```shell
 ./run.sh <scenario>
