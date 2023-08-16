@@ -103,7 +103,15 @@ class EchoFederate(object):
                 continue
 
             topology = Topology.parse_obj(self.sub.topology.json)
-            adapter.extract_info(topology)
+            [branch_info, bus_info] = adapter.extract_info(topology)
+            with open('branch_info.json', 'w', encoding='UTF-8') as f:
+                f.write(json.dumps(branch_info))
+
+            with open('bus_info.json', 'w', encoding='UTF-8') as f:
+                f.write(json.dumps(bus_info))
+
+            slack_bus = topology.slack_bus
+            # lindistflow.dist_OPF(branch_info, bus_info, )
 
             real = VoltagesReal.parse_obj(self.sub.voltages_real.json)
             logger.info(real)
