@@ -3,6 +3,7 @@ helics-apps==3.4.0
 pydantic>=1.7,<2
 pyarrow
 scipy
+cvxpy
 matplotlib
 numpy
 pandas

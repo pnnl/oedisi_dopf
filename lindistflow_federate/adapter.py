@@ -1,4 +1,6 @@
 import numpy as np
+import networkx as nx
+import matplotlib.pyplot as plt
 import logging
 from enum import IntEnum
 from typing import Tuple
@@ -36,8 +38,11 @@ class Phase(IntEnum):
 
 def init_branch() -> dict:
     branch = {}
+    branch["fr_bus"] = ""
+    branch["to_bus"] = ""
     branch["phases"] = []
     branch["zprim"] = np.zeros((3, 3, 2)).tolist()
+    branch["y"] = np.zeros((3, 3), dtype=complex)
     return branch
 
 
@@ -55,9 +60,19 @@ def index_info(branch: dict, bus: dict) -> Tuple[dict, dict]:
         bus[name]["idx"] = i
 
     for i, name in enumerate(branch):
+        logger.debug(f"idx : {i}, name : {name}")
         branch[name]["idx"] = i
         branch[name]["from"] = bus[branch[name]["fr_bus"]]["idx"]
         branch[name]["to"] = bus[branch[name]["to_bus"]]["idx"]
+        y = branch[name]["y"]
+        del branch[name]["y"]
+        logger.debug(y)
+        z = -1*np.linalg.pinv(y)
+        logger.debug(z)
+        for idx, value in np.ndenumerate(z):
+            row = idx[0]
+            col = idx[1]
+            branch[name]["zprim"][row][col] = [value.real, value.imag]
 
     return branch, bus
 
@@ -68,7 +83,7 @@ def extract_voltages(bus: dict, voltages: VoltagesMagnitude) -> dict:
         if name not in bus:
             bus[name] = init_bus()
 
-        bus[name]['kv'] = voltage
+        bus[name]['kv'] = voltage/1000.0
     return bus
 
 
@@ -81,57 +96,87 @@ def extract_powers(bus: dict, powers: Injection) -> dict:
         [type, _] = eq.split('.')
         phase = int(phase) - 1
         if type == "PVSystem":
-            bus[name]["pv"][phase][0] = power
+            bus[name]["pv"][phase][0] = power*1000
         else:
-            bus[name]["pq"][phase][0] = power
+            bus[name]["pq"][phase][0] = -power*1000
 
     for id, eq, power in zip(imag.ids, imag.equipment_ids, imag.values):
         [name, phase] = id.split('.')
         [type, _] = eq.split('.')
         phase = int(phase) - 1
         if type == "PVSystem":
-            bus[name]["pv"][phase][1] = power
+            bus[name]["pv"][phase][1] = power*1000
         else:
-            bus[name]["pq"][phase][1] = power
+            bus[name]["pq"][phase][1] = -power*1000
     return bus
 
 
 def extract_info(topology: Topology) -> Tuple[dict, dict]:
+    network = nx.Graph()
     branch_info = {}
     bus_info = {}
     from_equip = topology.admittance.from_equipment
     to_equip = topology.admittance.to_equipment
     admittance = topology.admittance.admittance_list
 
+    logger.debug(len(admittance))
+
     for fr_eq, to_eq, y in zip(from_equip, to_equip, admittance):
         [from_name, from_phase] = fr_eq.split('.')
         [to_name, to_phase] = to_eq.split('.')
-        from_phase = int(from_phase)
-        to_phase = int(to_phase)
+        from_phase = from_phase
+        to_phase = to_phase
 
-        if from_name not in branch_info:
-            branch_info[from_name] = init_branch()
+        if from_name == to_name:
+            continue
 
-        if from_phase not in branch_info[from_name]['phases']:
-            branch_info[from_name]['phases'].append(from_phase)
+        key = f"{from_name}_{to_name}"
+        key_back = f"{to_name}_{from_name}"
+
+        if key not in branch_info and key_back not in branch_info:
+            branch_info[key] = init_branch()
+        elif key_back in branch_info:
+            continue
+
+        if from_name not in bus_info:
+            bus_info[from_name] = init_bus()
 
         if to_name not in bus_info:
             bus_info[to_name] = init_bus()
 
+        row = int(from_phase) - 1
+        col = int(to_phase) - 1
+        branch_info[key]["y"][row][col] = complex(y[0], y[1])
+
+        network.add_edge(from_name, to_name)
+
+        if from_phase not in branch_info[key]['phases']:
+            branch_info[key]['phases'].append(from_phase)
+
+        if from_phase not in bus_info[from_name]['phases']:
+            bus_info[from_name]['phases'].append(from_phase)
+
         if to_phase not in bus_info[to_name]['phases']:
             bus_info[to_name]['phases'].append(to_phase)
 
-            z = 1/complex(y[0], y[1])
-            row = from_phase - 1
-            col = to_phase - 1
-            branch_info[from_name]["zprim"][row][col] = [z.real, z.imag]
-            branch_info[from_name]["zprim"][col][row] = [z.real, z.imag]
-
-        branch_info[from_name]['type'] = 'LINE'
-        branch_info[from_name]['fr_bus'] = from_name
-        branch_info[from_name]['to_bus'] = to_name
+        branch_info[key]['type'] = 'LINE'
+        branch_info[key]['fr_bus'] = from_name
+        branch_info[key]['to_bus'] = to_name
 
         bus_info = extract_voltages(bus_info, topology.base_voltage_magnitudes)
         bus_info = extract_powers(bus_info, topology.injections)
 
+        logger.debug(
+            f"from : {fr_eq}, to : {to_eq}, Y : {bus_info[from_name]['pq']}")
+
+    # double distance between all nodes
+    logger.debug(f"Nodes: {network.number_of_nodes()}")
+    logger.debug(f"Edges: {network.number_of_edges()}")
+    gcc = network.subgraph(
+        sorted(nx.connected_components(network), key=len, reverse=True)[0])
+    pos = nx.spring_layout(gcc, seed=123)
+    nx.draw_networkx_nodes(gcc, pos, node_size=20)
+    nx.draw_networkx_edges(gcc, pos, alpha=0.4)
+    nx.draw_networkx_labels(gcc, pos, font_size=2)
+    plt.savefig("network.svg")
     return index_info(branch_info, bus_info)

@@ -21,6 +21,7 @@ from oedisi.types.data_types import (
     VoltagesReal
 )
 import adapter
+import lindistflow
 
 logger = logging.getLogger(__name__)
 logger.addHandler(logging.StreamHandler())
@@ -110,8 +111,10 @@ class EchoFederate(object):
             with open('bus_info.json', 'w', encoding='UTF-8') as f:
                 f.write(json.dumps(bus_info))
 
-            slack_bus = topology.slack_bus
-            # lindistflow.dist_OPF(branch_info, bus_info, )
+            slack = topology.slack_bus[0]
+            [slack_bus, phase] = slack.split('.')
+            logger.info(lindistflow.optimal_power_flow(
+                branch_info, bus_info, slack_bus, lindistflow.ControlType.WATT, True))
 
             real = VoltagesReal.parse_obj(self.sub.voltages_real.json)
             logger.info(real)

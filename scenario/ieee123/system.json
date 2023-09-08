@@ -1,0 +1,47 @@
+{
+    "name": "small_echo",
+    "components": [
+        {
+            "name": "lindistflow",
+            "type": "OptimalPowerFlow",
+            "parameters": {
+                "deltat": 0.1
+            }
+        },
+        {
+            "name": "feeder",
+            "type": "Feeder",
+            "parameters": {
+                "existing_feeder_file": "opendss/master.dss",
+                "use_smartds": false,
+                "profile_location": "gadal_ieee123/profiles",
+                "opendss_location": "gadal_ieee123/qsts",
+                "start_date": "2017-05-01 00:00:00",
+                "number_of_timesteps": 96,
+                "run_freq_sec": 900,
+                "topology_output": "../../outputs/topology.json",
+                "use_sparse_admittance": true
+            }
+        }
+    ],
+    "links": [
+        {
+            "source": "feeder",
+            "source_port": "topology",
+            "target": "lindistflow",
+            "target_port": "topology"
+        },
+        {
+            "source": "feeder",
+            "source_port": "voltages_real",
+            "target": "lindistflow",
+            "target_port": "voltages_real"
+        },
+        {
+            "source": "feeder",
+            "source_port": "voltages_imag",
+            "target": "lindistflow",
+            "target_port": "voltages_imag"
+        }
+    ]
+}

@@ -1,0 +1,4 @@
+{
+	"Feeder":"feeder_federate/component_definition.json",
+	"OptimalPowerFlow":"lindistflow_federate/component_definition.json"
+}
