@@ -113,14 +113,20 @@ class EchoFederate(object):
 
             slack = topology.slack_bus[0]
             [slack_bus, phase] = slack.split('.')
-            logger.info(lindistflow.optimal_power_flow(
-                branch_info, bus_info, slack_bus, lindistflow.ControlType.WATT, True))
+            a, b, c, d = lindistflow.optimal_power_flow(
+                branch_info, bus_info, slack_bus, lindistflow.ControlType.WATT, True)
+            logger.info(a)
+            logger.info(b)
+            logger.info(c)
+            logger.info(d)
 
             real = VoltagesReal.parse_obj(self.sub.voltages_real.json)
             logger.info(real)
 
             imag = VoltagesImaginary.parse_obj(self.sub.voltages_imag.json)
             logger.info(imag)
+
+            # change_obj([Command('PVsystem.pv1','kVAr',25)])
 
         self.stop()
 

@@ -96,8 +96,10 @@ def extract_powers(bus: dict, powers: Injection) -> dict:
         [type, _] = eq.split('.')
         phase = int(phase) - 1
         if type == "PVSystem":
+            bus[name]["eqid"] = eq
             bus[name]["pv"][phase][0] = power*1000
         else:
+            bus[name]["eqid"] = eq
             bus[name]["pq"][phase][0] = -power*1000
 
     for id, eq, power in zip(imag.ids, imag.equipment_ids, imag.values):
@@ -105,8 +107,10 @@ def extract_powers(bus: dict, powers: Injection) -> dict:
         [type, _] = eq.split('.')
         phase = int(phase) - 1
         if type == "PVSystem":
+            bus[name]["eqid"] = eq
             bus[name]["pv"][phase][1] = power*1000
         else:
+            bus[name]["eqid"] = eq
             bus[name]["pq"][phase][1] = -power*1000
     return bus
 
@@ -123,9 +127,15 @@ def extract_info(topology: Topology) -> Tuple[dict, dict]:
 
     for fr_eq, to_eq, y in zip(from_equip, to_equip, admittance):
         [from_name, from_phase] = fr_eq.split('.')
+        type = "LINE"
+        if from_name.find('OPEN') != -1:
+            [from_name, _] = from_name.split('_')
+            type = "SWITCH"
+
         [to_name, to_phase] = to_eq.split('.')
-        from_phase = from_phase
-        to_phase = to_phase
+        if to_name.find('OPEN') != -1:
+            [to_name, _] = to_name.split('_')
+            type = "SWITCH"
 
         if from_name == to_name:
             continue
@@ -159,7 +169,7 @@ def extract_info(topology: Topology) -> Tuple[dict, dict]:
         if to_phase not in bus_info[to_name]['phases']:
             bus_info[to_name]['phases'].append(to_phase)
 
-        branch_info[key]['type'] = 'LINE'
+        branch_info[key]['type'] = type
         branch_info[key]['fr_bus'] = from_name
         branch_info[key]['to_bus'] = to_name
 
@@ -179,4 +189,5 @@ def extract_info(topology: Topology) -> Tuple[dict, dict]:
     nx.draw_networkx_edges(gcc, pos, alpha=0.4)
     nx.draw_networkx_labels(gcc, pos, font_size=2)
     plt.savefig("network.svg")
+
     return index_info(branch_info, bus_info)

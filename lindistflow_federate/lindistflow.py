@@ -30,11 +30,6 @@ Updated:
 
 """
 
-BASE_S = 1 / (1000000 * 100)
-S_CAPACITY = 1.2
-PRIMARY_V = 0.4
-SOURCE_V = [1.0475, 1.0475, 1.0475]
-
 
 class ControlType(Enum):
     WATT = 1
@@ -70,8 +65,12 @@ def voltage_cons_pri(A, b, p, frm, to, counteq, pii, qii, pij, qij, pik, qik, nb
     return A, b
 
 
-def optimal_power_flow(branch_info: dict, bus_info: dict, source_bus: str, control: ControlType, pf_flag: bool) -> dict:
+def optimal_power_flow(branch_info: dict, bus_info: dict, source_bus: str, control: ControlType, pf_flag: bool):
     # System's base definition
+    BASE_S = 1 / (1000000 * 100)
+    S_CAPACITY = 1.2
+    PRIMARY_V = 0.12
+    SOURCE_V = [1.0475, 1.0475, 1.0475]
     basekV = bus_info[source_bus]['kv'] / np.sqrt(3)
     baseZ = bus_info[source_bus]['kv'] ** 2 / 100
 
@@ -80,7 +79,7 @@ def optimal_power_flow(branch_info: dict, bus_info: dict, source_bus: str, contr
     nbus_ABC = 0
     nbranch_s1s2 = 0
     nbus_s1s2 = 0
-    mult = 1.0
+    mult = 1
     secondary_model = ['TPX_LINE', 'SPLIT_PHASE']
     name = []
     for b_eq in branch_info:
@@ -434,6 +433,8 @@ def optimal_power_flow(branch_info: dict, bus_info: dict, source_bus: str, contr
                     A_eq[counteq, nbus_ABC * 3 + nbus_s1s2 +
                          nbus_ABC * 5 + val_bus['idx']] = 1
                     A_eq[counteq, state_variable_number + val_bus['idx']] = 1
+                    logger.debug(keyb)
+                    logger.debug(val_bus)
                     b_eq[counteq] = val_bus['pq'][0] * BASE_S * mult
                     counteq += 1
                     # Reactive power
@@ -599,12 +600,6 @@ def optimal_power_flow(branch_info: dict, bus_info: dict, source_bus: str, contr
     line_flow = {}
     n_flow_ABC = (nbus_ABC * 3 + nbus_s1s2) + (nbus_ABC * 6 + nbus_s1s2 * 2)
     for k in range(n_flow_ABC, n_flow_ABC + nbranch_ABC):
-        flow.append([name[i], from_bus[i], to_bus[i], '{:.3f}'.format(x.value[k] * mul),
-                     '{:.3f}'.format(x.value[k + nbranch_ABC] * mul),
-                     '{:.3f}'.format(x.value[k + nbranch_ABC * 2] * mul),
-                     '{:.3f}'.format(x.value[k + nbranch_ABC * 3] * mul),
-                     '{:.3f}'.format(x.value[k + nbranch_ABC * 4] * mul),
-                     '{:.3f}'.format(x.value[k + nbranch_ABC * 5] * mul)])
         line_flow[name[i]] = {}
         line_flow[name[i]]['A'] = [x.value[k] * mul * 1000,
                                    x.value[k + nbranch_ABC * 3] * mul * 1000]
@@ -616,22 +611,12 @@ def optimal_power_flow(branch_info: dict, bus_info: dict, source_bus: str, contr
 
     n_flow_s1s2 = (nbus_ABC * 3 + nbus_s1s2) + \
         (nbus_ABC * 6 + nbus_s1s2 * 2) + nbranch_ABC * 6
-    flow = []
-    for k in range(n_flow_s1s2, n_flow_s1s2 + nbranch_s1s2):
-        flow.append([name[i], from_bus[i], to_bus[i], '{:.3f}'.format(x.value[k] * mul),
-                     '{:.3f}'.format(x.value[k + nbranch_s1s2] * mul)])
-        i += 1
     name = []
     for key, val_br in bus_info.items():
         name.append(key)
-    volt = []
     bus_voltage = {}
     i = 0
     for k in range(nbus_ABC):
-        volt.append(
-            [name[k], '{:.4f}'.format(math.sqrt(abs(x.value[k]))),
-             '{:.4f}'.format(math.sqrt(abs(x.value[nbus_ABC + k]))),
-             '{:.4f}'.format(math.sqrt(abs(x.value[nbus_ABC * 2 + k])))])
         bus_voltage[name[k]] = {}
         bus_voltage[name[k]]['A'] = math.sqrt(abs(x.value[k]))
         bus_voltage[name[k]]['B'] = math.sqrt(abs(x.value[nbus_ABC + k]))
@@ -651,10 +636,6 @@ def optimal_power_flow(branch_info: dict, bus_info: dict, source_bus: str, contr
         bus_voltage[key]['C'] = math.sqrt(
             abs(x.value[nbus_ABC * 2 + val_bus['idx']]))
         i += 1
-
-    injection = []
-    bus_injection = {}
-    check = ['43', '113']
 
     if control is ControlType.WATT:
         control_variable_idx_start = state_variable_number
