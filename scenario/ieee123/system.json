@@ -1,15 +1,16 @@
 {
-    "name": "small_echo",
+    "name": "ieee123",
     "components": [
         {
             "name": "lindistflow",
             "type": "OptimalPowerFlow",
             "parameters": {
-                "deltat": 0.1
+                "deltat": 0.1,
+                "pf_flag": true,
+                "control_type": 1
             }
         },
-        {
-            "name": "feeder",
+        { "name": "feeder",
             "type": "Feeder",
             "parameters": {
                 "existing_feeder_file": "opendss/master.dss",
@@ -25,6 +26,12 @@
         }
     ],
     "links": [
+        {
+            "source": "lindistflow",
+            "source_port": "change_commands",
+            "target": "feeder",
+            "target_port": "change_commands"
+        },
         {
             "source": "feeder",
             "source_port": "topology",

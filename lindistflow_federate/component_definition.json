@@ -2,12 +2,17 @@
     "directory": "lindistflow_federate",
     "execute_function": "python opf_federate.py",
     "static_inputs": [
-        {"type": "", "port_id": "deltat"}
+        {"type": "", "port_id": "name"},
+        {"type": "", "port_id": "deltat"},
+        {"type": "", "port_id": "control_type"},
+        {"type": "", "port_id": "pf_flag"}
     ],
     "dynamic_inputs": [
         {"type": "VoltagesReal", "port_id": "voltages_real"},
-        {"type": "voltagesImaginary", "port_id": "voltages_imag"},
+        {"type": "VoltagesImaginary", "port_id": "voltages_imag"},
         {"type": "Topology", "port_id": "topology"}
     ],
-    "dynamic_outputs": []
+    "dynamic_outputs": [
+        {"type": "ControlList", "port_id": "change_commands"}
+    ]
 }

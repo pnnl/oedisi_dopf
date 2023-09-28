@@ -5,7 +5,6 @@ Created on Sun March 10 12:58:46 2023
 """
 
 import networkx as nx
-import copy
 import logging
 
 logger = logging.getLogger(__name__)
@@ -15,52 +14,47 @@ logger.setLevel(logging.DEBUG)
 
 def graph_process(branch_info: dict):
     graph = nx.Graph()
+    edges = []
     for b in branch_info:
-        graph.add_edge(branch_info[b]['fr_bus'],
-                       branch_info[b]['to_bus'])
-    return graph
-
-
-def graph_process(branch_info: dict):
-    for b in branch_info:
-        graph.add_edge(branch_info[b]['fr_bus'],
-                       branch_info[b]['to_bus'])
-    return graph
+        if branch_info[b]['type'] != 'SWITCH':
+            graph.add_edge(branch_info[b]['fr_bus'],
+                           branch_info[b]['to_bus'])
+        else:
+            edges.append([branch_info[b]['fr_bus'],
+                          branch_info[b]['to_bus']])
+    return graph, edges
 
 
 def area_info(branch_info: dict, bus_info: dict, source_bus: str):
-
-    G = graph_process(branch_info)
-
-    # Find area between the switches
-    for e in edge:
-        G.remove_edge(e[0], e[1])
+    # System's base definition
+    mult_pv = 1.0
+    mult_sec_pv = 1.0
+    mult_load = 1.0
+    primary_kv_level = 0.12
+    v_source = [1.0475, 1.0475, 1.0475]
+    G, open_switches = graph_process(branch_info)
 
     area_info_swt = {'area_cen': {}}
 
     # area_info_swt['area_cen']['edges'] = [] # include switches that are opened i.e., [['54', '94'], ['151', '300']]
     area_info_swt['area_cen']['edges'] = open_switches
-    area_info_swt['area_cen']['source_bus'] = sourcebus
+    area_info_swt['area_cen']['source_bus'] = source_bus
     area_info_swt['area_cen']['vsrc'] = v_source
-    edge = area_info_swt['area_cen']['edges']
     area_source_bus = area_info_swt['area_cen']['source_bus']
-    G_area = copy.deepcopy(G)
-    branch_sw_data_area_cen, bus_info_area_cen = area_info(G_area, edge, branch_sw_xfmr, bus_info, sourcebus,
-                                                           area_source_bus)
 
     areas_info = {'bus_info': {}, 'branch_info': {}}
-    areas_info['bus_info']['area_cen'] = bus_info_area_cen
-    areas_info['branch_info']['area_cen'] = branch_sw_data_area_cen
+    areas_info['bus_info']['area_cen'] = bus_info
+    areas_info['branch_info']['area_cen'] = branch_info
 
-    # List of sub-graphs. The one that has no sourcebus is the disconnected one
+    # List of sub-graphs. The one that has no source_bus is the disconnected one
     sp_graph = list(nx.connected_components(G))
     for k in sp_graph:
-        if sourcebus == area_source_bus:
-            if sourcebus in k:
+        if source_bus == area_source_bus:
+            if source_bus in k:
                 area = k
                 break
         else:
-            if sourcebus not in k:
+            if source_bus not in k:
                 area = k
                 break
 
@@ -114,101 +108,49 @@ def area_info(branch_info: dict, bus_info: dict, source_bus: str):
     secondary_model = ['SPLIT_PHASE', 'TPX_LINE']
     branch_sw_data_area_i = {}
     nor_open = ['sw7', 'sw8']
-    for key, val_bus in branch_sw_data.items():
+    for key, val_bus in branch_info.items():
         if val_bus['fr_bus'] in bus_info_area_i and val_bus['to_bus'] in bus_info_area_i:
-            if branch_sw_data[key]['type'] not in secondary_model and key not in nor_open:
+            if branch_info[key]['type'] not in secondary_model and key not in nor_open:
                 branch_sw_data_area_i[key] = {}
                 branch_sw_data_area_i[key]['idx'] = idx
-                branch_sw_data_area_i[key]['type'] = branch_sw_data[key]['type']
-                branch_sw_data_area_i[key]['from'] = bus_info_area_i[branch_sw_data[key]
+                branch_sw_data_area_i[key]['type'] = branch_info[key]['type']
+                branch_sw_data_area_i[key]['from'] = bus_info_area_i[branch_info[key]
                                                                      ['fr_bus']]['idx']
-                branch_sw_data_area_i[key]['to'] = bus_info_area_i[branch_sw_data[key]
+                branch_sw_data_area_i[key]['to'] = bus_info_area_i[branch_info[key]
                                                                    ['to_bus']]['idx']
-                branch_sw_data_area_i[key]['fr_bus'] = branch_sw_data[key]['fr_bus']
-                branch_sw_data_area_i[key]['to_bus'] = branch_sw_data[key]['to_bus']
-                branch_sw_data_area_i[key]['phases'] = branch_sw_data[key]['phases']
-                if branch_sw_data[key]['type'] == 'SPLIT_PHASE':
-                    branch_sw_data_area_i[key]['impedance'] = branch_sw_data[key]['impedance']
-                    branch_sw_data_area_i[key]['impedance1'] = branch_sw_data[key]['impedance1']
+                branch_sw_data_area_i[key]['fr_bus'] = branch_info[key]['fr_bus']
+                branch_sw_data_area_i[key]['to_bus'] = branch_info[key]['to_bus']
+                branch_sw_data_area_i[key]['phases'] = branch_info[key]['phases']
+                if branch_info[key]['type'] == 'SPLIT_PHASE':
+                    branch_sw_data_area_i[key]['impedance'] = branch_info[key]['impedance']
+                    branch_sw_data_area_i[key]['impedance1'] = branch_info[key]['impedance1']
                 else:
-                    branch_sw_data_area_i[key]['zprim'] = branch_sw_data[key]['zprim']
+                    branch_sw_data_area_i[key]['zprim'] = branch_info[key]['zprim']
                 idx += 1
     idx = 0
-    for key, val_bus in branch_sw_data.items():
+    for key, val_bus in branch_info.items():
         if val_bus['fr_bus'] in bus_info_area_i and val_bus['to_bus'] in bus_info_area_i:
-            if branch_sw_data[key]['type'] in secondary_model:
+            if branch_info[key]['type'] in secondary_model:
                 branch_sw_data_area_i[key] = {}
                 branch_sw_data_area_i[key]['idx'] = idx
-                branch_sw_data_area_i[key]['type'] = branch_sw_data[key]['type']
-                branch_sw_data_area_i[key]['from'] = bus_info_area_i[branch_sw_data[key]
+                branch_sw_data_area_i[key]['type'] = branch_info[key]['type']
+                branch_sw_data_area_i[key]['from'] = bus_info_area_i[branch_info[key]
                                                                      ['fr_bus']]['idx']
-                branch_sw_data_area_i[key]['to'] = bus_info_area_i[branch_sw_data[key]
+                branch_sw_data_area_i[key]['to'] = bus_info_area_i[branch_info[key]
                                                                    ['to_bus']]['idx']
-                branch_sw_data_area_i[key]['fr_bus'] = branch_sw_data[key]['fr_bus']
-                branch_sw_data_area_i[key]['to_bus'] = branch_sw_data[key]['to_bus']
-                branch_sw_data_area_i[key]['phases'] = branch_sw_data[key]['phases']
-                if branch_sw_data[key]['type'] == 'SPLIT_PHASE':
-                    branch_sw_data_area_i[key]['impedance'] = branch_sw_data[key]['impedance']
-                    branch_sw_data_area_i[key]['impedance1'] = branch_sw_data[key]['impedance1']
+                branch_sw_data_area_i[key]['fr_bus'] = branch_info[key]['fr_bus']
+                branch_sw_data_area_i[key]['to_bus'] = branch_info[key]['to_bus']
+                branch_sw_data_area_i[key]['phases'] = branch_info[key]['phases']
+                if branch_info[key]['type'] == 'SPLIT_PHASE':
+                    branch_sw_data_area_i[key]['impedance'] = branch_info[key]['impedance']
+                    branch_sw_data_area_i[key]['impedance1'] = branch_info[key]['impedance1']
                 else:
-                    branch_sw_data_area_i[key]['impedance'] = branch_sw_data[key]['zprim']
+                    branch_sw_data_area_i[key]['impedance'] = branch_info[key]['zprim']
                 idx += 1
+
     return branch_sw_data_area_i, bus_info_area_i
 
 
 def check_network_radiality(branch_info_cen, bus_info_cen, bus_info):
     if not len(bus_info_cen)-len(branch_info_cen) == 1:
-        # if not len(bus_info_cen) - len(bus_info) == 0:
-        print("%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%")
-        print("                !!!!  ERROR  !!!!                   ")
-        print("%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%")
-        print("Stopping simulation prematurely")
-        print("------------------------------------------------------------")
-        print(" ->>> Network is NOT Radial. PLease check the network data")
-        print("------------------------------------------------------------")
-        exit()
-
-
-def check_network_PowerFlow(branch_info_cen, bus_info_cen, Base_kV, agent_source_bus, agent_source_bus_idx, vsrc, solver_name):
-    # Power Flow Check:
-    print('checking power flow')
-    pf_flag = 1
-    P_control = 1
-    Q_control = 0
-
-    print_LineFlows_Voltage = 0
-
-    bus_voltage_area_cen, flow_area_cen, Control_variables_dict, kw_converter = _solve_lindist_OPF(branch_info_cen, bus_info_cen,
-                                                                                                   Base_kV, agent_source_bus,
-                                                                                                   agent_source_bus_idx, vsrc,
-                                                                                                   pf_flag,
-                                                                                                   solver_name, P_control, Q_control,
-                                                                                                   print_LineFlows_Voltage, print_result=False)
-
-    maxV = 0
-    minV = 5
-    for key, val in bus_voltage_area_cen.items():
-        node_voltA = bus_voltage_area_cen[key]['A']
-        node_voltB = bus_voltage_area_cen[key]['B']
-        node_voltC = bus_voltage_area_cen[key]['C']
-        node_max = max(node_voltA, node_voltB, node_voltC)
-        node_min = min(node_voltA, node_voltB, node_voltC)
-        if node_max > maxV:
-            maxV = node_max
-        if node_min < minV:
-            minV = node_min
-
-    if maxV > 1.2 or minV < 0.8:
-        print("%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%")
-        print("                !!!!  ERROR  !!!!                   ")
-        print("%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%")
-        print("Stopping simulation prematurely")
-        print(
-            "----------------------------------------------------------------------------")
-        print(" ->>> Network is not power flow feasible. Update the network parameter")
-        print(
-            "----------------------------------------------------------------------------")
-        exit()
-    else:
-        all_voltage_plot(bus_info_cen, bus_voltage_area_cen,
-                         title="Voltage: Base Power Flow", plot_node_voltage=1)
+        logger.debug("Network is not Radial. Please check the network data")

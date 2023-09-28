@@ -8,6 +8,7 @@ from oedisi.types.data_types import (
     AdmittanceMatrix,
     AdmittanceSparse,
     CommandList,
+    Command,
     EquipmentNodeArray,
     Injection,
     InverterControlList,
@@ -22,6 +23,7 @@ from oedisi.types.data_types import (
 )
 import adapter
 import lindistflow
+from area import area_info
 
 logger = logging.getLogger(__name__)
 logger.addHandler(logging.StreamHandler())
@@ -30,6 +32,9 @@ logger.setLevel(logging.DEBUG)
 
 class StaticConfig(object):
     name: str
+    deltat: float
+    control_type: lindistflow.ControlType
+    pf_flag: bool
 
 
 class Subscriptions(object):
@@ -46,6 +51,7 @@ class EchoFederate(object):
         self.initilize()
         self.load_component_definition()
         self.register_subscription()
+        self.register_publication()
 
     def load_component_definition(self) -> None:
         path = Path(__file__).parent / "component_definition.json"
@@ -65,6 +71,9 @@ class EchoFederate(object):
 
         self.static.name = config["name"]
         self.static.deltat = config["deltat"]
+        self.static.control_type = lindistflow.ControlType(
+            config["control_type"])
+        self.static.pf_flag = config["pf_flag"]
 
     def initilize(self) -> None:
         self.info = h.helicsCreateFederateInfo()
@@ -87,7 +96,9 @@ class EchoFederate(object):
             self.inputs["voltages_imag"], "")
 
     def register_publication(self) -> None:
-        pass
+        self.pub_commands = self.fed.register_publication(
+            "change_commands", h.HELICS_DATA_TYPE_STRING, ""
+        )
 
     def run(self) -> None:
         logger.info(f"Federate connected: {datetime.now()}")
@@ -113,12 +124,9 @@ class EchoFederate(object):
 
             slack = topology.slack_bus[0]
             [slack_bus, phase] = slack.split('.')
-            a, b, c, d = lindistflow.optimal_power_flow(
-                branch_info, bus_info, slack_bus, lindistflow.ControlType.WATT, True)
-            logger.info(a)
-            logger.info(b)
-            logger.info(c)
-            logger.info(d)
+
+            area_branch, area_bus = area_info(
+                branch_info, bus_info, slack_bus)
 
             real = VoltagesReal.parse_obj(self.sub.voltages_real.json)
             logger.info(real)
@@ -126,8 +134,37 @@ class EchoFederate(object):
             imag = VoltagesImaginary.parse_obj(self.sub.voltages_imag.json)
             logger.info(imag)
 
-            # change_obj([Command('PVsystem.pv1','kVAr',25)])
+            voltages, power_flow, control, converter = lindistflow.optimal_power_flow(
+                area_branch, area_bus, slack_bus, self.static.control_type, self.static.pf_flag)
 
+            commands = []
+            for key, val in control.items():
+                if key in bus_info:
+                    bus = bus_info[key]
+                    if 'eqid' in bus_info[key]:
+                        eqid = bus['eqid']
+                        if 'PVSystem' in eqid:
+                            logger.info(key)
+                            setpoint = lindistflow.ignore_phase(val)
+                            logger.info(setpoint)
+
+                            if self.static.control_type == lindistflow.ControlType.WATT:
+                                value = setpoint/1000.0
+                                commands.append(
+                                    Command(obj_name=eqid, obj_property='kVA', val=value))
+                            elif self.static.control_type == lindistflow.ControlType.VAR:
+                                value = setpoint/1000.0
+                                commands.append(
+                                    Command(obj_name=eqid, obj_property='kVA', val=value))
+                            elif self.static.control_type == lindistflow.ControlType.WATT_VAR:
+                                value = setpoint/1000.0
+                                commands.append(
+                                    Command(obj_name=eqid, obj_property='kVA', val=value))
+
+            logger.info(commands)
+            self.pub_commands.publish(
+                CommandList(__root__=commands).json()
+            )
         self.stop()
 
     def stop(self) -> None:

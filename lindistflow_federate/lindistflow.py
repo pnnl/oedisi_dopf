@@ -37,6 +37,14 @@ class ControlType(Enum):
     WATT_VAR = 3
 
 
+def ignore_phase(control: dict) -> float:
+    setpoint = 0
+    for key, val in control.items():
+        if np.abs(val) > np.abs(setpoint):
+            setpoint = val
+    return setpoint
+
+
 def power_balance(A, b, k_frm, k_to, counteq, col, val):
     for k in k_frm:
         A[counteq, col + k] = -1
@@ -72,7 +80,7 @@ def optimal_power_flow(branch_info: dict, bus_info: dict, source_bus: str, contr
     PRIMARY_V = 0.12
     SOURCE_V = [1.0475, 1.0475, 1.0475]
     basekV = bus_info[source_bus]['kv'] / np.sqrt(3)
-    baseZ = bus_info[source_bus]['kv'] ** 2 / 100
+    baseZ = basekV ** 2 / 100
 
     # Find the ABC phase and s1s2 phase triplex line and bus numbers
     nbranch_ABC = 0
@@ -594,8 +602,20 @@ def optimal_power_flow(branch_info: dict, bus_info: dict, source_bus: str, contr
     prob.solve(solver=cp.ECOS, verbose=True)
     logging.info(prob.status)
 
+    if prob.status == 'infeasible_or_unbounded' or prob.status == 'infeasible':
+        logging.debug("Check for limits. Power flow didn't converge")
+        exit()
+
+    from_bus = []
+    to_bus = []
+    name = []
+
+    for key, val_br in branch_info.items():
+        from_bus.append(val_br['fr_bus'])
+        to_bus.append(val_br['to_bus'])
+        name.append(key)
+
     i = 0
-    flow = []
     mul = 1 / (BASE_S * 1000)
     line_flow = {}
     n_flow_ABC = (nbus_ABC * 3 + nbus_s1s2) + (nbus_ABC * 6 + nbus_s1s2 * 2)
