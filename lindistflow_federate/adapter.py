@@ -60,15 +60,12 @@ def index_info(branch: dict, bus: dict) -> Tuple[dict, dict]:
         bus[name]["idx"] = i
 
     for i, name in enumerate(branch):
-        logger.debug(f"idx : {i}, name : {name}")
         branch[name]["idx"] = i
         branch[name]["from"] = bus[branch[name]["fr_bus"]]["idx"]
         branch[name]["to"] = bus[branch[name]["to_bus"]]["idx"]
         y = branch[name]["y"]
         del branch[name]["y"]
-        logger.debug(y)
         z = -1*np.linalg.pinv(y)
-        logger.debug(z)
         for idx, value in np.ndenumerate(z):
             row = idx[0]
             col = idx[1]
@@ -123,8 +120,6 @@ def extract_info(topology: Topology) -> Tuple[dict, dict]:
     to_equip = topology.admittance.to_equipment
     admittance = topology.admittance.admittance_list
 
-    logger.debug(len(admittance))
-
     for fr_eq, to_eq, y in zip(from_equip, to_equip, admittance):
         [from_name, from_phase] = fr_eq.split('.')
         type = "LINE"
@@ -175,9 +170,6 @@ def extract_info(topology: Topology) -> Tuple[dict, dict]:
 
         bus_info = extract_voltages(bus_info, topology.base_voltage_magnitudes)
         bus_info = extract_powers(bus_info, topology.injections)
-
-        logger.debug(
-            f"from : {fr_eq}, to : {to_eq}, Y : {bus_info[from_name]['pq']}")
 
     # double distance between all nodes
     logger.debug(f"Nodes: {network.number_of_nodes()}")

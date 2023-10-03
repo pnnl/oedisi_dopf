@@ -7,7 +7,6 @@ First `call_h` calculates the residual from the voltage magnitude and angle,
 and `call_H` calculates a jacobian. Then `scipy.optimize.least_squares`
 is used to solve.
 """
-import traceback
 import logging
 import helics as h
 import json
@@ -409,10 +408,5 @@ if __name__ == "__main__":
     with open("input_mapping.json") as f:
         input_mapping = json.load(f)
 
-    try:
-        sfed = StateEstimatorFederate(federate_name, parameters, input_mapping)
-        sfed.run()
-    except Exception as e:
-        logger.error(e)
-        logger.error(traceback.format_exc())
-        sfed.destroy()
+    sfed = StateEstimatorFederate(federate_name, parameters, input_mapping)
+    sfed.run()

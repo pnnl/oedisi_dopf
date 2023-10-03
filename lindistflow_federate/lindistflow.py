@@ -441,8 +441,6 @@ def optimal_power_flow(branch_info: dict, bus_info: dict, source_bus: str, contr
                     A_eq[counteq, nbus_ABC * 3 + nbus_s1s2 +
                          nbus_ABC * 5 + val_bus['idx']] = 1
                     A_eq[counteq, state_variable_number + val_bus['idx']] = 1
-                    logger.debug(keyb)
-                    logger.debug(val_bus)
                     b_eq[counteq] = val_bus['pq'][0] * BASE_S * mult
                     counteq += 1
                     # Reactive power
@@ -600,10 +598,10 @@ def optimal_power_flow(branch_info: dict, bus_info: dict, source_bus: str, contr
                        A_eq @ x == b_eq])
 
     prob.solve(solver=cp.ECOS, verbose=True)
-    logging.info(prob.status)
+    logger.info(prob.status)
 
     if prob.status == 'infeasible_or_unbounded' or prob.status == 'infeasible':
-        logging.debug("Check for limits. Power flow didn't converge")
+        logger.debug("Check for limits. Power flow didn't converge")
         exit()
 
     from_bus = []

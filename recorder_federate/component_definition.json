@@ -1,6 +1,6 @@
 {
-    "directory": "recorder_federate",
-    "execute_function": "python recorder.py",
+    "directory": "recorder",
+    "execute_function": "python record.py",
     "static_inputs": [
         {"type": "", "port_id": "filename"}
     ],

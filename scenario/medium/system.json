@@ -1,5 +1,5 @@
 {
-    "name": "test_state_estimator",
+    "name": "medium",
     "components": [
         {
             "name": "recorder_voltage_real",
@@ -33,14 +33,7 @@
             "name": "state_estimator",
             "type": "Estimator",
             "parameters": {
-                "algorithm_parameters": {"tol": 1e-3}
-            }
-        },
-        {
-            "name": "lindistflow",
-            "type": "OptimalPowerFlow",
-            "parameters": {
-                "deltat": 0.1
+                "algorithm_parameters": {"tol": 1e-5}
             }
         },
         {
@@ -110,24 +103,6 @@
             "source_port": "topology",
             "target": "state_estimator",
             "target_port": "topology"
-        },
-        {
-            "source": "feeder",
-            "source_port": "topology",
-            "target": "lindistflow",
-            "target_port": "topology"
-        },
-        {
-            "source": "feeder",
-            "source_port": "voltages_real",
-            "target": "lindistflow",
-            "target_port": "voltages_real"
-        },
-        {
-            "source": "feeder",
-            "source_port": "voltages_imag",
-            "target": "lindistflow",
-            "target_port": "voltages_imag"
         },
         {
             "source": "sensor_voltage_magnitude",

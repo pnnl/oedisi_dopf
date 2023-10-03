@@ -108,7 +108,7 @@ class EchoFederate(object):
 
         while granted_time < h.HELICS_TIME_MAXTIME:
 
-            if not self.sub.topology.is_updated():
+            if not self.sub.voltages_real.is_updated():
                 granted_time = h.helicsFederateRequestTime(
                     self.fed, h.HELICS_TIME_MAXTIME
                 )
@@ -144,9 +144,7 @@ class EchoFederate(object):
                     if 'eqid' in bus_info[key]:
                         eqid = bus['eqid']
                         if 'PVSystem' in eqid:
-                            logger.info(key)
                             setpoint = lindistflow.ignore_phase(val)
-                            logger.info(setpoint)
 
                             if self.static.control_type == lindistflow.ControlType.WATT:
                                 value = setpoint/1000.0
