@@ -3,7 +3,7 @@ Open Energy Data Initiative - Solar Systems Integration Data and Analytics (OEDI
 
 ## Docker
 
-To simply run the DOPF algorithm an an example scenaior fill modify the build arg *SCENARIO* to: small, medium, large, or ieee123. ieee123 is the default scenario. Outputs are save in the mounted volumn to local directory.
+To simply run the DOPF algorithm for a specific scenario modify the build arg *SCENARIO* to one of the preconfigured settings: small, medium, large, or ieee123. ieee123 is the default scenario. Outputs are saved in the mounted volume to your local directory.
 
 ```shell
     docker build --build-arg SCENARIO=<ieee123> -t oedisi-example:0.0.0 .
