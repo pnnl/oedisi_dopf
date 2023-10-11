@@ -2,6 +2,20 @@
     "name": "medium",
     "components": [
         {
+            "name": "recorder_power_real",
+            "type": "Recorder",
+            "parameters": {"feather_filename": "../../outputs/power_real.feather",
+                           "csv_filename": "../../outputs/power_real.csv"
+                          }
+        },
+        {
+            "name": "recorder_power_imag",
+            "type": "Recorder",
+            "parameters": {"feather_filename": "../../outputs/power_imag.feather",
+                           "csv_filename": "../../outputs/power_imag.csv"
+                          }
+        },
+        {
             "name": "recorder_voltage_real",
             "type": "Recorder",
             "parameters": {"feather_filename": "../../outputs/voltage_real.feather",
@@ -76,8 +90,16 @@
                 "random_percent": 0.0,
                 "measurement_file": "../feeder/sensors/reactive_ids.json"
             }
+        },
+        {
+            "name": "lindistflow",
+            "type": "OptimalPowerFlow",
+            "parameters": {
+                "deltat": 0.1,
+                "pf_flag": true,
+                "control_type": 1
+            }
         }
-
     ],
     "links": [
         {
@@ -124,6 +146,18 @@
         },
         {
             "source": "feeder",
+            "source_port": "powers_real",
+            "target": "recorder_power_real",
+            "target_port": "subscription"
+        },
+        {
+            "source": "feeder",
+            "source_port": "powers_imag",
+            "target": "recorder_power_imag",
+            "target_port": "subscription"
+        },
+        {
+            "source": "feeder",
             "source_port": "voltages_real",
             "target": "recorder_voltage_real",
             "target_port": "subscription"
@@ -145,6 +179,30 @@
             "source_port": "voltage_mag",
             "target": "recorder_voltage_mag",
             "target_port": "subscription"
+        },
+        {
+            "source": "feeder",
+            "source_port": "voltages_real",
+            "target": "lindistflow",
+            "target_port": "voltages_real"
+        },
+        {
+            "source": "feeder",
+            "source_port": "voltages_imag",
+            "target": "lindistflow",
+            "target_port": "voltages_imag"
+        },
+        {
+            "source": "feeder",
+            "source_port": "topology",
+            "target": "lindistflow",
+            "target_port": "topology"
+        },
+        {
+            "source": "lindistflow",
+            "source_port": "change_commands",
+            "target": "feeder",
+            "target_port": "change_commands"
         }
     ]
 }
