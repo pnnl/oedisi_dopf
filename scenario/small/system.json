@@ -2,6 +2,20 @@
     "name": "small",
     "components": [
         {
+            "name": "recorder_power_real",
+            "type": "Recorder",
+            "parameters": {"feather_filename": "../../outputs/power_real.feather",
+                           "csv_filename": "../../outputs/power_real.csv"
+                          }
+        },
+        {
+            "name": "recorder_power_imag",
+            "type": "Recorder",
+            "parameters": {"feather_filename": "../../outputs/power_imag.feather",
+                           "csv_filename": "../../outputs/power_imag.csv"
+                          }
+        },
+        {
             "name": "recorder_voltage_real",
             "type": "Recorder",
             "parameters": {"feather_filename": "../../outputs/voltage_real.feather",
@@ -130,6 +144,18 @@
             "source_port": "publication",
             "target": "state_estimator",
             "target_port": "powers_imaginary"
+        },
+        {
+            "source": "feeder",
+            "source_port": "powers_real",
+            "target": "recorder_power_real",
+            "target_port": "subscription"
+        },
+        {
+            "source": "feeder",
+            "source_port": "powers_imag",
+            "target": "recorder_power_imag",
+            "target_port": "subscription"
         },
         {
             "source": "feeder",

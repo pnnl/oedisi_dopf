@@ -174,12 +174,5 @@ def extract_info(topology: Topology) -> Tuple[dict, dict]:
     # double distance between all nodes
     logger.debug(f"Nodes: {network.number_of_nodes()}")
     logger.debug(f"Edges: {network.number_of_edges()}")
-    gcc = network.subgraph(
-        sorted(nx.connected_components(network), key=len, reverse=True)[0])
-    pos = nx.spring_layout(gcc, seed=123)
-    nx.draw_networkx_nodes(gcc, pos, node_size=20)
-    nx.draw_networkx_edges(gcc, pos, alpha=0.4)
-    nx.draw_networkx_labels(gcc, pos, font_size=2)
-    plt.savefig("network.svg")
 
     return index_info(branch_info, bus_info)
