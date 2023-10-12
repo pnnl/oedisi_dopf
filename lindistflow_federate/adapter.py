@@ -83,6 +83,23 @@ def extract_voltages(bus: dict, voltages: VoltagesMagnitude) -> dict:
     return bus
 
 
+def pack_voltages(voltages: dict, time: int) -> VoltagesMagnitude:
+    ids = []
+    values = []
+    logger.debug(time)
+    for key, value in voltages.items():
+        for phase, voltage in value.items():
+            if phase == 'A':
+                id = f"{key}.1"
+            if phase == 'B':
+                id = f"{key}.2"
+            if phase == 'C':
+                id = f"{key}.3"
+            ids.append(id)
+            values.append(voltage)
+    return VoltagesMagnitude(ids=ids, values=values, time=time)
+
+
 def extract_powers(bus: dict, real: PowersReal, imag: PowersImaginary) -> dict:
     for id, eq, power in zip(real.ids, real.equipment_ids, real.values):
         [name, phase] = id.split('.')

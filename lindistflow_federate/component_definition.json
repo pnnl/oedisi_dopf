@@ -13,6 +13,7 @@
         {"type": "Topology", "port_id": "topology"}
     ],
     "dynamic_outputs": [
-        {"type": "ControlList", "port_id": "change_commands"}
+        {"type": "ControlList", "port_id": "change_commands"},
+        {"type": "VoltagesMagnitude", "port_id": "opf_voltages_magnitude"}
     ]
 }
