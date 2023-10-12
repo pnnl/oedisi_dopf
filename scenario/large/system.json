@@ -182,15 +182,15 @@
         },
         {
             "source": "feeder",
-            "source_port": "voltages_real",
+            "source_port": "voltages_magnitude",
             "target": "lindistflow",
-            "target_port": "voltages_real"
+            "target_port": "voltages_magnitude"
         },
         {
             "source": "feeder",
-            "source_port": "voltages_imag",
+            "source_port": "injections",
             "target": "lindistflow",
-            "target_port": "voltages_imag"
+            "target_port": "injections"
         },
         {
             "source": "feeder",
