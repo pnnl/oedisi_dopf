@@ -8,8 +8,8 @@
         {"type": "", "port_id": "pf_flag"}
     ],
     "dynamic_inputs": [
-        {"type": "VoltagesReal", "port_id": "voltages_real"},
-        {"type": "VoltagesImaginary", "port_id": "voltages_imag"},
+        {"type": "VoltagesMagnitude", "port_id": "voltages_magnitude"},
+        {"type": "Injection", "port_id": "injections"},
         {"type": "Topology", "port_id": "topology"}
     ],
     "dynamic_outputs": [

@@ -1,6 +1,4 @@
 import numpy as np
-import networkx as nx
-import matplotlib.pyplot as plt
 import logging
 from enum import IntEnum
 from typing import Tuple
@@ -77,19 +75,21 @@ def index_info(branch: dict, bus: dict) -> Tuple[dict, dict]:
 def extract_voltages(bus: dict, voltages: VoltagesMagnitude) -> dict:
     for id, voltage in zip(voltages.ids, voltages.values):
         [name, _] = id.split('.')
+
         if name not in bus:
-            bus[name] = init_bus()
+            continue
 
         bus[name]['kv'] = voltage/1000.0
     return bus
 
 
-def extract_powers(bus: dict, powers: Injection) -> dict:
-    real = powers.power_real
-    imag = powers.power_imaginary
-
+def extract_powers(bus: dict, real: PowersReal, imag: PowersImaginary) -> dict:
     for id, eq, power in zip(real.ids, real.equipment_ids, real.values):
         [name, phase] = id.split('.')
+
+        if name not in bus:
+            continue
+
         [type, _] = eq.split('.')
         phase = int(phase) - 1
         if type == "PVSystem":
@@ -101,6 +101,46 @@ def extract_powers(bus: dict, powers: Injection) -> dict:
 
     for id, eq, power in zip(imag.ids, imag.equipment_ids, imag.values):
         [name, phase] = id.split('.')
+
+        if name not in bus:
+            continue
+
+        [type, _] = eq.split('.')
+        phase = int(phase) - 1
+        if type == "PVSystem":
+            bus[name]["eqid"] = eq
+            bus[name]["pv"][phase][1] = power*1000
+        else:
+            bus[name]["eqid"] = eq
+            bus[name]["pq"][phase][1] = -power*1000
+    return bus
+
+
+def extract_injection(bus: dict, powers: Injection) -> dict:
+    real = powers.power_real
+    imag = powers.power_imaginary
+
+    for id, eq, power in zip(real.ids, real.equipment_ids, real.values):
+        [name, phase] = id.split('.')
+
+        if name.find('OPEN') != -1:
+            continue
+
+        [type, _] = eq.split('.')
+        phase = int(phase) - 1
+        if type == "PVSystem":
+            bus[name]["eqid"] = eq
+            bus[name]["pv"][phase][0] = power*1000
+        else:
+            bus[name]["eqid"] = eq
+            bus[name]["pq"][phase][0] = -power*1000
+
+    for id, eq, power in zip(imag.ids, imag.equipment_ids, imag.values):
+        [name, phase] = id.split('.')
+
+        if name.find('OPEN') != -1:
+            continue
+
         [type, _] = eq.split('.')
         phase = int(phase) - 1
         if type == "PVSystem":
@@ -113,7 +153,6 @@ def extract_powers(bus: dict, powers: Injection) -> dict:
 
 
 def extract_info(topology: Topology) -> Tuple[dict, dict]:
-    network = nx.Graph()
     branch_info = {}
     bus_info = {}
     from_equip = topology.admittance.from_equipment
@@ -153,8 +192,6 @@ def extract_info(topology: Topology) -> Tuple[dict, dict]:
         col = int(to_phase) - 1
         branch_info[key]["y"][row][col] = complex(y[0], y[1])
 
-        network.add_edge(from_name, to_name)
-
         if from_phase not in branch_info[key]['phases']:
             branch_info[key]['phases'].append(from_phase)
 
@@ -169,10 +206,6 @@ def extract_info(topology: Topology) -> Tuple[dict, dict]:
         branch_info[key]['to_bus'] = to_name
 
         bus_info = extract_voltages(bus_info, topology.base_voltage_magnitudes)
-        bus_info = extract_powers(bus_info, topology.injections)
-
-    # double distance between all nodes
-    logger.debug(f"Nodes: {network.number_of_nodes()}")
-    logger.debug(f"Edges: {network.number_of_edges()}")
+        # bus_info = extract_injection(bus_info, topology.injections)
 
     return index_info(branch_info, bus_info)

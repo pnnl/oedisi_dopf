@@ -38,8 +38,8 @@ class StaticConfig(object):
 
 
 class Subscriptions(object):
-    voltages_real: VoltagesReal
-    voltages_imag: VoltagesImaginary
+    voltages_mag: VoltagesMagnitude
+    powers: Injection
     topology: Topology
 
 
@@ -90,10 +90,10 @@ class EchoFederate(object):
     def register_subscription(self) -> None:
         self.sub.topology = self.fed.register_subscription(
             self.inputs["topology"], "")
-        self.sub.voltages_real = self.fed.register_subscription(
-            self.inputs["voltages_real"], "")
-        self.sub.voltages_imag = self.fed.register_subscription(
-            self.inputs["voltages_imag"], "")
+        self.sub.voltages_mag = self.fed.register_subscription(
+            self.inputs["voltages_magnitude"], "")
+        self.sub.powers = self.fed.register_subscription(
+            self.inputs["injections"], "")
 
     def register_publication(self) -> None:
         self.pub_commands = self.fed.register_publication(
@@ -108,7 +108,7 @@ class EchoFederate(object):
 
         while granted_time < h.HELICS_TIME_MAXTIME:
 
-            if not self.sub.voltages_real.is_updated():
+            if not self.sub.voltages_mag.is_updated():
                 granted_time = h.helicsFederateRequestTime(
                     self.fed, h.HELICS_TIME_MAXTIME
                 )
@@ -116,11 +116,6 @@ class EchoFederate(object):
 
             topology = Topology.parse_obj(self.sub.topology.json)
             [branch_info, bus_info] = adapter.extract_info(topology)
-            with open('branch_info.json', 'w', encoding='UTF-8') as f:
-                f.write(json.dumps(branch_info))
-
-            with open('bus_info.json', 'w', encoding='UTF-8') as f:
-                f.write(json.dumps(bus_info))
 
             slack = topology.slack_bus[0]
             [slack_bus, phase] = slack.split('.')
@@ -128,22 +123,30 @@ class EchoFederate(object):
             area_branch, area_bus = area_info(
                 branch_info, bus_info, slack_bus)
 
-            real = VoltagesReal.parse_obj(self.sub.voltages_real.json)
-            logger.info(real)
+            voltages = VoltagesMagnitude.parse_obj(self.sub.voltages_mag.json)
 
-            imag = VoltagesImaginary.parse_obj(self.sub.voltages_imag.json)
-            logger.info(imag)
+            powers = Injection.parse_obj(self.sub.powers.json)
+
+            area_bus = adapter.extract_voltages(area_bus, voltages)
+            area_bus = adapter.extract_injection(area_bus, powers)
+
+            with open('branch_info.json', 'w', encoding='UTF-8') as f:
+                f.write(json.dumps(area_branch))
+
+            with open('bus_info.json', 'w', encoding='UTF-8') as f:
+                f.write(json.dumps(area_bus))
 
             voltages, power_flow, control, converter = lindistflow.optimal_power_flow(
                 area_branch, area_bus, slack_bus, self.static.control_type, self.static.pf_flag)
 
             commands = []
             for key, val in control.items():
-                if key in bus_info:
-                    bus = bus_info[key]
-                    if 'eqid' in bus_info[key]:
+                if key in area_bus:
+                    bus = area_bus[key]
+                    if 'eqid' in bus:
                         eqid = bus['eqid']
-                        if 'PVSystem' in eqid:
+                        [type, _] = eqid.split('.')
+                        if type == "PVSystem":
                             setpoint = lindistflow.ignore_phase(val)
 
                             if self.static.control_type == lindistflow.ControlType.WATT:
