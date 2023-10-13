@@ -189,9 +189,6 @@ def optimal_power_flow(branch_info: dict, bus_info: dict, source_bus: str, contr
                 counteq += 1
             else:
                 for key, val_br in branch_info.items():
-                    if 'idx' not in val_bus:
-                        logger.debug(val_bus)
-                        logger.debug(val_br)
                     if val_bus['idx'] == val_br['from']:
                         if bus_info[val_br['to_bus']]['kv'] > PRIMARY_V:
                             k_frm_3p.append(ind_frm)

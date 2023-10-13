@@ -44,6 +44,13 @@
                           }
         },
         {
+            "name": "recorder_opf_voltage_mag",
+            "type": "Recorder",
+            "parameters": {"feather_filename": "../../outputs/opf_voltage_mag.feather",
+                           "csv_filename": "../../outputs/opf_voltage_mag.csv"
+                          }
+        },
+        {
             "name": "state_estimator",
             "type": "Estimator",
             "parameters": {
@@ -204,6 +211,12 @@
             "source_port": "change_commands",
             "target": "feeder",
             "target_port": "change_commands"
+        },
+        {
+            "source": "lindistflow",
+            "source_port": "opf_voltages_magnitude",
+            "target": "recorder_opf_voltage_mag",
+            "target_port": "subscription"
         }
     ]
 }

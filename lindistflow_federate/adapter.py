@@ -83,6 +83,23 @@ def extract_voltages(bus: dict, voltages: VoltagesMagnitude) -> dict:
     return bus
 
 
+def pack_voltages(voltages: dict, time: int) -> VoltagesMagnitude:
+    ids = []
+    values = []
+    logger.debug(time)
+    for key, value in voltages.items():
+        for phase, voltage in value.items():
+            if phase == 'A':
+                id = f"{key}.1"
+            if phase == 'B':
+                id = f"{key}.2"
+            if phase == 'C':
+                id = f"{key}.3"
+            ids.append(id)
+            values.append(voltage)
+    return VoltagesMagnitude(ids=ids, values=values, time=time)
+
+
 def extract_powers(bus: dict, real: PowersReal, imag: PowersImaginary) -> dict:
     for id, eq, power in zip(real.ids, real.equipment_ids, real.values):
         [name, phase] = id.split('.')
@@ -130,10 +147,10 @@ def extract_injection(bus: dict, powers: Injection) -> dict:
         phase = int(phase) - 1
         if type == "PVSystem":
             bus[name]["eqid"] = eq
-            bus[name]["pv"][phase][0] = power*1000
+            bus[name]["pv"][phase][0] = power*1
         else:
             bus[name]["eqid"] = eq
-            bus[name]["pq"][phase][0] = -power*1000
+            bus[name]["pq"][phase][0] = -power*1
 
     for id, eq, power in zip(imag.ids, imag.equipment_ids, imag.values):
         [name, phase] = id.split('.')
@@ -145,10 +162,10 @@ def extract_injection(bus: dict, powers: Injection) -> dict:
         phase = int(phase) - 1
         if type == "PVSystem":
             bus[name]["eqid"] = eq
-            bus[name]["pv"][phase][1] = power*1000
+            bus[name]["pv"][phase][1] = power*1
         else:
             bus[name]["eqid"] = eq
-            bus[name]["pq"][phase][1] = -power*1000
+            bus[name]["pq"][phase][1] = -power*1
     return bus
 
 
