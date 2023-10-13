@@ -147,10 +147,10 @@ def extract_injection(bus: dict, powers: Injection) -> dict:
         phase = int(phase) - 1
         if type == "PVSystem":
             bus[name]["eqid"] = eq
-            bus[name]["pv"][phase][0] = power*1000
+            bus[name]["pv"][phase][0] = power*1
         else:
             bus[name]["eqid"] = eq
-            bus[name]["pq"][phase][0] = -power*1000
+            bus[name]["pq"][phase][0] = -power*1
 
     for id, eq, power in zip(imag.ids, imag.equipment_ids, imag.values):
         [name, phase] = id.split('.')
@@ -162,10 +162,10 @@ def extract_injection(bus: dict, powers: Injection) -> dict:
         phase = int(phase) - 1
         if type == "PVSystem":
             bus[name]["eqid"] = eq
-            bus[name]["pv"][phase][1] = power*1000
+            bus[name]["pv"][phase][1] = power*1
         else:
             bus[name]["eqid"] = eq
-            bus[name]["pq"][phase][1] = -power*1000
+            bus[name]["pq"][phase][1] = -power*1
     return bus
 
 

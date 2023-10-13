@@ -128,18 +128,13 @@ class EchoFederate(object):
 
             voltages_mag = VoltagesMagnitude.parse_obj(
                 self.sub.voltages_mag.json)
-            logger.debug(voltages_mag)
+            logger.info(voltages_mag)
 
             powers = Injection.parse_obj(self.sub.powers.json)
+            logger.info(powers)
 
             area_bus = adapter.extract_voltages(area_bus, voltages_mag)
             area_bus = adapter.extract_injection(area_bus, powers)
-
-            with open('branch_info.json', 'w', encoding='UTF-8') as f:
-                f.write(json.dumps(area_branch))
-
-            with open('bus_info.json', 'w', encoding='UTF-8') as f:
-                f.write(json.dumps(area_bus))
 
             voltages, power_flow, control, converter = lindistflow.optimal_power_flow(
                 area_branch, area_bus, slack_bus, self.static.control_type, self.static.pf_flag)
@@ -174,7 +169,6 @@ class EchoFederate(object):
             )
 
             pub_mags = adapter.pack_voltages(voltages, time)
-            logger.debug(pub_mags)
             self.pub_voltages.publish(
                 pub_mags.json()
             )
