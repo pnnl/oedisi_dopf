@@ -86,7 +86,6 @@ def extract_voltages(bus: dict, voltages: VoltagesMagnitude) -> dict:
 def pack_voltages(voltages: dict, time: int) -> VoltagesMagnitude:
     ids = []
     values = []
-    logger.debug(time)
     for key, value in voltages.items():
         for phase, voltage in value.items():
             if phase == 'A':
@@ -106,10 +105,10 @@ def extract_powers(bus: dict, real: PowersReal, imag: PowersImaginary) -> dict:
 
         if name not in bus:
             continue
-
         [type, _] = eq.split('.')
         phase = int(phase) - 1
         if type == "PVSystem":
+            logger.info(f"{id} : {power}")
             bus[name]["eqid"] = eq
             bus[name]["pv"][phase][0] = power*1000
         else:
@@ -140,6 +139,8 @@ def extract_injection(bus: dict, powers: Injection) -> dict:
     for id, eq, power in zip(real.ids, real.equipment_ids, real.values):
         [name, phase] = id.split('.')
 
+        if name not in bus:
+            continue
         if name.find('OPEN') != -1:
             continue
 
@@ -147,14 +148,17 @@ def extract_injection(bus: dict, powers: Injection) -> dict:
         phase = int(phase) - 1
         if type == "PVSystem":
             bus[name]["eqid"] = eq
-            bus[name]["pv"][phase][0] = power*1
+            bus[name]["pv"][phase][0] = power*1000
+            logger.debug(f"{eq}, {power}")
         else:
             bus[name]["eqid"] = eq
-            bus[name]["pq"][phase][0] = -power*1
+            bus[name]["pq"][phase][0] = -power*1000
 
     for id, eq, power in zip(imag.ids, imag.equipment_ids, imag.values):
         [name, phase] = id.split('.')
 
+        if name not in bus:
+            continue
         if name.find('OPEN') != -1:
             continue
 
@@ -162,10 +166,10 @@ def extract_injection(bus: dict, powers: Injection) -> dict:
         phase = int(phase) - 1
         if type == "PVSystem":
             bus[name]["eqid"] = eq
-            bus[name]["pv"][phase][1] = power*1
+            bus[name]["pv"][phase][1] = power*1000
         else:
             bus[name]["eqid"] = eq
-            bus[name]["pq"][phase][1] = -power*1
+            bus[name]["pq"][phase][1] = -power*1000
     return bus
 
 
@@ -222,7 +226,6 @@ def extract_info(topology: Topology) -> Tuple[dict, dict]:
         branch_info[key]['fr_bus'] = from_name
         branch_info[key]['to_bus'] = to_name
 
-        bus_info = extract_voltages(bus_info, topology.base_voltage_magnitudes)
-        # bus_info = extract_injection(bus_info, topology.injections)
+    bus_info = extract_voltages(bus_info, topology.base_voltage_magnitudes)
 
     return index_info(branch_info, bus_info)

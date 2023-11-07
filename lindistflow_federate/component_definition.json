@@ -9,6 +9,8 @@
     ],
     "dynamic_inputs": [
         {"type": "VoltagesMagnitude", "port_id": "voltages_magnitude"},
+        {"type": "PowersReal", "port_id": "powers_real"},
+        {"type": "PowersImaginary", "port_id": "powers_imag"},
         {"type": "Injection", "port_id": "injections"},
         {"type": "Topology", "port_id": "topology"}
     ],

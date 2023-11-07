@@ -3,23 +3,14 @@ import helics as h
 import json
 from pathlib import Path
 from datetime import datetime
-from typing import Tuple
 from oedisi.types.data_types import (
-    AdmittanceMatrix,
-    AdmittanceSparse,
     CommandList,
     Command,
-    EquipmentNodeArray,
-    Injection,
-    InverterControlList,
-    MeasurementArray,
     PowersImaginary,
     PowersReal,
+    Injection,
     Topology,
-    VoltagesAngle,
-    VoltagesImaginary,
     VoltagesMagnitude,
-    VoltagesReal
 )
 import adapter
 import lindistflow
@@ -39,7 +30,9 @@ class StaticConfig(object):
 
 class Subscriptions(object):
     voltages_mag: VoltagesMagnitude
-    powers: Injection
+    powers_real: PowersReal
+    powers_imag: PowersImaginary
+    injections: Injection
     topology: Topology
 
 
@@ -92,7 +85,11 @@ class EchoFederate(object):
             self.inputs["topology"], "")
         self.sub.voltages_mag = self.fed.register_subscription(
             self.inputs["voltages_magnitude"], "")
-        self.sub.powers = self.fed.register_subscription(
+        self.sub.powers_real = self.fed.register_subscription(
+            self.inputs["powers_real"], "")
+        self.sub.powers_imag = self.fed.register_subscription(
+            self.inputs["powers_imag"], "")
+        self.sub.injections = self.fed.register_subscription(
             self.inputs["injections"], "")
 
     def register_publication(self) -> None:
@@ -128,17 +125,16 @@ class EchoFederate(object):
 
             voltages_mag = VoltagesMagnitude.parse_obj(
                 self.sub.voltages_mag.json)
-            logger.info(voltages_mag)
-
-            powers = Injection.parse_obj(self.sub.powers.json)
-            logger.info(powers)
-
             area_bus = adapter.extract_voltages(area_bus, voltages_mag)
-            area_bus = adapter.extract_injection(area_bus, powers)
 
-            voltages, power_flow, control, converter = lindistflow.optimal_power_flow(
-                area_branch, area_bus, slack_bus, self.static.control_type, self.static.pf_flag)
             time = voltages_mag.time
+            logger.info(time)
+
+            injection = Injection.parse_obj(self.sub.injections.json)
+            area_bus = adapter.extract_injection(area_bus, injection)
+
+            voltages, power_flow, control, conversion = lindistflow.optimal_power_flow(
+                area_branch, area_bus, slack_bus, self.static.control_type, self.static.pf_flag)
 
             commands = []
             for key, val in control.items():
@@ -148,25 +144,26 @@ class EchoFederate(object):
                         eqid = bus['eqid']
                         [type, _] = eqid.split('.')
                         if type == "PVSystem":
-                            setpoint = lindistflow.ignore_phase(val)
+                            setpoint = lindistflow.ignore_phase(val)*conversion
+                            if setpoint < 0.1:
+                                continue
 
                             if self.static.control_type == lindistflow.ControlType.WATT:
-                                value = setpoint/1000.0
+                                logger.debug(f"{eqid}, {setpoint}")
                                 commands.append(
-                                    Command(obj_name=eqid, obj_property='kVA', val=value))
+                                    Command(obj_name=eqid, obj_property='WattPriority', val=setpoint))
                             elif self.static.control_type == lindistflow.ControlType.VAR:
-                                value = setpoint/1000.0
                                 commands.append(
-                                    Command(obj_name=eqid, obj_property='kVA', val=value))
+                                    Command(obj_name=eqid, obj_property='kVAR', val=setpoint))
                             elif self.static.control_type == lindistflow.ControlType.WATT_VAR:
-                                value = setpoint/1000.0
                                 commands.append(
-                                    Command(obj_name=eqid, obj_property='kVA', val=value))
+                                    Command(obj_name=eqid, obj_property='kVA', val=setpoint))
 
             logger.info(commands)
-            self.pub_commands.publish(
-                CommandList(__root__=commands).json()
-            )
+            if commands:
+                self.pub_commands.publish(
+                    CommandList(__root__=commands).json()
+                )
 
             pub_mags = adapter.pack_voltages(voltages, time)
             self.pub_voltages.publish(
