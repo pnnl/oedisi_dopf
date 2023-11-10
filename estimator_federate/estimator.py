@@ -79,12 +79,12 @@ def cal_H(X0, z, num_node, knownP, knownQ, knownV, Y):
 def residual(X0, z, num_node, knownP, knownQ, knownV, Y):
     delta, Vabs = X0[:num_node], X0[num_node:]
     h = cal_h(knownP, knownQ, knownV, Y, delta, Vabs, num_node)
-    logger.debug("X0")
-    logger.debug(X0)
-    logger.debug("z")
-    logger.debug(z)
-    logger.debug("h")
-    logger.debug(h)
+    # logger.debug("X0")
+    # logger.debug(X0)
+    # logger.debug("z")
+    # logger.debug(z)
+    # logger.debug("h")
+    # logger.debug(h)
     return z - h
 
 
@@ -208,10 +208,8 @@ def state_estimator(
     else:
         Vabs = initial_V
     assert Vabs.shape == (num_node,)
-    logging.debug("delta")
-    logging.debug(delta)
+    logger.debug(f"delta: {delta}")
     X0 = np.concatenate((delta, Vabs))
-    logging.debug(X0)
     ang_low = np.concatenate(([-1e-5], np.ones(num_node - 1) * (-np.inf)))
     ang_up = np.concatenate(([1e-5], np.ones(num_node - 1) * (np.inf)))
     mag_low = np.ones(num_node) * (-np.inf)
@@ -337,10 +335,12 @@ class StateEstimatorFederate:
                 )
                 continue
 
-            logger.info("start time: " + str(datetime.now()))
+            logger.info("starting time: " + str(datetime.now()))
 
             voltages = VoltagesMagnitude.parse_obj(
                 self.sub_voltages_magnitude.json)
+            logger.info(f"sim time: {voltages.time}")
+
             power_P = PowersReal.parse_obj(self.sub_power_P.json)
             power_Q = PowersImaginary.parse_obj(self.sub_power_Q.json)
             knownP = get_indices(topology, power_P)
@@ -382,7 +382,7 @@ class StateEstimatorFederate:
                     values=list(voltage_angles), ids=ids, time=voltages.time
                 ).json()
             )
-            logger.info("end time: " + str(datetime.now()))
+            logger.info("publishing time: " + str(datetime.now()))
 
         self.destroy()
 
