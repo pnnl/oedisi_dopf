@@ -30,34 +30,6 @@
                           }
         },
         {
-            "name": "recorder_voltage_mag",
-            "type": "Recorder",
-            "parameters": {"feather_filename": "../../outputs/voltage_mag.feather",
-                           "csv_filename": "../../outputs/voltage_mag.csv"
-                          }
-        },
-        {
-            "name": "recorder_voltage_angle",
-            "type": "Recorder",
-            "parameters": {"feather_filename": "../../outputs/voltage_angle.feather",
-                           "csv_filename": "../../outputs/voltage_angle.csv"
-                          }
-        },
-        {
-            "name": "recorder_opf_voltage_mag",
-            "type": "Recorder",
-            "parameters": {"feather_filename": "../../outputs/opf_voltage_mag.feather",
-                           "csv_filename": "../../outputs/opf_voltage_mag.csv"
-                          }
-        },
-        {
-            "name": "state_estimator",
-            "type": "Estimator",
-            "parameters": {
-                "algorithm_parameters": {"tol": 1e-4}
-            }
-        },
-        {
             "name": "feeder",
             "type": "Feeder",
             "parameters": {
@@ -73,33 +45,6 @@
             }
         },
         {
-            "name": "sensor_voltage_magnitude",
-            "type": "Measurement",
-            "parameters": {
-                "gaussian_variance": 0.0,
-                "random_percent": 0.0,
-                "measurement_file": "../feeder/sensors/voltage_ids.json"
-            }
-        },
-        {
-            "name": "sensor_power_real",
-            "type": "Measurement",
-            "parameters": {
-                "gaussian_variance": 0.0,
-                "random_percent": 0.0,
-                "measurement_file": "../feeder/sensors/real_ids.json"
-            }
-        },
-        {
-            "name": "sensor_power_imaginary",
-            "type": "Measurement",
-            "parameters": {
-                "gaussian_variance": 0.0,
-                "random_percent": 0.0,
-                "measurement_file": "../feeder/sensors/reactive_ids.json"
-            }
-        },
-        {
             "name": "lindistflow",
             "type": "OptimalPowerFlow",
             "parameters": {
@@ -112,45 +57,15 @@
     "links": [
         {
             "source": "feeder",
-            "source_port": "voltages_magnitude",
-            "target": "sensor_voltage_magnitude",
+            "source_port": "voltages_real",
+            "target": "recorder_voltage_real",
             "target_port": "subscription"
         },
         {
             "source": "feeder",
-            "source_port": "powers_real",
-            "target": "sensor_power_real",
+            "source_port": "voltages_imag",
+            "target": "recorder_voltage_imag",
             "target_port": "subscription"
-        },
-        {
-            "source": "feeder",
-            "source_port": "powers_imag",
-            "target": "sensor_power_imaginary",
-            "target_port": "subscription"
-        },
-        {
-            "source": "feeder",
-            "source_port": "topology",
-            "target": "state_estimator",
-            "target_port": "topology"
-        },
-        {
-            "source": "sensor_voltage_magnitude",
-            "source_port": "publication",
-            "target": "state_estimator",
-            "target_port": "voltages_magnitude"
-        },
-        {
-            "source": "sensor_power_real",
-            "source_port": "publication",
-            "target": "state_estimator",
-            "target_port": "powers_real"
-        },
-        {
-            "source": "sensor_power_imaginary",
-            "source_port": "publication",
-            "target": "state_estimator",
-            "target_port": "powers_imaginary"
         },
         {
             "source": "feeder",
@@ -166,48 +81,6 @@
         },
         {
             "source": "feeder",
-            "source_port": "voltages_real",
-            "target": "recorder_voltage_real",
-            "target_port": "subscription"
-        },
-        {
-            "source": "feeder",
-            "source_port": "voltages_imag",
-            "target": "recorder_voltage_imag",
-            "target_port": "subscription"
-        },
-        {
-            "source": "state_estimator",
-            "source_port": "voltage_angle",
-            "target": "recorder_voltage_angle",
-            "target_port": "subscription"
-        },
-        {
-            "source": "state_estimator",
-            "source_port": "voltage_mag",
-            "target": "recorder_voltage_mag",
-            "target_port": "subscription"
-        },
-        {
-            "source": "feeder",
-            "source_port": "voltages_magnitude",
-            "target": "lindistflow",
-            "target_port": "voltages_magnitude"
-        },
-        {
-            "source": "feeder",
-            "source_port": "powers_real",
-            "target": "lindistflow",
-            "target_port": "powers_real"
-        },
-        {
-            "source": "feeder",
-            "source_port": "powers_imag",
-            "target": "lindistflow",
-            "target_port": "powers_imag"
-        },
-        {
-            "source": "feeder",
             "source_port": "topology",
             "target": "lindistflow",
             "target_port": "topology"
@@ -219,16 +92,16 @@
             "target_port": "injections"
         },
         {
+            "source": "feeder",
+            "source_port": "voltages_magnitude",
+            "target": "lindistflow",
+            "target_port": "voltages_magnitude"
+        },
+        {
             "source": "lindistflow",
             "source_port": "change_commands",
             "target": "feeder",
             "target_port": "change_commands"
-        },
-        {
-            "source": "lindistflow",
-            "source_port": "opf_voltages_magnitude",
-            "target": "recorder_opf_voltage_mag",
-            "target_port": "subscription"
         }
     ]
 }

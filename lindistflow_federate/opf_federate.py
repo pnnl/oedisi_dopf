@@ -30,8 +30,6 @@ class StaticConfig(object):
 
 class Subscriptions(object):
     voltages_mag: VoltagesMagnitude
-    powers_real: PowersReal
-    powers_imag: PowersImaginary
     injections: Injection
     topology: Topology
 
@@ -85,19 +83,12 @@ class EchoFederate(object):
             self.inputs["topology"], "")
         self.sub.voltages_mag = self.fed.register_subscription(
             self.inputs["voltages_magnitude"], "")
-        self.sub.powers_real = self.fed.register_subscription(
-            self.inputs["powers_real"], "")
-        self.sub.powers_imag = self.fed.register_subscription(
-            self.inputs["powers_imag"], "")
         self.sub.injections = self.fed.register_subscription(
             self.inputs["injections"], "")
 
     def register_publication(self) -> None:
         self.pub_commands = self.fed.register_publication(
             "change_commands", h.HELICS_DATA_TYPE_STRING, ""
-        )
-        self.pub_voltages = self.fed.register_publication(
-            "opf_voltages_magnitude", h.HELICS_DATA_TYPE_STRING, ""
         )
 
     def run(self) -> None:
@@ -125,6 +116,7 @@ class EchoFederate(object):
 
             voltages_mag = VoltagesMagnitude.parse_obj(
                 self.sub.voltages_mag.json)
+
             area_bus = adapter.extract_voltages(area_bus, voltages_mag)
 
             time = voltages_mag.time
@@ -149,7 +141,8 @@ class EchoFederate(object):
                                 continue
 
                             if self.static.control_type == lindistflow.ControlType.WATT:
-                                logger.debug(f"{eqid}, {setpoint}")
+                                logger.debug(
+                                    f"{eqid}, {setpoint}")
                                 commands.append(
                                     Command(obj_name=eqid, obj_property='WattPriority', val=setpoint))
                             elif self.static.control_type == lindistflow.ControlType.VAR:
@@ -165,10 +158,6 @@ class EchoFederate(object):
                     CommandList(__root__=commands).json()
                 )
 
-            pub_mags = adapter.pack_voltages(voltages, time)
-            self.pub_voltages.publish(
-                pub_mags.json()
-            )
         self.stop()
 
     def stop(self) -> None:
