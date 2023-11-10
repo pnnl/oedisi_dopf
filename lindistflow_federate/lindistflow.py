@@ -78,7 +78,7 @@ def optimal_power_flow(branch_info: dict, bus_info: dict, source_bus: str, contr
     BASE_S = 1 / (1000000 * 100)
     S_CAPACITY = 1.2
     PRIMARY_V = 0.12
-    SOURCE_V = [1.0475, 1.0475, 1.0475]
+    SOURCE_V = [1.04, 1.04, 1.04]
     basekV = bus_info[source_bus]['kv'] / np.sqrt(3)
     baseZ = basekV ** 2 / 100
 
