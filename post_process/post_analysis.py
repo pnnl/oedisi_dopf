@@ -11,10 +11,10 @@ import argparse
 
 
 def plot_network(topology: Topology) -> None:
-
     network = nx.Graph()
     from_equip = topology.admittance.from_equipment
     to_equip = topology.admittance.to_equipment
+    cmap = plt.cm.plasma
 
     for fr_eq, to_eq in zip(from_equip, to_equip):
         [from_name, from_phase] = fr_eq.split('.')
@@ -29,12 +29,14 @@ def plot_network(topology: Topology) -> None:
             continue
 
         network.add_edge(from_name, to_name)
-
+    M = network.number_of_edges()
+    edge_colors = range(2, M + 2)
     gcc = network.subgraph(
         sorted(nx.connected_components(network), key=len, reverse=True)[0])
     pos = nx.spring_layout(gcc, seed=2023, iterations=500)
     nx.draw_networkx_nodes(gcc, pos, node_size=20)
-    nx.draw_networkx_edges(gcc, pos, alpha=0.4)
+    nx.draw_networkx_edges(gcc, pos, alpha=0.4,
+                           edge_color=edge_colors, edge_cmap=cmap)
     nx.draw_networkx_labels(gcc, pos, font_size=2)
     plt.savefig(os.path.join(args.directory, "network.svg"))
 
