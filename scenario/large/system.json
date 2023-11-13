@@ -4,29 +4,29 @@
         {
             "name": "recorder_power_real",
             "type": "Recorder",
-            "parameters": {"feather_filename": "../../outputs/power_real.feather",
-                           "csv_filename": "../../outputs/power_real.csv"
+            "parameters": {"feather_filename": "../../outputs/large/power_real.feather",
+                           "csv_filename": "../../outputs/large/power_real.csv"
                           }
         },
         {
             "name": "recorder_power_imag",
             "type": "Recorder",
-            "parameters": {"feather_filename": "../../outputs/power_imag.feather",
-                           "csv_filename": "../../outputs/power_imag.csv"
+            "parameters": {"feather_filename": "../../outputs/large/power_imag.feather",
+                           "csv_filename": "../../outputs/large/power_imag.csv"
                           }
         },
         {
             "name": "recorder_voltage_real",
             "type": "Recorder",
-            "parameters": {"feather_filename": "../../outputs/voltage_real.feather",
-                           "csv_filename": "../../outputs/voltage_real.csv"
+            "parameters": {"feather_filename": "../../outputs/large/voltage_real.feather",
+                           "csv_filename": "../../outputs/large/voltage_real.csv"
                           }
         },
         {
             "name": "recorder_voltage_imag",
             "type": "Recorder",
-            "parameters": {"feather_filename": "../../outputs/voltage_imag.feather",
-                           "csv_filename": "../../outputs/voltage_imag.csv"
+            "parameters": {"feather_filename": "../../outputs/large/voltage_imag.feather",
+                           "csv_filename": "../../outputs/large/voltage_imag.csv"
                           }
         },
         {
@@ -39,7 +39,7 @@
                 "start_date": "2017-05-01 00:00:00",
                 "number_of_timesteps": 1,
                 "run_freq_sec": 900,
-                "topology_output": "../../outputs/topology.json",
+                "topology_output": "../../outputs/large/topology.json",
                 "use_sparse_admittance": true
             }
         },
