@@ -30,6 +30,20 @@
                           }
         },
         {
+            "name": "recorder_voltage_magnitude",
+            "type": "Recorder",
+            "parameters": {"feather_filename": "../../outputs/voltage_mag.feather",
+                           "csv_filename": "../../outputs/voltage_mag.csv"
+                          }
+        },
+        {
+            "name": "recorder_opf_voltage_magnitude",
+            "type": "Recorder",
+            "parameters": {"feather_filename": "../../outputs/opf_voltage_mag.feather",
+                           "csv_filename": "../../outputs/opf_voltage_mag.csv"
+                          }
+        },
+        {
             "name": "feeder",
             "type": "Feeder",
             "parameters": {
@@ -55,6 +69,12 @@
         }
     ],
     "links": [
+        {
+            "source": "feeder",
+            "source_port": "voltages_magnitude",
+            "target": "recorder_voltage_magnitude",
+            "target_port": "subscription"
+        },
         {
             "source": "feeder",
             "source_port": "voltages_real",
@@ -102,6 +122,12 @@
             "source_port": "change_commands",
             "target": "feeder",
             "target_port": "change_commands"
+        },
+        {
+            "source": "lindistflow",
+            "source_port": "opf_voltages_magnitude",
+            "target": "recorder_opf_voltage_magnitude",
+            "target_port": "subscription"
         }
     ]
 }
