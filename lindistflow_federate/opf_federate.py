@@ -91,6 +91,10 @@ class EchoFederate(object):
             "change_commands", h.HELICS_DATA_TYPE_STRING, ""
         )
 
+        self.pub_voltages = self.fed.register_publication(
+            "opf_voltages_magnitude", h.HELICS_DATA_TYPE_STRING, ""
+        )
+
     def run(self) -> None:
         logger.info(f"Federate connected: {datetime.now()}")
         self.fed.enter_executing_mode()
@@ -157,6 +161,11 @@ class EchoFederate(object):
                 self.pub_commands.publish(
                     CommandList(__root__=commands).json()
                 )
+
+            pub_mags = adapter.pack_voltages(voltages, time)
+            self.pub_voltages.publish(
+                pub_mags.json()
+            )
 
         self.stop()
 
