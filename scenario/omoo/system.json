@@ -16,13 +16,6 @@
                           }
         },
         {
-            "name": "recorder_opf_voltage_magnitude",
-            "type": "Recorder",
-            "parameters": {"feather_filename": "../../outputs/omoo/opf_voltage_mag.feather",
-                           "csv_filename": "../../outputs/omoo/opf_voltage_mag.csv"
-                          }
-        },
-        {
             "name": "optimal_pf",
             "type": "OMOOComponent",
             "parameters": {
@@ -99,12 +92,6 @@
             "source_port": "P_set",
             "target": "feeder",
             "target_port": "change_commands"
-        },
-        {
-            "source": "optimal_pf",
-            "source_port": "voltage_mag",
-            "target": "recorder_opf_voltage_magnitude",
-            "target_port": "subscription"
         }
     ]
 }
