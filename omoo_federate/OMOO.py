@@ -596,8 +596,8 @@ class OMOOFederate:
         ratings = eqarray_to_xarray(topology.injections.power_real) + 1j * eqarray_to_xarray(topology.injections.power_imaginary)
         pv_ratings = ratings[ratings.equipment_ids.str.startswith("PVSystem")]
 
-        previous_power_factor = xr.ones_like(pv_ratings.real).values
-        previous_pmpp = xr.ones_like(pv_ratings.real).values
+        previous_power_factor = xr.ones_like(pv_ratings.real)
+        previous_pmpp = xr.ones_like(pv_ratings.real)
         # while granted_time < h.HELICS_TIME_MAXTIME:
         v = measurement_to_xarray(topology.base_voltage_magnitudes)
         while granted_time < 1000:
