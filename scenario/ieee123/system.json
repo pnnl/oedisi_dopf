@@ -32,15 +32,15 @@
         {
             "name": "recorder_voltage_magnitude",
             "type": "Recorder",
-            "parameters": {"feather_filename": "../../outputs/voltage_mag.feather",
-                           "csv_filename": "../../outputs/voltage_mag.csv"
+            "parameters": {"feather_filename": "../../outputs/ieee123/voltage_mag.feather",
+                           "csv_filename": "../../outputs/ieee123/voltage_mag.csv"
                           }
         },
         {
             "name": "recorder_opf_voltage_magnitude",
             "type": "Recorder",
-            "parameters": {"feather_filename": "../../outputs/opf_voltage_mag.feather",
-                           "csv_filename": "../../outputs/opf_voltage_mag.csv"
+            "parameters": {"feather_filename": "../../outputs/ieee123/opf_voltage_mag.feather",
+                           "csv_filename": "../../outputs/ieee123/opf_voltage_mag.csv"
                           }
         },
         {
