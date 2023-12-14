@@ -148,3 +148,5 @@ cython_debug/
 
 # Self additions
 lindistflow_primsec
+outputs/noopf
+scenario/noopf

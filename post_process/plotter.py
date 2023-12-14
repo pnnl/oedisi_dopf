@@ -85,7 +85,7 @@ def plot_voltages(
     return fig
 
 
-def extract_topology(topology_file, buscoord_file):
+def extract_topology(topology_file, buscoord_file, sep="    "):
     
     # Extract topology
     with open(topology_file) as f:
@@ -105,7 +105,7 @@ def extract_topology(topology_file, buscoord_file):
         lines = cord_file.readlines()
     cord = {}
     for line in lines:
-        temp = line.strip('\n').split('    ')
+        temp = line.strip('\n').split(sep)
         cord[temp[0].upper()] = [float(temp[1]),float(temp[2])]
     
     return branch_info, base_voltages, cord
@@ -122,7 +122,7 @@ def extract_info(topology: Topology) -> dict:
             [from_name, _] = from_name.split('_')
             type = "SWITCH"
 
-        [to_name, to_phase] = to_eq.split('.')
+        [to_name, _] = to_eq.split('.')
         if to_name.find('OPEN') != -1:
             [to_name, _] = to_name.split('_')
             type = "SWITCH"
@@ -192,18 +192,22 @@ def get_network(branch_info, pos, root_node='150R', open_buses=[]):
     # compute distance to root node
     for n in network.nodes:
         phase = n.split('.')[-1]
-        network.nodes[n]["root_distance"] = nx.shortest_path_length(
-            network, 
-            source=root_node+f'.{phase}', 
-            target=n, weight='length'
-            )
+        r = root_node+f'.{phase}'
+        if nx.has_path(network, source=r, target=n):
+            network.nodes[n]["root_distance"] = nx.shortest_path_length(
+                network, 
+                source=r, target=n, 
+                weight='length'
+                )
+        else:
+            print(f"No path between nodes {r} and {n}")
     
     return network
 
 def plot_network(
         topology_file, buscoord_file,
         realVfile, imagVfile,
-        root_node = '150R',
+        root_node = '150R', sep="    ",
         time=[30, 60, 90], vmin=1.0, vmax=1.05,
         to_file = None, show=False, do_return=False,
         **kwargs
@@ -215,6 +219,7 @@ def plot_network(
     constrained_layout = kwargs.get('constrained_layout', False)
     node_size = kwargs.get('node_size',50)
     label_fontsize = kwargs.get('fontsize', 25)
+    suptitle_sfx = kwargs.get("suptitle_sfx", None)
     ticklabel_fontsize = label_fontsize - 2
     title_fontsize = label_fontsize + 10
     
@@ -227,7 +232,7 @@ def plot_network(
     open_buses = [bus for bus in df_voltages.columns if bus.find("OPEN") != -1]
 
     # networkx graph
-    branch_info, base_voltages, cord = extract_topology(topology_file, buscoord_file)
+    branch_info, base_voltages, cord = extract_topology(topology_file, buscoord_file, sep=sep)
     network = get_network(branch_info, cord, root_node=root_node, open_buses=open_buses)
 
     # Plotting
@@ -260,6 +265,8 @@ def plot_network(
     cbar.ax.tick_params(labelsize = ticklabel_fontsize)
 
     suptitle = "Voltage magnitude heatmaps at time steps t="+','.join([str(i) for i in time])
+    if suptitle_sfx:
+        suptitle = f"{suptitle}  {suptitle_sfx}"
     fig.suptitle(suptitle, fontsize=title_fontsize)
 
     if to_file:
@@ -276,7 +283,7 @@ def plot_network(
 def plot_voltage_tree(
     topology_file, buscoord_file,
     realVfile, imagVfile,
-    root_node='150R',
+    root_node='150R', sep="    ",
     time=[30, 60, 90],
     to_file = None, show=False, do_return=False,
     **kwargs
@@ -289,6 +296,7 @@ def plot_voltage_tree(
     label_fontsize = kwargs.get('fontsize', 40)
     ticklabel_fontsize = label_fontsize - 10
     title_fontsize = label_fontsize + 10
+    suptitle_sfx = kwargs.get("suptitle_sfx", None)
     annotate = kwargs.get('annotate', False)
 
     # get voltage data
@@ -300,7 +308,7 @@ def plot_voltage_tree(
     open_buses = [bus for bus in df_voltages.columns if bus.find("OPEN") != -1]
 
     # networkx graph
-    branch_info, base_voltages, cord = extract_topology(topology_file, buscoord_file)
+    branch_info, base_voltages, cord = extract_topology(topology_file, buscoord_file, sep=sep)
     network = get_network(branch_info, cord, root_node=root_node, open_buses=open_buses)
     distance_to_root = nx.get_node_attributes(network, "root_distance")
 
@@ -355,7 +363,10 @@ def plot_voltage_tree(
         axs[i].tick_params(axis="x", labelsize=ticklabel_fontsize)
         axs[i].tick_params(axis="y", labelsize=ticklabel_fontsize)
     
+    
     suptitle = "Voltage tree at time steps t="+','.join([str(i) for i in time])
+    if suptitle_sfx:
+        suptitle = f"{suptitle}  {suptitle_sfx}"
     fig.suptitle(suptitle, fontsize=title_fontsize)
 
     if to_file:
