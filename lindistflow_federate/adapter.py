@@ -272,7 +272,11 @@ def extract_info(topology: Topology) -> Tuple[dict, dict]:
 
 if __name__ == "__main__":
     import json
-    case = "ieee123"
+    import sys
+    if len(sys.argv) == 1:
+        case = "ieee123"
+    else:
+        case = sys.argv[1]
     with open (f"../outputs/{case}/topology.json", 'r') as jsonfile:
         topology = Topology.parse_obj(json.load(jsonfile))
     
