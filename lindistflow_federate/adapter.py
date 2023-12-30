@@ -224,7 +224,7 @@ def extract_info(topology: Topology) -> Tuple[dict, dict]:
             if fbus_phase_cnt == 3 and tbus_phase_cnt == 3:
                 type = "3 PHASE TSFR"
             elif (fbus_phase_cnt == 1 and tbus_phase_cnt==2) or (fbus_phase_cnt == 2 and tbus_phase_cnt==1):
-                type = "SPLIT_PHASE"
+                type = "SPLIT PHASE TSFR"
             elif (fbus_phase_cnt == 1 or tbus_phase_cnt==1):
                 type = "1 PHASE TSFR"
             else:

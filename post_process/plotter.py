@@ -280,6 +280,68 @@ def plot_network(
     pass
 
 
+def voltage_tree(
+        network, voltages, 
+        ax, time, **kwargs
+    ):
+    # keyword arguments
+    label_fontsize = kwargs.get('fontsize', 40)
+    ticklabel_fontsize = label_fontsize - 10
+    annotate = kwargs.get('annotate', False)
+
+    # plot paramters
+    color_choice = {'1' : 'red', '2' : 'blue', '3': 'seagreen'}
+    distance_to_root = nx.get_node_attributes(network, "root_distance")
+    
+    # initialize buses to annotate
+    bus_annotated = []
+    
+    # plot the voltage tree
+    for u,v in network.edges:
+        u_phase = u.split('.')[-1]
+        v_phase = v.split('.')[-1]
+
+        # raise error if there is an edge between different phases
+        if u_phase != v_phase:
+            raise ValueError("Phases do not match!!!")
+        
+        # Plot an edge in the voltage tree
+        kwargs_plot = dict(
+            ls = kwargs.get('ls','dashed'), 
+            lw = kwargs.get('lw', 2.5)
+            )
+        ax.plot([distance_to_root[u], distance_to_root[v]], 
+                [voltages[u], voltages[v]], 
+                color = color_choice[u_phase],
+                **kwargs_plot)
+        
+        # Annotate for large voltage deviation
+        if annotate:
+            if abs(voltages[v] - voltages[u]) > 0.01:
+                ubus = u.split('.')[0]
+                vbus = v.split('.')[0]
+                if ubus not in bus_annotated:
+                    bus_annotated.append(ubus)
+                    ax.annotate(
+                        ubus, (distance_to_root[u], voltages[u]), 
+                        fontsize=label_fontsize-10
+                    )
+                if vbus not in bus_annotated:
+                    bus_annotated.append(vbus)
+                    ax.annotate(
+                        vbus, (distance_to_root[v], voltages[v]), 
+                        fontsize=label_fontsize-10
+                    )
+
+    ax.set_xlabel("Distance from the root node (units)", fontsize=label_fontsize)
+    ax.set_ylabel("Voltage at node (p.u.)", fontsize=label_fontsize)
+    ax.set_title(f"Time step: t={time}", fontsize=label_fontsize)
+    ax.grid(color='k', linestyle='dashed', linewidth=0.2)
+    ax.tick_params(axis="x", labelsize=ticklabel_fontsize)
+    ax.tick_params(axis="y", labelsize=ticklabel_fontsize)
+    return
+
+
 def plot_voltage_tree(
     topology_file, buscoord_file,
     realVfile, imagVfile,
@@ -294,10 +356,8 @@ def plot_voltage_tree(
     figsize = kwargs.get('figsize', (30, 10))
     constrained_layout = kwargs.get('constrained_layout', False)
     label_fontsize = kwargs.get('fontsize', 40)
-    ticklabel_fontsize = label_fontsize - 10
     title_fontsize = label_fontsize + 10
     suptitle_sfx = kwargs.get("suptitle_sfx", None)
-    annotate = kwargs.get('annotate', False)
 
     # get voltage data
     voltage_real = feather.read_feather(realVfile)
@@ -310,58 +370,13 @@ def plot_voltage_tree(
     # networkx graph
     branch_info, base_voltages, cord = extract_topology(topology_file, buscoord_file, sep=sep)
     network = get_network(branch_info, cord, root_node=root_node, open_buses=open_buses)
-    distance_to_root = nx.get_node_attributes(network, "root_distance")
 
     # Plotting
     fig, axs = plt.subplots(nrows, ncols, figsize=figsize, constrained_layout=constrained_layout)
-    color_choice = {'1' : 'red', '2' : 'blue', '3': 'seagreen'}
+    
     for i,t in enumerate(time):
         voltages = df_voltages.iloc[t,:] / base_voltages
-        bus_annotated = []
-        for u,v in network.edges:
-            u_phase = u.split('.')[-1]
-            v_phase = v.split('.')[-1]
-
-            # raise error if there is an edge between different phases
-            if u_phase != v_phase:
-                raise ValueError("Phases do not match!!!")
-            
-            # Plot an edge in the voltage tree
-            kwargs_plot = dict(
-                ls = kwargs.get('ls','dashed'), 
-                lw = kwargs.get('lw', 2.5)
-                )
-            axs[i].plot([distance_to_root[u], distance_to_root[v]], 
-                    [voltages[u], voltages[v]], 
-                    color = color_choice[u_phase],
-                    **kwargs_plot)
-            
-            # Annotate for large voltage deviation
-            if annotate:
-                if abs(voltages[v] - voltages[u]) > 0.01:
-                    ubus = u.split('.')[0]
-                    vbus = v.split('.')[0]
-                    if ubus not in bus_annotated:
-                        bus_annotated.append(ubus)
-                        axs[i].annotate(
-                            ubus, (distance_to_root[u], voltages[u]), 
-                            fontsize=label_fontsize-10
-                        )
-                    if vbus not in bus_annotated:
-                        bus_annotated.append(vbus)
-                        axs[i].annotate(
-                            vbus, (distance_to_root[v], voltages[v]), 
-                            fontsize=label_fontsize-10
-                        )
-                    # print(f"Voltage deviation of {abs(voltages[v] - voltages[u])} between nodes {u} and {v}")
-
-
-        axs[i].set_xlabel("Distance from the root node (units)", fontsize=label_fontsize)
-        axs[i].set_ylabel("Voltage at node (p.u.)", fontsize=label_fontsize)
-        axs[i].set_title(f"Time step: t={t}", fontsize=label_fontsize)
-        axs[i].grid(color='k', linestyle='dashed', linewidth=0.2)
-        axs[i].tick_params(axis="x", labelsize=ticklabel_fontsize)
-        axs[i].tick_params(axis="y", labelsize=ticklabel_fontsize)
+        voltage_tree(network, voltages, axs[i], t, **kwargs)
     
     
     suptitle = "Voltage tree at time steps t="+','.join([str(i) for i in time])

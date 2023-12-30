@@ -9,6 +9,8 @@ authors:
   given-names: "Rabayet"
 - family-names: "Mitra"
   given-names: "Bhaskar"
+- family-names: "Meyur"
+  given-names: "Rounak"
 title: "OpenEDI - System Integration (OEDI-SI)- PNNL Distributed Optimal Power Flow (DOPF)"
 version: 1.0.0
 doi: 10.11578/1986048.
