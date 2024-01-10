@@ -88,7 +88,8 @@ def optimal_power_flow(branch_info: dict, bus_info: dict, source_bus: str, contr
     nbranch_s1s2 = 0
     nbus_s1s2 = 0
     mult = 1
-    secondary_model = ['TPX_LINE', 'SPLIT_PHASE']
+    secondary_model = ['TPX_LINE', 'SPLIT_PHASE', 
+                       '1 PHASE TSFR', 'SOME OTHER TSFR']
     name = []
     for b_eq in branch_info:
         if branch_info[b_eq]['type'] in secondary_model:
