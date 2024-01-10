@@ -314,6 +314,7 @@ def voltage_tree(
                 [voltages[u], voltages[v]], 
                 color = color_choice[u_phase],
                 **kwargs_plot)
+        ax.set_ylim(0.98,1.06)
         
         # Annotate for large voltage deviation
         if annotate:
