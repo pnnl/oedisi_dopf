@@ -672,15 +672,15 @@ class OMOOFederate:
             logger.debug(f"OMOO takes {(te-ts)/60} (min)")
             command_list = []
             for i in range(len(P_set)):
-                command_list.append(
-                    Command(
-                        obj_name=pv.loc[i, "name"],
-                        obj_property="PF",
-                        val=str(np.sign(Q_set[i]) * power_factor[i])
-                        # increases Q until it runs out of rating,
-                        # and then decreases P
-                    )
-                )
+                # command_list.append(
+                #     Command(
+                #         obj_name=pv.loc[i, "name"],
+                #         obj_property="PF",
+                #         val=str(np.sign(Q_set[i]) * power_factor[i])
+                #         # increases Q until it runs out of rating,
+                #         # and then decreases P
+                #     )
+                # )
                 command_list.append(
                     Command(
                         obj_name=pv.loc[i, "name"],

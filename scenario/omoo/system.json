@@ -32,7 +32,7 @@
                 "sensor_location": "gadal_ieee123/sensors.json",
                 "existing_feeder_file": "opendss/master.dss",
                 "start_date": "2017-01-01 11:00:00",
-                "number_of_timesteps": 10,
+                "number_of_timesteps": 96,
                 "run_freq_sec": 900,
                 "topology_output": "../../outputs/omoo/topology.json"
             }
