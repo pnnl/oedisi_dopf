@@ -34,7 +34,8 @@
                 "start_date": "2017-01-01 11:00:00",
                 "number_of_timesteps": 96,
                 "run_freq_sec": 900,
-                "topology_output": "../../outputs/omoo/topology.json"
+                "topology_output": "../../outputs/omoo/topology.json", 
+                "use_sparse_admittance": true
             }
         }
     ],

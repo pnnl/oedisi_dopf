@@ -6,6 +6,7 @@ import networkx as nx
 import numpy as np
 import json
 import pyarrow.feather as feather
+from geopy.distance import geodesic
 
 
 def compare_voltages(
@@ -98,7 +99,7 @@ def extract_topology(topology_file, buscoord_file, sep="    "):
         )
         base_voltage_df.set_index("id", inplace=True)
         base_voltages = base_voltage_df["value"]
-        branch_info = extract_info(topology)
+        branch_info, bus_info = extract_info(topology)
     
     # Extract bus coordinates
     with open(buscoord_file, 'r') as cord_file:
@@ -108,15 +109,26 @@ def extract_topology(topology_file, buscoord_file, sep="    "):
         temp = line.strip('\n').split(sep)
         cord[temp[0].upper()] = [float(temp[1]),float(temp[2])]
     
-    return branch_info, base_voltages, cord
+    return branch_info, bus_info, base_voltages, cord
 
 def extract_info(topology: Topology) -> dict:
+    
+    # Get the valid phases for each bus
+    buses = list(topology.base_voltage_magnitudes.ids)
+    bus_info = {}
+    for bus in buses:
+        [bus_name, bus_phase] = bus.split(".")
+        if bus_name not in bus_info:
+            bus_info[bus_name] = [bus_phase]
+        else:
+            bus_info[bus_name].append(bus_phase)
+    
     branch_info = {}
     from_equip = topology.admittance.from_equipment
     to_equip = topology.admittance.to_equipment
 
     for fr_eq, to_eq in zip(from_equip, to_equip):
-        [from_name, from_phase] = fr_eq.split('.')
+        [from_name, _] = fr_eq.split('.')
         type = "LINE"
         if from_name.find('OPEN') != -1:
             [from_name, _] = from_name.split('_')
@@ -137,57 +149,70 @@ def extract_info(topology: Topology) -> dict:
             branch_info[key] = {}
             branch_info[key]["fr_bus"] = ""
             branch_info[key]["to_bus"] = ""
-            branch_info[key]["phases"] = []
         elif key_back in branch_info:
             continue
-
-        if from_phase not in branch_info[key]['phases']:
-            branch_info[key]['phases'].append(from_phase)
 
         branch_info[key]['type'] = type
         branch_info[key]['fr_bus'] = from_name
         branch_info[key]['to_bus'] = to_name
 
-    return branch_info
+    return branch_info, bus_info
 
 
 def dist(cordA, cordB):
     return np.linalg.norm(np.array(cordA) - np.array(cordB))
 
-def get_network(branch_info, pos, root_node='150R', open_buses=[]):
+def geodist(cordA, cordB):
+    return geodesic(cordA[::-1],cordB[::-1]).miles
+
+def get_network(branch_info, bus_info, pos, root_node='150R', open_buses=[], coordsys="2D"):
     
-    # construct the networkx graph
+    # construct the networkx graph with only three phase transformers
     network = nx.Graph()
     for brn in branch_info:
-        # add single, two and three phase lines
-        if branch_info[brn]["type"] == 'LINE':
-            fbus = branch_info[brn]['fr_bus']
-            tbus = branch_info[brn]['to_bus']
-            for phase in branch_info[brn]["phases"]:
-                u = '.'.join([fbus,phase])
-                v = '.'.join([tbus,phase])
-                network.add_edge(u,v)
+        fbus = branch_info[brn]['fr_bus']
+        tbus = branch_info[brn]['to_bus']
+        fbus_phases = bus_info[fbus]
+        tbus_phases = bus_info[tbus]
+        common_phases = list(set(fbus_phases).intersection(set(tbus_phases)))
+        
         # add switches if they are NOT OPEN
-        elif branch_info[brn]["type"] == "SWITCH":
-            fbus = branch_info[brn]['fr_bus']
-            tbus = branch_info[brn]['to_bus']
-            for phase in branch_info[brn]["phases"]:
+        if branch_info[brn]["type"] == "SWITCH":
+            for phase in common_phases:
                 u = '.'.join([fbus,phase])
                 v = '.'.join([tbus,phase])
                 if (f"{fbus}_OPEN.{phase}" not in open_buses) and (f"{tbus}_OPEN.{phase}" not in open_buses):
                     network.add_edge(u,v)
         else:
-            print(f"Branch of type {branch_info[brn]['type']} cannot be added in the present version")
+            for phase in common_phases:
+                u = '.'.join([fbus,phase])
+                v = '.'.join([tbus,phase])
+                network.add_edge(u,v)
     
+    # delete nodes if there is no path to the root node
+    nodes_to_delete = []
+    for n in network.nodes:
+        if not nx.has_path(
+            network, source=f"{root_node}.1", target=n
+            ) and not nx.has_path(
+                network, source=f"{root_node}.2", target=n
+            ) and not nx.has_path(
+                network, source=f"{root_node}.3", target=n
+            ):
+            nodes_to_delete.append(n)
+    network.remove_nodes_from(nodes_to_delete)
+
     # add coordinates of each node and length of each edge to the network as attributes
-    np.random.seed(1221)
     for u in network.nodes:
         network.nodes[u]['cord'] = pos[u.split('.')[0]]
     
     for (u,v) in network.edges:
         upos = network.nodes[u]['cord']
         vpos = network.nodes[v]['cord']
-        network[u][v]['length'] = dist(upos, vpos)
+        if coordsys == "2D":
+            network[u][v]['length'] = dist(upos, vpos)
+        elif coordsys == "GEO":
+            network[u][v]['length'] = geodist(upos, vpos)
 
     # compute distance to root node
     for n in network.nodes:
@@ -213,9 +238,7 @@ def plot_network(
         **kwargs
         ) -> None:
     # keyword arguments
-    ncols = kwargs.get('ncols', 3)
-    nrows = kwargs.get('nrows', 1)
-    figsize = kwargs.get('figsize', (30, 10))
+    figsize = kwargs.get('figsize', (10*len(time), 10))
     constrained_layout = kwargs.get('constrained_layout', False)
     node_size = kwargs.get('node_size',50)
     label_fontsize = kwargs.get('fontsize', 25)
@@ -232,12 +255,12 @@ def plot_network(
     open_buses = [bus for bus in df_voltages.columns if bus.find("OPEN") != -1]
 
     # networkx graph
-    branch_info, base_voltages, cord = extract_topology(topology_file, buscoord_file, sep=sep)
-    network = get_network(branch_info, cord, root_node=root_node, open_buses=open_buses)
+    branch_info, bus_info, base_voltages, cord = extract_topology(topology_file, buscoord_file, sep=sep)
+    network = get_network(branch_info, bus_info, cord, root_node=root_node, open_buses=open_buses)
 
     # Plotting
     cmap = plt.cm.plasma
-    fig, axs = plt.subplots(nrows, ncols, figsize=figsize, constrained_layout=constrained_layout)
+    fig, axs = plt.subplots(1, len(time), figsize=figsize, constrained_layout=constrained_layout)
     for i,t in enumerate(time):
         voltages = df_voltages.iloc[t,:] / base_voltages
         n_colors = [voltages[n] for n in network.nodes]
@@ -264,7 +287,11 @@ def plot_network(
     cbar.set_label("Voltage Magnitude (p.u.)", size=label_fontsize)
     cbar.ax.tick_params(labelsize = ticklabel_fontsize)
 
-    suptitle = "Voltage magnitude heatmaps at time steps t="+','.join([str(i) for i in time])
+    if len(time)>1:
+        suptitle = "Voltage magnitude heatmaps at time steps t="+','.join([str(i) for i in time])
+    else:
+        suptitle = f"Voltage magnitude heatmaps at time step t={time[0]}"
+
     if suptitle_sfx:
         suptitle = f"{suptitle}  {suptitle_sfx}"
     fig.suptitle(suptitle, fontsize=title_fontsize)
@@ -282,7 +309,9 @@ def plot_network(
 
 def voltage_tree(
         network, voltages, 
-        ax, time, **kwargs
+        ax, time, 
+        coordsys="2D", 
+        **kwargs
     ):
     # keyword arguments
     label_fontsize = kwargs.get('fontsize', 40)
@@ -314,7 +343,7 @@ def voltage_tree(
                 [voltages[u], voltages[v]], 
                 color = color_choice[u_phase],
                 **kwargs_plot)
-        ax.set_ylim(0.98,1.06)
+        # ax.set_ylim(0.98,1.06)
         
         # Annotate for large voltage deviation
         if annotate:
@@ -334,7 +363,10 @@ def voltage_tree(
                         fontsize=label_fontsize-10
                     )
 
-    ax.set_xlabel("Distance from the root node (units)", fontsize=label_fontsize)
+    if coordsys == "2D":
+        ax.set_xlabel("Distance from the root node (units)", fontsize=label_fontsize)
+    elif coordsys == "GEO":
+        ax.set_xlabel("Distance from the root node (miles)", fontsize=label_fontsize)
     ax.set_ylabel("Voltage at node (p.u.)", fontsize=label_fontsize)
     ax.set_title(f"Time step: t={time}", fontsize=label_fontsize)
     ax.grid(color='k', linestyle='dashed', linewidth=0.2)
@@ -347,14 +379,13 @@ def plot_voltage_tree(
     topology_file, buscoord_file,
     realVfile, imagVfile,
     root_node='150R', sep="    ",
+    coordsys="2D",
     time=[30, 60, 90],
     to_file = None, show=False, do_return=False,
     **kwargs
     ):
     # keyword arguments
-    ncols = kwargs.get('ncols', 3)
-    nrows = kwargs.get('nrows', 1)
-    figsize = kwargs.get('figsize', (30, 10))
+    figsize = kwargs.get('figsize', (10*len(time), 10))
     constrained_layout = kwargs.get('constrained_layout', False)
     label_fontsize = kwargs.get('fontsize', 40)
     title_fontsize = label_fontsize + 10
@@ -369,18 +400,21 @@ def plot_voltage_tree(
     open_buses = [bus for bus in df_voltages.columns if bus.find("OPEN") != -1]
 
     # networkx graph
-    branch_info, base_voltages, cord = extract_topology(topology_file, buscoord_file, sep=sep)
-    network = get_network(branch_info, cord, root_node=root_node, open_buses=open_buses)
+    branch_info, bus_info, base_voltages, cord = extract_topology(topology_file, buscoord_file, sep=sep)
+    network = get_network(branch_info, bus_info, cord, root_node=root_node, open_buses=open_buses, coordsys=coordsys)
 
     # Plotting
-    fig, axs = plt.subplots(nrows, ncols, figsize=figsize, constrained_layout=constrained_layout)
+    fig, axs = plt.subplots(1, len(time), figsize=figsize, constrained_layout=constrained_layout)
     
     for i,t in enumerate(time):
         voltages = df_voltages.iloc[t,:] / base_voltages
-        voltage_tree(network, voltages, axs[i], t, **kwargs)
+        voltage_tree(network, voltages, axs[i], t, coordsys=coordsys, **kwargs)
     
+    if len(time) > 1:
+        suptitle = "Voltage tree at time steps t=" + ','.join([str(i) for i in time])
+    else:
+        suptitle = f"Voltage tree at time steps t={time[0]}"
     
-    suptitle = "Voltage tree at time steps t="+','.join([str(i) for i in time])
     if suptitle_sfx:
         suptitle = f"{suptitle}  {suptitle_sfx}"
     fig.suptitle(suptitle, fontsize=title_fontsize)

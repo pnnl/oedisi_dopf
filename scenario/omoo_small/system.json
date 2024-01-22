@@ -1,0 +1,97 @@
+{
+    "name": "test_omoo",
+    "components": [
+        {
+            "name": "recorder_voltage_real",
+            "type": "Recorder",
+            "parameters": {"feather_filename": "../../outputs/omoo_small/voltage_real.feather",
+                           "csv_filename": "../../outputs/omoo_small/voltage_real.csv"
+                          }
+        },
+        {
+            "name": "recorder_voltage_imag",
+            "type": "Recorder",
+            "parameters": {"feather_filename": "../../outputs/omoo_small/voltage_imag.feather",
+                           "csv_filename": "../../outputs/omoo_small/voltage_imag.csv"
+                          }
+        },
+        {
+            "name": "optimal_pf",
+            "type": "OMOOComponent",
+            "parameters": {
+                "algorithm_parameters": {"tol": 1e-5}
+            }
+        },
+        {
+            "name": "feeder",
+            "type": "LocalFeeder",
+            "parameters": {
+                "use_smartds": true,
+                "existing_feeder_file": "opendss/Master.dss",
+                "profile_location": "SMART-DS/v1.0/2017/SFO/P1U/profiles",
+                "opendss_location": "SMART-DS/v1.0/2017/SFO/P1U/scenarios/solar_medium_batteries_none_timeseries/opendss/p1uhs0_1247/p1uhs0_1247--p1udt942",
+                "start_date": "2017-05-01 00:00:00",
+                "number_of_timesteps": 96,
+                "run_freq_sec": 900,
+                "use_sparse_admittance": true,
+                "topology_output": "../../outputs/omoo_small/topology.json"
+            }
+        }
+    ],
+    "links": [
+        {
+            "source": "feeder",
+            "source_port": "voltages_real",
+            "target": "recorder_voltage_real",
+            "target_port": "subscription"
+        },
+        {
+            "source": "feeder",
+            "source_port": "voltages_imag",
+            "target": "recorder_voltage_imag",
+            "target_port": "subscription"
+        },
+        {
+            "source": "feeder",
+            "source_port": "topology",
+            "target": "optimal_pf",
+            "target_port": "topology"
+        },
+        {
+            "source": "feeder",
+            "source_port": "injections",
+            "target": "optimal_pf",
+            "target_port": "injections"
+        },
+        {
+            "source": "feeder",
+            "source_port": "powers_real",
+            "target": "optimal_pf",
+            "target_port": "powers_real"
+        },
+        {
+            "source": "feeder",
+            "source_port": "powers_imag",
+            "target": "optimal_pf",
+            "target_port": "powers_imag"
+        },
+        {
+            "source": "feeder",
+            "source_port": "voltages_real",
+            "target": "optimal_pf",
+            "target_port": "voltages_real"
+        },
+        {
+            "source": "feeder",
+            "source_port": "voltages_imag",
+            "target": "optimal_pf",
+            "target_port": "voltages_imag"
+        },
+        {
+            "source": "optimal_pf",
+            "source_port": "P_set",
+            "target": "feeder",
+            "target_port": "change_commands"
+        }
+    ]
+}
