@@ -4,7 +4,7 @@ import plotter
 case = sys.argv[1]
 
 if case == "ieee123" or case == "omoo":
-    root = "150R"
+    root = "150"
     seperator = "    "
     cordsys = "2D"
     annotate=True
@@ -23,7 +23,7 @@ elif case == "medium" or case == "omoo_medium":
 if case.find("omoo") != -1:
     sfx = "(OMOO Algorithm)"
 else:
-    sfx = "(Linearized Distribution Flow Algorithm)"
+    sfx = "(LinDistFlow Algorithm)"
 
 directory = f"../outputs/{case}"
 topology_filepath = os.path.join(directory, "topology.json")
@@ -58,6 +58,40 @@ plotter.plot_voltage_tree(
     show=False, to_file=fig_filename,
     lw=2.5, ls='dashed', 
     figsize=(60,15),
+    annotate=annotate,
+    suptitle_sfx = sfx, 
+    coordsys=cordsys,
+    )
+
+
+time = [75]
+fig_filename = os.path.join(directory, f"network_peak_{case}.png")
+plotter.plot_network(
+    topology_filepath,
+    buscoord_filepath, 
+    real_voltage_filepath, 
+    imag_voltage_filepath, 
+    root_node=root, sep=seperator,
+    time=time, node_size=200, 
+    show=False, to_file=fig_filename, 
+    suptitle_sfx = sfx, 
+    figsize=(20,20)
+    )
+
+
+
+fig_filename = os.path.join(directory, f"vtree_peak_{case}.png")
+plotter.plot_voltage_tree(
+    topology_filepath,
+    buscoord_filepath, 
+    real_voltage_filepath, 
+    imag_voltage_filepath,
+    root_node=root, 
+    sep=seperator,
+    time=time,
+    show=False, to_file=fig_filename,
+    lw=2.5, ls='dashed', 
+    figsize=(20,15),
     annotate=annotate,
     suptitle_sfx = sfx, 
     coordsys=cordsys,

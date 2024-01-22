@@ -264,18 +264,22 @@ def plot_network(
     for i,t in enumerate(time):
         voltages = df_voltages.iloc[t,:] / base_voltages
         n_colors = [voltages[n] for n in network.nodes]
-        
+
+        if len(time) > 1:
+            ax = axs[i]
+            ax.set_title(f"Time step: t={t}", fontsize=label_fontsize)
+        else:
+            ax = axs
         
         # Draw the network
         pos = nx.get_node_attributes(network, 'cord')
         nx.draw_networkx_nodes(
-            network, pos, ax=axs[i],
+            network, pos, ax=ax,
             node_size=node_size, node_color=n_colors, cmap=cmap, 
             vmin=vmin,vmax=vmax,
             )
-        nx.draw_networkx_edges(network, pos, alpha=0.1,edge_color='k', ax=axs[i])
-
-        axs[i].set_title(f"Time step: t={t}", fontsize=label_fontsize)
+        nx.draw_networkx_edges(network, pos, alpha=0.1,edge_color='k', ax=ax)
+        
 
     # Colorbar
     cobj = cm.ScalarMappable(cmap=cmap)
@@ -283,7 +287,6 @@ def plot_network(
     fig.subplots_adjust(bottom=0.2)
     cbar_ax = fig.add_axes([0.15, 0.1, 0.72, 0.05])
     cbar = fig.colorbar(cobj, cax=cbar_ax, orientation= 'horizontal')
-    # cbar = fig.colorbar(cobj, ax=axs[0], orientation= 'horizontal', pad=0.05)
     cbar.set_label("Voltage Magnitude (p.u.)", size=label_fontsize)
     cbar.ax.tick_params(labelsize = ticklabel_fontsize)
 
@@ -310,7 +313,8 @@ def plot_network(
 def voltage_tree(
         network, voltages, 
         ax, time, 
-        coordsys="2D", 
+        coordsys="2D",
+        add_title=True,  
         **kwargs
     ):
     # keyword arguments
@@ -368,7 +372,8 @@ def voltage_tree(
     elif coordsys == "GEO":
         ax.set_xlabel("Distance from the root node (miles)", fontsize=label_fontsize)
     ax.set_ylabel("Voltage at node (p.u.)", fontsize=label_fontsize)
-    ax.set_title(f"Time step: t={time}", fontsize=label_fontsize)
+    if add_title:
+        ax.set_title(f"Time step: t={time}", fontsize=label_fontsize)
     ax.grid(color='k', linestyle='dashed', linewidth=0.2)
     ax.tick_params(axis="x", labelsize=ticklabel_fontsize)
     ax.tick_params(axis="y", labelsize=ticklabel_fontsize)
@@ -408,12 +413,22 @@ def plot_voltage_tree(
     
     for i,t in enumerate(time):
         voltages = df_voltages.iloc[t,:] / base_voltages
-        voltage_tree(network, voltages, axs[i], t, coordsys=coordsys, **kwargs)
+        if len(time) > 1:
+            ax = axs[i]
+            add_title=True
+        else:
+            ax = axs
+            add_title = False
+        voltage_tree(
+            network, voltages, ax, t, 
+            coordsys=coordsys, add_title=add_title, 
+            **kwargs
+            )
     
     if len(time) > 1:
         suptitle = "Voltage tree at time steps t=" + ','.join([str(i) for i in time])
     else:
-        suptitle = f"Voltage tree at time steps t={time[0]}"
+        suptitle = f"Voltage tree at time step t={time[0]}"
     
     if suptitle_sfx:
         suptitle = f"{suptitle}  {suptitle_sfx}"
