@@ -267,9 +267,13 @@ def plot_network(
 
         if len(time) > 1:
             ax = axs[i]
-            ax.set_title(f"Time step: t={t}", fontsize=label_fontsize)
+            
         else:
             ax = axs
+        ax.set_title(
+            f"Time: {t//4 :02d}:{15*(t%4) :2d} hours", 
+            fontsize=label_fontsize
+            )
         
         # Draw the network
         pos = nx.get_node_attributes(network, 'cord')
@@ -291,9 +295,9 @@ def plot_network(
     cbar.ax.tick_params(labelsize = ticklabel_fontsize)
 
     if len(time)>1:
-        suptitle = "Voltage magnitude heatmaps at time steps t="+','.join([str(i) for i in time])
+        suptitle = f"Voltage magnitude heatmaps at {len(time)} different time steps"
     else:
-        suptitle = f"Voltage magnitude heatmaps at time step t={time[0]}"
+        suptitle = "Voltage magnitude heatmap at a particular time step"
 
     if suptitle_sfx:
         suptitle = f"{suptitle}  {suptitle_sfx}"
@@ -312,15 +316,16 @@ def plot_network(
 
 def voltage_tree(
         network, voltages, 
-        ax, time, 
+        ax, title="", 
         coordsys="2D",
-        add_title=True,  
         **kwargs
     ):
     # keyword arguments
     label_fontsize = kwargs.get('fontsize', 40)
     ticklabel_fontsize = label_fontsize - 10
     annotate = kwargs.get('annotate', False)
+    ymin = kwargs.get('ymin', 0.98)
+    ymax = kwargs.get('ymax', 1.06)
 
     # plot paramters
     color_choice = {'1' : 'red', '2' : 'blue', '3': 'seagreen'}
@@ -347,7 +352,7 @@ def voltage_tree(
                 [voltages[u], voltages[v]], 
                 color = color_choice[u_phase],
                 **kwargs_plot)
-        # ax.set_ylim(0.98,1.06)
+        ax.set_ylim(ymin, ymax)
         
         # Annotate for large voltage deviation
         if annotate:
@@ -371,9 +376,9 @@ def voltage_tree(
         ax.set_xlabel("Distance from the root node (units)", fontsize=label_fontsize)
     elif coordsys == "GEO":
         ax.set_xlabel("Distance from the root node (miles)", fontsize=label_fontsize)
+    
     ax.set_ylabel("Voltage at node (p.u.)", fontsize=label_fontsize)
-    if add_title:
-        ax.set_title(f"Time step: t={time}", fontsize=label_fontsize)
+    ax.set_title(title, fontsize=label_fontsize)
     ax.grid(color='k', linestyle='dashed', linewidth=0.2)
     ax.tick_params(axis="x", labelsize=ticklabel_fontsize)
     ax.tick_params(axis="y", labelsize=ticklabel_fontsize)
@@ -415,23 +420,189 @@ def plot_voltage_tree(
         voltages = df_voltages.iloc[t,:] / base_voltages
         if len(time) > 1:
             ax = axs[i]
-            add_title=True
         else:
             ax = axs
-            add_title = False
         voltage_tree(
-            network, voltages, ax, t, 
-            coordsys=coordsys, add_title=add_title, 
+            network, voltages, ax, 
+            title=f"Time: {t//4 :02d}:{15*(t%4) :2d} hours", 
+            coordsys=coordsys,
             **kwargs
             )
     
     if len(time) > 1:
-        suptitle = "Voltage tree at time steps t=" + ','.join([str(i) for i in time])
+        suptitle = f"Voltage trees at {len(time)} different time steps"
     else:
-        suptitle = f"Voltage tree at time step t={time[0]}"
+        suptitle = f"Voltage tree at a particular time step"
     
     if suptitle_sfx:
         suptitle = f"{suptitle}  {suptitle_sfx}"
+    fig.suptitle(suptitle, fontsize=title_fontsize)
+
+    if to_file:
+        fig.savefig(to_file, bbox_inches='tight')
+    if show:
+        plt.show()
+    plt.close(fig)
+    
+    if do_return:
+        return fig
+    pass
+
+
+def compare_vtree(
+        realVfile1, realVfile2, 
+        imagVfile1, imagVfile2, 
+        topofile1, topofile2, 
+        buscordfile1, buscordfile2, 
+        alg1, alg2, 
+        sep = "    ", root_node = "150",
+        coordsys = "2D", 
+        time = 45,  
+        to_file = None, show=True, do_return=False, 
+        **kwargs
+):
+    # keyword arguments
+    figsize = kwargs.get('figsize', (40, 20))
+    constrained_layout = kwargs.get('constrained_layout', False)
+    label_fontsize = kwargs.get('fontsize', 40)
+    title_fontsize = label_fontsize + 10
+
+    # get voltage data
+    voltage_real1 = feather.read_feather(realVfile1)
+    voltage_imag1 = feather.read_feather(imagVfile1)
+    df_voltages1 = np.abs(voltage_real1.drop("time", axis=1) + 1j * voltage_imag1.drop("time", axis=1))
+
+    voltage_real2 = feather.read_feather(realVfile2)
+    voltage_imag2 = feather.read_feather(imagVfile2)
+    df_voltages2 = np.abs(voltage_real2.drop("time", axis=1) + 1j * voltage_imag2.drop("time", axis=1))
+    
+    # get open switches in the network
+    open_buses1 = [bus for bus in df_voltages1.columns if bus.find("OPEN") != -1]
+    open_buses2 = [bus for bus in df_voltages2.columns if bus.find("OPEN") != -1]
+
+    # networkx graph
+    branch_info1, bus_info1, base_voltages1, cord1 = extract_topology(topofile1, buscordfile1, sep=sep)
+    network1 = get_network(branch_info1, bus_info1, cord1, root_node=root_node, open_buses=open_buses1, coordsys=coordsys)
+    branch_info2, bus_info2, base_voltages2, cord2 = extract_topology(topofile2, buscordfile2, sep=sep)
+    network2 = get_network(branch_info2, bus_info2, cord2, root_node=root_node, open_buses=open_buses2, coordsys=coordsys)
+
+    # Plotting
+    fig, axs = plt.subplots(
+        1, 2, figsize=figsize, 
+        constrained_layout=constrained_layout
+        )
+    
+    voltages1 = df_voltages1.iloc[time,:] / base_voltages1
+    voltages2 = df_voltages2.iloc[time,:] / base_voltages2
+    
+    voltage_tree(
+        network1, voltages1, axs[0], 
+        title=f"DOPF Algorithm: {alg1}", 
+        coordsys=coordsys,
+        **kwargs
+        )
+    voltage_tree(
+        network2, voltages2, axs[1], 
+        title=f"DOPF Algorithm: {alg2}", 
+        coordsys=coordsys, 
+        **kwargs
+        )
+    
+    suptitle = f"Voltage tree comparison of networks for two DOPF algorithms, time={time//4 :02d}:{15*(time%4) :2d} hours"
+    fig.suptitle(suptitle, fontsize=title_fontsize)
+
+    if to_file:
+        fig.savefig(to_file, bbox_inches='tight')
+    if show:
+        plt.show()
+    plt.close(fig)
+    
+    if do_return:
+        return fig
+    pass
+
+def compare_network(
+        realVfile1, realVfile2, 
+        imagVfile1, imagVfile2, 
+        topofile1, topofile2, 
+        buscordfile1, buscordfile2, 
+        alg1, alg2, 
+        sep = "    ", root_node = "150",
+        coordsys = "2D", 
+        time = 45, vmin=1.0, vmax=1.05,
+        to_file = None, show=True, do_return=False, 
+        **kwargs
+):
+    # keyword arguments
+    figsize = kwargs.get('figsize', (20, 10))
+    constrained_layout = kwargs.get('constrained_layout', False)
+    node_size = kwargs.get('node_size',50)
+    label_fontsize = kwargs.get('fontsize', 25)
+    ticklabel_fontsize = label_fontsize - 2
+    title_fontsize = label_fontsize + 10
+
+    # get voltage data
+    voltage_real1 = feather.read_feather(realVfile1)
+    voltage_imag1 = feather.read_feather(imagVfile1)
+    df_voltages1 = np.abs(voltage_real1.drop("time", axis=1) + 1j * voltage_imag1.drop("time", axis=1))
+
+    voltage_real2 = feather.read_feather(realVfile2)
+    voltage_imag2 = feather.read_feather(imagVfile2)
+    df_voltages2 = np.abs(voltage_real2.drop("time", axis=1) + 1j * voltage_imag2.drop("time", axis=1))
+    
+    # get open switches in the network
+    open_buses1 = [bus for bus in df_voltages1.columns if bus.find("OPEN") != -1]
+    open_buses2 = [bus for bus in df_voltages2.columns if bus.find("OPEN") != -1]
+
+    # networkx graph
+    branch_info1, bus_info1, base_voltages1, cord1 = extract_topology(topofile1, buscordfile1, sep=sep)
+    network1 = get_network(branch_info1, bus_info1, cord1, root_node=root_node, open_buses=open_buses1, coordsys=coordsys)
+    branch_info2, bus_info2, base_voltages2, cord2 = extract_topology(topofile2, buscordfile2, sep=sep)
+    network2 = get_network(branch_info2, bus_info2, cord2, root_node=root_node, open_buses=open_buses2, coordsys=coordsys)
+
+    # Plotting
+    cmap = plt.cm.plasma
+    fig, axs = plt.subplots(
+        1, 2, figsize=figsize, 
+        constrained_layout=constrained_layout
+        )
+    
+    voltages1 = df_voltages1.iloc[time,:] / base_voltages1
+    n_colors1 = [voltages1[n] for n in network1.nodes]
+    voltages2 = df_voltages2.iloc[time,:] / base_voltages2
+    n_colors2 = [voltages2[n] for n in network2.nodes]
+    
+    # Draw the network
+    pos1 = nx.get_node_attributes(network1, 'cord')
+    pos2 = nx.get_node_attributes(network2, 'cord')
+    
+    nx.draw_networkx_nodes(
+        network1, pos1, ax=axs[0],
+        node_size=node_size, node_color=n_colors1, cmap=cmap, 
+        vmin=vmin,vmax=vmax,
+        )
+    nx.draw_networkx_edges(network1, pos1, alpha=0.1,edge_color='k', ax=axs[0])
+    nx.draw_networkx_nodes(
+        network2, pos2, ax=axs[1],
+        node_size=node_size, node_color=n_colors2, cmap=cmap, 
+        vmin=vmin,vmax=vmax,
+        )
+    nx.draw_networkx_edges(network2, pos2, alpha=0.1,edge_color='k', ax=axs[1])
+    axs[0].set_title(f"DOPF Algorithm: {alg1}", fontsize=label_fontsize)
+    axs[1].set_title(f"DOPF Algorithm: {alg2}", fontsize=label_fontsize)
+        
+
+    # Colorbar
+    cobj = cm.ScalarMappable(cmap=cmap)
+    cobj.set_clim(vmin=vmin, vmax=vmax)
+    fig.subplots_adjust(bottom=0.2)
+    cbar_ax = fig.add_axes([0.15, 0.1, 0.72, 0.05])
+    cbar = fig.colorbar(cobj, cax=cbar_ax, orientation= 'horizontal')
+    cbar.set_label("Voltage Magnitude (p.u.)", size=label_fontsize)
+    cbar.ax.tick_params(labelsize = ticklabel_fontsize)
+
+    
+    suptitle = f"Voltage magnitude heatmaps for two DOPF algorithms, time={time//4 :02d}:{15*(time%4) :2d} hours"
     fig.suptitle(suptitle, fontsize=title_fontsize)
 
     if to_file:
