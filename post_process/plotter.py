@@ -271,7 +271,7 @@ def plot_network(
         else:
             ax = axs
         ax.set_title(
-            f"Time: {t//4 :02d}:{15*(t%4) :2d} hours", 
+            f"Time: {t//4 :02d}:{15*(t%4) :02d} hours", 
             fontsize=label_fontsize
             )
         

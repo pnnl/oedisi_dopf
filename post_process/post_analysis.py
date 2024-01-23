@@ -88,8 +88,8 @@ def plot_result_comparison(
     realVfile2 = os.path.join(dir2, "voltage_real.feather")
     imagVfile2 = os.path.join(dir2, "voltage_imag.feather")
 
-    fig_filename1 = os.path.join(dir1, f"vtree_peak.png")
-    fig_filename2 = os.path.join(dir1, f"network_peak.png")
+    fig_filename1 = os.path.join(dir1, f"vtree_peak_{casename1}.png")
+    fig_filename2 = os.path.join(dir1, f"network_peak_{casename1}.png")
     
     plotter.compare_vtree(
         realVfile1, realVfile2, 
