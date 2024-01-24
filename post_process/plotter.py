@@ -539,7 +539,7 @@ def compare_network(
     node_size = kwargs.get('node_size',50)
     label_fontsize = kwargs.get('fontsize', 25)
     ticklabel_fontsize = label_fontsize - 2
-    title_fontsize = label_fontsize + 10
+    title_fontsize = label_fontsize + 5
 
     # get voltage data
     voltage_real1 = feather.read_feather(realVfile1)
