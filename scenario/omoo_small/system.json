@@ -65,6 +65,12 @@
         },
         {
             "source": "feeder",
+            "source_port": "available_power",
+            "target": "optimal_pf",
+            "target_port": "available_power"
+        },
+        {
+            "source": "feeder",
             "source_port": "powers_real",
             "target": "optimal_pf",
             "target_port": "powers_real"
@@ -91,7 +97,7 @@
             "source": "optimal_pf",
             "source_port": "P_set",
             "target": "feeder",
-            "target_port": "change_commands"
+            "target_port": "pv_set"
         }
     ]
 }

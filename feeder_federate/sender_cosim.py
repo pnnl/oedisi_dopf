@@ -26,8 +26,8 @@ from oedisi.types.data_types import (
     VoltagesReal,
 )
 from scipy.sparse import coo_matrix
-
 from simulator import FeederConfig, FeederSimulator
+from oedisi.types.common import BrokerConfig
 
 logger = logging.getLogger(__name__)
 logger.addHandler(logging.StreamHandler())
@@ -246,8 +246,7 @@ def get_current_data(sim: FeederSimulator, Y):
         feeder_voltages * (Y.conjugate() @ feeder_voltages.conjugate()) / 1000
     )
 
-    PQ_injections_all[sim._source_indexes] = - \
-        calculated_power[sim._source_indexes]
+    PQ_injections_all[sim._source_indexes] = -calculated_power[sim._source_indexes]
 
     Y_load = sim.get_load_y_matrix()
     return CurrentData(
@@ -266,7 +265,12 @@ def where_power_unbalanced(PQ_injections_all, calculated_power, tol=1):
     return errors.ids[indices]
 
 
-def go_cosim(sim: FeederSimulator, config: FeederConfig, input_mapping: Dict[str, str]):
+def go_cosim(
+    sim: FeederSimulator,
+    config: FeederConfig,
+    input_mapping: Dict[str, str],
+    broker_config: BrokerConfig,
+):
     """Run HELICS federate with FeederSimulation.
 
     TODO: Maybe this should be a class or a coroutine or something cleaner.
@@ -277,6 +281,10 @@ def go_cosim(sim: FeederSimulator, config: FeederConfig, input_mapping: Dict[str
 
     logger.info("Creating Federate Info")
     fedinfo = h.helicsCreateFederateInfo()
+
+    h.helicsFederateInfoSetBroker(fedinfo, broker_config.broker_ip)
+    h.helicsFederateInfoSetBrokerPort(fedinfo, broker_config.broker_port)
+
     h.helicsFederateInfoSetCoreName(fedinfo, config.name)
     h.helicsFederateInfoSetCoreTypeFromString(fedinfo, "zmq")
     h.helicsFederateInfoSetCoreInitString(fedinfo, fedinitstring)
@@ -305,6 +313,9 @@ def go_cosim(sim: FeederSimulator, config: FeederConfig, input_mapping: Dict[str
     pub_injections = h.helicsFederateRegisterPublication(
         vfed, "injections", h.HELICS_DATA_TYPE_STRING, ""
     )
+    pub_available_power = h.helicsFederateRegisterPublication(
+        vfed, "available_power", h.HELICS_DATA_TYPE_STRING, ""
+    )
     pub_load_y_matrix = h.helicsFederateRegisterPublication(
         vfed, "load_y_matrix", h.HELICS_DATA_TYPE_STRING, ""
     )
@@ -326,6 +337,16 @@ def go_cosim(sim: FeederSimulator, config: FeederConfig, input_mapping: Dict[str
     sub_invcontrol = vfed.register_subscription(inv_control_key, "")
     sub_invcontrol.set_default("[]")
     sub_invcontrol.option["CONNECTION_OPTIONAL"] = 1
+
+    pv_set_key = (
+        "unused/pv_set"
+        if "pv_set" not in input_mapping
+        else input_mapping["pv_set"]
+    )
+
+    sub_pv_set = vfed.register_subscription(pv_set_key, "")
+    sub_pv_set.set_default("[]")
+    sub_pv_set.option["CONNECTION_OPTIONAL"] = 1
 
     h.helicsFederateEnterExecutingMode(vfed)
     initial_data = get_initial_data(sim, config)
@@ -353,6 +374,10 @@ def go_cosim(sim: FeederSimulator, config: FeederConfig, input_mapping: Dict[str
         inverter_controls = InverterControlList.parse_obj(sub_invcontrol.json)
         for inv_control in inverter_controls.__root__:
             sim.apply_inverter_control(inv_control)
+
+        pv_sets = sub_pv_set.json
+        for pv_set in pv_sets:
+            sim.set_pv_output(pv_set[0].split(".")[1], pv_set[1], pv_set[2])
 
         logger.info(
             f"Solve at hour {floored_timestamp.hour} second "
@@ -418,6 +443,13 @@ def go_cosim(sim: FeederSimulator, config: FeederConfig, input_mapping: Dict[str
             ).json()
         )
         pub_injections.publish(current_data.injections.json())
+        pub_available_power.publish(
+            MeasurementArray(
+                **xarray_to_dict(sim.get_available_pv()),
+                time=current_timestamp,
+                units="kWA"
+            ).json()
+        )
 
         if config.use_sparse_admittance:
             pub_load_y_matrix.publish(
@@ -442,7 +474,7 @@ def go_cosim(sim: FeederSimulator, config: FeederConfig, input_mapping: Dict[str
     h.helicsCloseLibrary()
 
 
-def run():
+def run_simulator(broker_config: BrokerConfig):
     """Load static_inputs and input_mapping and run JSON."""
     with open("static_inputs.json") as f:
         parameters = json.load(f)
@@ -450,8 +482,8 @@ def run():
         input_mapping = json.load(f)
     config = FeederConfig(**parameters)
     sim = FeederSimulator(config)
-    go_cosim(sim, config, input_mapping)
+    go_cosim(sim, config, input_mapping, broker_config)
 
 
 if __name__ == "__main__":
-    run()
+    run_simulator(BrokerConfig(broker_ip="127.0.0.1"))

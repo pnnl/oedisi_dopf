@@ -7,7 +7,7 @@ import random
 import time
 from enum import Enum
 from time import strptime
-from typing import Dict, List, Set, Optional
+from typing import Dict, List, Optional, Set
 
 import boto3
 import numpy as np
@@ -15,17 +15,12 @@ import opendssdirect as dss
 import xarray as xr
 from botocore import UNSIGNED
 from botocore.config import Config
-from oedisi.types.data_types import Command, InverterControl, InverterControlMode
+from dss_functions import (get_capacitors, get_generators, get_loads,
+                           get_pvsystems, get_voltages)
+from oedisi.types.data_types import (Command, InverterControl,
+                                     InverterControlMode)
 from pydantic import BaseModel
 from scipy.sparse import coo_matrix, csc_matrix
-
-from dss_functions import (
-    get_capacitors,
-    get_generators,
-    get_loads,
-    get_pvsystems,
-    get_voltages,
-)
 
 logger = logging.getLogger(__name__)
 logger.addHandler(logging.StreamHandler())
@@ -52,6 +47,7 @@ class FeederConfig(BaseModel):
 
     name: str
     use_smartds: bool = False
+    user_uploads_model: bool = False
     profile_location: str
     opendss_location: str
     existing_feeder_file: Optional[str] = None
@@ -62,6 +58,11 @@ class FeederConfig(BaseModel):
     start_time_index: int = 0
     topology_output: str = "topology.json"
     use_sparse_admittance: bool = False
+
+
+class FeederMapping(BaseModel):
+    static_inputs: FeederConfig
+    input_mapping: Dict[str, str]
 
 
 class OpenDSSState(Enum):
@@ -99,7 +100,7 @@ class FeederSimulator(object):
         self._profile_location = config.profile_location
         self._sensor_location = config.sensor_location
         self._use_smartds = config.use_smartds
-
+        self._user_uploads_model = config.user_uploads_model
         self._inverter_to_pvsystems = {}
         self._pvsystem_to_inverter = {}
         self._inverters = set()
@@ -118,21 +119,16 @@ class FeederSimulator(object):
         if config.existing_feeder_file is None:
             if self._use_smartds:
                 self._feeder_file = os.path.join("opendss", "Master.dss")
-                self.download_data(
-                    "oedi-data-lake", update_loadshape_location=True)
-            else:
+                self.download_data("oedi-data-lake", update_loadshape_location=True)
+            elif not self._use_smartds and not self._user_uploads_model:
                 self._feeder_file = os.path.join("opendss", "master.dss")
                 self.download_data("gadal")
-        elif not os.path.exists(config.existing_feeder_file):
-            if self._use_smartds:
-                self._feeder_file = os.path.join("opendss", "Master.dss")
-                self.download_data(
-                    "oedi-data-lake", update_loadshape_location=True)
             else:
-                self._feeder_file = os.path.join("opendss", "master.dss")
-                self.download_data("gadal")
+                # User should have uploaded model using endpoint
+                raise Exception("Set existing_feeder_file when uploading data")
         else:
             self._feeder_file = config.existing_feeder_file
+            self.download_data("gadal")
 
         self.load_feeder()
 
@@ -166,8 +162,7 @@ class FeederSimulator(object):
         """Download data from bucket path."""
         logging.info(f"Downloading from bucket {bucket_name}")
         # Equivalent to --no-sign-request
-        s3_resource = boto3.resource(
-            "s3", config=Config(signature_version=UNSIGNED))
+        s3_resource = boto3.resource("s3", config=Config(signature_version=UNSIGNED))
         bucket = s3_resource.Bucket(bucket_name)
         opendss_location = self._opendss_location
         profile_location = self._profile_location
@@ -191,8 +186,7 @@ class FeederSimulator(object):
                     for token in new_row.split(" "):
                         if token.startswith("(file="):
                             location = (
-                                token.split(
-                                    "=../profiles/")[1].strip().strip(")")
+                                token.split("=../profiles/")[1].strip().strip(")")
                             )
                             all_profiles.add(location)
                     modified_loadshapes = modified_loadshapes + new_row
@@ -200,21 +194,18 @@ class FeederSimulator(object):
                 fp_loadshapes.write(modified_loadshapes)
             for profile in all_profiles:
                 s3_location = f"{profile_location}/{profile}"
-                bucket.download_file(
-                    s3_location, os.path.join("profiles", profile))
+                bucket.download_file(s3_location, os.path.join("profiles", profile))
 
         else:
             for obj in bucket.objects.filter(Prefix=profile_location):
                 output_location = os.path.join(
-                    "profiles", obj.key.replace(
-                        profile_location, "").strip("/")
+                    "profiles", obj.key.replace(profile_location, "").strip("/")
                 )
                 os.makedirs(os.path.dirname(output_location), exist_ok=True)
                 bucket.download_file(obj.key, output_location)
 
         if sensor_location is not None:
-            output_location = os.path.join(
-                "sensors", os.path.basename(sensor_location))
+            output_location = os.path.join("sensors", os.path.basename(sensor_location))
             if not os.path.exists(os.path.dirname(output_location)):
                 os.makedirs(os.path.dirname(output_location))
             bucket.download_file(sensor_location, output_location)
@@ -277,8 +268,7 @@ class FeederSimulator(object):
         self._circuit = dss.Circuit
         self._AllNodeNames = self._circuit.YNodeOrder()
         self._node_number = len(self._AllNodeNames)
-        self._nodes_index = [self._AllNodeNames.index(
-            ii) for ii in self._AllNodeNames]
+        self._nodes_index = [self._AllNodeNames.index(ii) for ii in self._AllNodeNames]
         self._name_index_dict = {
             ii: self._AllNodeNames.index(ii) for ii in self._AllNodeNames
         }
@@ -589,8 +579,7 @@ class FeederSimulator(object):
             and self._state != OpenDSSState.UNLOADED
         ), f"{self._state}"
         name_voltage_dict = get_voltages(self._circuit)
-        res_feeder_voltages = np.zeros(
-            (len(self._AllNodeNames)), dtype=np.complex_)
+        res_feeder_voltages = np.zeros((len(self._AllNodeNames)), dtype=np.complex_)
         for voltage_name in name_voltage_dict.keys():
             res_feeder_voltages[
                 self._name_index_dict[voltage_name]
@@ -610,7 +599,7 @@ class FeederSimulator(object):
 
         Examples
         --------
-        ``change_obj([Command('PVsystem.pv1','kVAr',25)])``
+        ``change_obj([Command('PVsystem.pv1','kVAr','25')])``
         """
         assert self._state != OpenDSSState.UNLOADED, f"{self._state}"
         for entry in change_commands:
@@ -624,8 +613,7 @@ class FeederSimulator(object):
             assert entry.obj_property.lower() in map(
                 lambda x: x.lower(), properties
             ), f"{entry.obj_property} not in {properties} for {element_name}"
-            dss.Text.Command(
-                f"{entry.obj_name}.{entry.obj_property}={entry.val}")
+            dss.Text.Command(f"{entry.obj_name}.{entry.obj_property}={entry.val}")
 
     def create_inverter(self, pvsystem_set: Set[str]):
         """Create new inverter from set of pvsystem.
@@ -668,8 +656,7 @@ class FeederSimulator(object):
                     """Controlling mulitple pvsystems manually results in unstable
                     behavior when the number of phases differ"""
                 )
-            pvlist = ", ".join(pv_name.split(".")[1]
-                               for pv_name in pvsystem_set)
+            pvlist = ", ".join(pv_name.split(".")[1] for pv_name in pvsystem_set)
         dss.Text.Command(f"New {name} PVsystemList=[{pvlist}]")
         self._inverter_counter += 1
         self._inverters.add(name)
@@ -690,8 +677,7 @@ class FeederSimulator(object):
         assert len(x) == len(y), "Length of curves do not match"
         x_str = ",".join(str(i) for i in x)
         y_str = ",".join(str(i) for i in y)
-        dss.Text.Command(
-            f"New {name} npts={npts} Yarray=({y_str}) Xarray=({x_str})")
+        dss.Text.Command(f"New {name} npts={npts} Yarray=({y_str}) Xarray=({x_str})")
         self._xycurve_counter += 1
         return name
 
@@ -701,8 +687,7 @@ class FeederSimulator(object):
             vvc_curve = self.create_xy_curve(
                 inv_control.vvcontrol.voltage, inv_control.vvcontrol.reactive_response
             )
-            dss.Text.Command(
-                f"{inverter}.vvc_curve1={vvc_curve.split('.')[1]}")
+            dss.Text.Command(f"{inverter}.vvc_curve1={vvc_curve.split('.')[1]}")
             dss.Text.Command(
                 f"{inverter}.deltaQ_factor={inv_control.vvcontrol.deltaq_factor}"
             )
@@ -719,8 +704,7 @@ class FeederSimulator(object):
             vw_curve = self.create_xy_curve(
                 inv_control.vwcontrol.voltage, inv_control.vwcontrol.power_response,
             )
-            dss.Text.Command(
-                f"{inverter}.voltwatt_curve={vw_curve.split('.')[1]}")
+            dss.Text.Command(f"{inverter}.voltwatt_curve={vw_curve.split('.')[1]}")
             dss.Text.Command(
                 f"{inverter}.deltaP_factor={inv_control.vwcontrol.deltap_factor}"
             )
@@ -728,6 +712,51 @@ class FeederSimulator(object):
             dss.Text.Command(f"{inverter}.CombiMode = VV_VW")
         else:
             dss.Text.Command(f"{inverter}.Mode = {inv_control.mode.value}")
+
+    def set_pv_output(self, pv_system, p, q):
+        """Sets the P and Q values for a PV system in OpenDSS
+        """
+        max_pv = self.get_max_pv_available(pv_system)
+        #pf = q / ((p**2 + q **2)**0.5)
+
+        obj_name = f"PVSystem.{pv_system}"
+        if max_pv <=0 or p == 0:
+            Warning("Maximum PV Value is 0")
+            obj_val = 100
+            q=0
+        elif p < max_pv:
+            obj_val = p/float(max_pv) *100
+        else:
+            obj_val = 100
+            ratio = float(max_pv)/p
+            q = q*ratio #adjust q value to that it matches the kw output
+        command = [Command(obj_name=obj_name,obj_property="%Pmpp",val=str(obj_val)), Command(obj_name=obj_name,obj_property="kvar",val=str(q)), Command(obj_name=obj_name,obj_property="%Cutout", val="0"),  Command(obj_name=obj_name,obj_property="%Cutin", val="0")]
+        self.change_obj(command)
+
+    def get_max_pv_available(self,pv_system):
+        dss.PVsystems.First()
+        irradiance = None
+        pmpp = None
+        while True:
+            if dss.PVsystems.Name() == pv_system:
+                irradiance = dss.PVsystems.IrradianceNow()
+                pmpp = dss.PVsystems.Pmpp()
+            if not dss.PVsystems.Next() > 0:
+                break
+        if irradiance is None or pmpp is None:
+            raise ValueError(f"Irradiance or PMPP not found for {pv_system}")
+        return irradiance*pmpp
+
+    def get_available_pv(self):
+        pv_names = []
+        powers = []
+        dss.PVsystems.First()
+        while True:
+            pv_names.append(f"PVSystem.{dss.PVsystems.Name()}")
+            powers.append(dss.PVsystems.Pmpp() * dss.PVsystems.IrradianceNow())
+            if not dss.PVsystems.Next() > 0:
+                break
+        return xr.DataArray(powers, coords={"ids": pv_names})
 
     def apply_inverter_control(self, inv_control: InverterControl):
         """Apply inverter control to OpenDSS.

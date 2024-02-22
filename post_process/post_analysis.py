@@ -51,7 +51,6 @@ def plot_result_case(
 if __name__ == "__main__":
     
     case = sys.argv[1]
-    alg = "LinDistFlow"
     time = [30,60,90]
 
     if case == "ieee123":
@@ -60,7 +59,8 @@ if __name__ == "__main__":
         cordsys = "2D"
         annotate=True
         ymin = 0.98
-        ymax = 1.06 
+        ymax = 1.06
+        alg = "LinDistFlow" 
 
     elif case == "small":
         root = "P1UDT942-P1UHS0_1247X"
@@ -69,6 +69,7 @@ if __name__ == "__main__":
         annotate=False
         ymin = 1.02
         ymax = 1.035
+        alg = "LinDistFlow"
 
     elif case == "medium":
         root = "P6UDT5293-P6UHS10_1247X"
@@ -77,9 +78,37 @@ if __name__ == "__main__":
         annotate=False
         ymin = 1.01
         ymax = 1.05
+        alg = "LinDistFlow"
+    
+    elif case == "omoo":
+        root = "150"
+        seperator = "    "
+        cordsys = "2D"
+        annotate=True
+        ymin = 0.98
+        ymax = 1.06
+        alg = "OMOO"
+
+    elif case == "omoo_small":
+        root = "P1UDT942-P1UHS0_1247X"
+        seperator = " "
+        cordsys = "GEO"
+        annotate=False
+        ymin = 1.02
+        ymax = 1.035
+        alg = "OMOO"
+
+    elif case == "omoo_medium":
+        root = "P6UDT5293-P6UHS10_1247X"
+        seperator = " "
+        cordsys = "GEO"
+        annotate=False
+        ymin = 1.01
+        ymax = 1.05
+        alg = "OMOO"
     
     else:
-        print("Unknown case")
+        raise NotImplementedError
         sys.exit(0)
 
     plot_result_case(

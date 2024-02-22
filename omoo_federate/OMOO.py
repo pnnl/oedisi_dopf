@@ -36,10 +36,26 @@ from oedisi.types.data_types import (
 )
 from scipy.sparse import csc_matrix, coo_matrix, diags, vstack, hstack
 from scipy.sparse.linalg import svds, inv
+import xarray as xr
 
 logger = logging.getLogger(__name__)
 logger.addHandler(logging.StreamHandler())
 logger.setLevel(logging.DEBUG)
+
+
+def eqarray_to_xarray(eq: EquipmentNodeArray):
+    return xr.DataArray(
+        eq.values,
+        dims=("eqnode",),
+        coords={
+            "equipment_ids": ("eqnode", eq.equipment_ids),
+            "ids": ("eqnode", eq.ids),
+        },
+    )
+
+
+def measurement_to_xarray(eq: MeasurementArray):
+    return xr.DataArray(eq.values, coords={"ids": eq.ids})
 
 
 def matrix_to_numpy(admittance: List[List[Complex]]):
@@ -372,7 +388,7 @@ class OMOO:
         )
         P_0, Q_0 = (
             self.pv_frame["avai"].values / self.base_power,
-            self.pv_frame["avaiQ"].values / self.base_power,
+            self.pv_frame["avaiQ"].values.real / self.base_power,
         )
         Ppv, Qpv = np.zeros(self.num_node), np.zeros(self.num_node)
         for pp, pv_ii in enumerate(self.pv_index):
@@ -517,6 +533,9 @@ class OMOOFederate:
         self.injections = self.vfed.register_subscription(
             input_mapping["injections"], ""
         )
+        self.sub_available_power = self.vfed.register_subscription(
+            input_mapping["available_power"], ""
+        )
 
         self.pub_voltage_mag = self.vfed.register_publication(
             "voltage_mag", h.HELICS_DATA_TYPE_STRING, ""
@@ -573,33 +592,15 @@ class OMOOFederate:
         self.YL0 = csc_matrix(np.delete(Y, slack_bus, axis=0)[:, slack_bus])
         self.Y = csc_matrix(Y)
         del Y
-        import xarray as xr
-
-        def eqarray_to_xarray(eq: EquipmentNodeArray):
-            return xr.DataArray(
-                eq.values,
-                dims=("eqnode",),
-                coords={
-                    "equipment_ids": ("eqnode", eq.equipment_ids),
-                    "ids": ("eqnode", eq.ids),
-                }
-            )
-
-        def measurement_to_xarray(eq: MeasurementArray):
-            return xr.DataArray(
-                eq.values,
-                coords={
-                    "ids": eq.ids
-                }
-            )
 
         ratings = eqarray_to_xarray(topology.injections.power_real) + 1j * eqarray_to_xarray(topology.injections.power_imaginary)
         pv_ratings = ratings[ratings.equipment_ids.str.startswith("PVSystem")]
 
-        previous_power_factor = xr.ones_like(pv_ratings.real)
-        previous_pmpp = xr.ones_like(pv_ratings.real)
-        # while granted_time < h.HELICS_TIME_MAXTIME:
         v = measurement_to_xarray(topology.base_voltage_magnitudes)
+
+        voltages = None
+        power_P = None
+        power_Q = None
         while granted_time < 1000:
             logger.debug("granted_time")
             logger.debug(granted_time)
@@ -611,30 +612,32 @@ class OMOOFederate:
 
             voltages_real = VoltagesReal.parse_obj(self.sub_voltages_real.json)
             voltages_imag = VoltagesImaginary.parse_obj(self.sub_voltages_imaginary.json)
-            voltages = measurement_to_xarray(voltages_real) + 1j * measurement_to_xarray(voltages_imag)
-            print(np.max(np.abs(voltages) / v))
+            if voltages is None:
+                voltages = measurement_to_xarray(voltages_real) + 1j * measurement_to_xarray(voltages_imag)
+            logger.debug(np.max(np.abs(voltages) / v))
             assert topology.base_voltage_magnitudes.ids == list(voltages.ids.data)
 
             injections = Injection.parse_obj(self.injections.json)
             power_injections = eqarray_to_xarray(injections.power_real) + 1j * eqarray_to_xarray(injections.power_imaginary)
             pv_injections = power_injections[power_injections.equipment_ids.str.startswith("PVSystem")]
             _, pv_injections = xr.align(pv_ratings, pv_injections)
+            available_power = measurement_to_xarray(
+                MeasurementArray.parse_obj(self.sub_available_power.json)
+            )
+            split_power = available_power / pv_injections.ids.groupby("equipment_ids").count().rename({"equipment_ids": "ids"})
+            available_power = split_power.loc[pv_injections.equipment_ids].assign_coords(ids=pv_injections.ids)
 
             pv = pd.DataFrame()
             pv["name"] = pv_ratings.equipment_ids.data
             pv["bus"] = pv_ratings.ids.data
             pv["kVarRated"] = pv_ratings.values.real
 
-            # pv["pf"] = previous_power_factor.values.real
-            pv["pf"] = previous_power_factor
-            pv["avai"] = pv_injections.real / (previous_power_factor * previous_pmpp + 1e-6)
-            pv["avaiQ"] = pv_injections.imag / (previous_power_factor * previous_pmpp + 1e-6)
-
+            # This needs to be fixed.
+            pv["avai"] = available_power
+            pv["avaiQ"] = np.sqrt(pv_ratings**2 - available_power**2)  # TODO: Get a better pf limit
 
             bus_to_index = {v: i for i, v in enumerate(topology.base_voltage_magnitudes.ids)}
             pv["index"] = [bus_to_index[v] for v in pv_injections.ids.data]
-
-
             V0 = voltages[slack_bus].data
             self.V0 = (
                 V0 / np.array(topology.base_voltage_magnitudes.values)[slack_bus]
@@ -644,8 +647,10 @@ class OMOOFederate:
             logger.debug("PVframe")
             logger.debug(pv)
 
-            power_P = PowersReal.parse_obj(self.sub_power_P.json)
-            power_Q = PowersImaginary.parse_obj(self.sub_power_Q.json)
+            if power_P is None:
+                power_P = PowersReal.parse_obj(self.sub_power_P.json)
+            if power_Q is None:
+                power_Q = PowersImaginary.parse_obj(self.sub_power_Q.json)
             assert topology.base_voltage_magnitudes.ids == power_P.ids
             assert topology.base_voltage_magnitudes.ids == power_Q.ids
             ts = time.time()
@@ -670,36 +675,54 @@ class OMOOFederate:
 
             te = time.time()
             logger.debug(f"OMOO takes {(te-ts)/60} (min)")
-            command_list = []
-            for i in range(len(P_set)):
+
+            power_set_xr = xr.DataArray(
+                power_set,
+                coords={"equipment_ids": pv.loc[:, "name"]}
+            ).groupby("equipment_ids").sum()
+
+            available_total_xr = available_power.groupby("equipment_ids").sum()
+
+            pv_settings = []
+            # command_list = []
+            # We should test against the new interface
+            for i in range(len(power_set_xr)):
+                assert available_total_xr.equipment_ids[i] == power_set_xr.equipment_ids[i]
+                if np.isclose(available_total_xr[i], 0):
+                    continue
+                
+                pv_settings.append((power_set_xr.equipment_ids.data[i], power_set_xr.values[i].real, power_set_xr.values[i].imag))
+
+                #if np.isclose(pv["avai"][i], 0) and np.isclose(pv["avaiQ"][i], 0):
+                #    continue
+                
                 # command_list.append(
                 #     Command(
                 #         obj_name=pv.loc[i, "name"],
                 #         obj_property="PF",
-                #         val=str(np.sign(Q_set[i]) * power_factor[i])
+                #         val=str(np.sign(Q_set[i]) * power_factor[i]),
                 #         # increases Q until it runs out of rating,
                 #         # and then decreases P
                 #     )
                 # )
-                command_list.append(
-                    Command(
-                        obj_name=pv.loc[i, "name"],
-                        obj_property="%Pmpp",
-                        val=str(100*pmpp[i])
-                        # % of rating!
-                    )
-                )
-            logger.debug(command_list)
+                # command_list.append(
+                #     Command(
+                #         obj_name=pv.loc[i, "name"],
+                #         obj_property="%Pmpp",
+                #         val=str(100 * pmpp[i]),
+                #         # % of rating!
+                #     )
+                # )
+            # command_list_obj = CommandList(__root__=command_list)
+            # logger.debug(command_list_obj)
             # Turn P_set and Q_set into commands
-            self.pub_P_set.publish(
-                CommandList(__root__=command_list).json()
-            )
+            # self.pub_P_set.publish(command_list_obj.json())
+            self.pub_P_set.publish(json.dumps(pv_settings))
 
             logger.info("end time: " + str(datetime.now()))
 
+            # import pdb; pdb.set_trace()
             granted_time = h.helicsFederateRequestTime(self.vfed, 1000)
-            previous_power_factor = power_factor
-            previous_pmpp = pmpp
 
         self.destroy()
 
