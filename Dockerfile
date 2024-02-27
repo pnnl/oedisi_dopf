@@ -9,6 +9,7 @@ RUN apt update && apt install -y \
   libboost-program-options-dev \
   libboost-test-dev \
   libzmq5-dev python3-dev \
+  libopenblas-dev \
   build-essential swig cmake git
 
 WORKDIR /simulation
