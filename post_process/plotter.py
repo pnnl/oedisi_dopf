@@ -102,8 +102,12 @@ def extract_topology(topology_file, buscoord_file, sep="    "):
         branch_info, bus_info = extract_info(topology)
     
     # Extract bus coordinates
-    with open(buscoord_file, 'r') as cord_file:
-        lines = cord_file.readlines()
+    try:
+        with open(buscoord_file, 'r') as cord_file:
+            lines = cord_file.readlines()
+    except FileExistsError:
+        print(f"File {buscoord_file} for bus coordinates. Get this file to generate plots!!!")
+    
     cord = {}
     for line in lines:
         temp = line.strip('\n').split(sep)
