@@ -3,6 +3,7 @@ ARG SCENARIO
 RUN apt-get update && apt-get install -y git ssh
 RUN mkdir -p /root/.ssh
 
+# Libraries specifically required for Mac machines
 RUN apt update && apt install -y \
   libboost-dev \
   libboost-filesystem-dev \
