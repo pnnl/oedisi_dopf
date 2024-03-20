@@ -1,4 +1,5 @@
 """Core class to abstract OpenDSS into Feeder class."""
+
 import json
 import logging
 import math
@@ -22,7 +23,13 @@ from dss_functions import (
     get_pvsystems,
     get_voltages,
 )
-from oedisi.types.data_types import Command, InverterControl, InverterControlMode
+
+from oedisi.types.data_types import (
+    Command,
+    InverterControl,
+    InverterControlMode,
+    IncidenceList,
+)
 from pydantic import BaseModel
 from scipy.sparse import coo_matrix, csc_matrix
 
@@ -62,6 +69,7 @@ class FeederConfig(BaseModel):
     start_time_index: int = 0
     topology_output: str = "topology.json"
     use_sparse_admittance: bool = False
+    tap_setting: Optional[int] = None
 
 
 class FeederMapping(BaseModel):
@@ -118,6 +126,8 @@ class FeederSimulator(object):
         self._simulation_step = config.start_time_index
         self._number_of_timesteps = config.number_of_timesteps
         self._vmult = 0.001
+
+        self.tap_setting = config.tap_setting
 
         self._simulation_time_step = "15m"
         if config.existing_feeder_file is None:
@@ -290,12 +300,15 @@ class FeederSimulator(object):
         self._pvsystems = set()
         for PV in get_pvsystems(dss):
             self._pvsystems.add("PVSystem." + PV["name"])
+
+        if self.tap_setting is not None:
+            # Doesn't work with AutoTrans or 3-winding transformers.
+            dss.Text.Command(f"batchedit transformer..* wdg=2 tap={self.tap_setting}")
         self._state = OpenDSSState.LOADED
 
     def disable_elements(self):
         """Disable most elements. Used in disabled_run."""
         assert self._state != OpenDSSState.UNLOADED, f"{self._state}"
-        # dss.Text.Command("batchedit transformer..* wdg=2 tap=1")
         dss.Text.Command("batchedit regcontrol..* enabled=false")
         dss.Text.Command("batchedit vsource..* enabled=false")
         dss.Text.Command("batchedit isource..* enabled=false")
@@ -584,9 +597,9 @@ class FeederSimulator(object):
         name_voltage_dict = get_voltages(self._circuit)
         res_feeder_voltages = np.zeros((len(self._AllNodeNames)), dtype=np.complex_)
         for voltage_name in name_voltage_dict.keys():
-            res_feeder_voltages[
-                self._name_index_dict[voltage_name]
-            ] = name_voltage_dict[voltage_name]
+            res_feeder_voltages[self._name_index_dict[voltage_name]] = (
+                name_voltage_dict[voltage_name]
+            )
 
         return xr.DataArray(
             res_feeder_voltages, {"ids": list(name_voltage_dict.keys())}
@@ -742,15 +755,14 @@ class FeederSimulator(object):
         self.change_obj(command)
 
     def get_max_pv_available(self, pv_system):
-        dss.PVsystems.First()
         irradiance = None
         pmpp = None
-        while True:
+        flag = dss.PVsystems.First()
+        while flag:
             if dss.PVsystems.Name() == pv_system:
                 irradiance = dss.PVsystems.IrradianceNow()
                 pmpp = dss.PVsystems.Pmpp()
-            if not dss.PVsystems.Next() > 0:
-                break
+            flag = dss.PVsystems.Next()
         if irradiance is None or pmpp is None:
             raise ValueError(f"Irradiance or PMPP not found for {pv_system}")
         return irradiance * pmpp
@@ -758,12 +770,11 @@ class FeederSimulator(object):
     def get_available_pv(self):
         pv_names = []
         powers = []
-        dss.PVsystems.First()
-        while True:
+        flag = dss.PVsystems.First()
+        while flag:
             pv_names.append(f"PVSystem.{dss.PVsystems.Name()}")
             powers.append(dss.PVsystems.Pmpp() * dss.PVsystems.IrradianceNow())
-            if not dss.PVsystems.Next() > 0:
-                break
+            flag = dss.PVsystems.Next()
         return xr.DataArray(powers, coords={"ids": pv_names})
 
     def apply_inverter_control(self, inv_control: InverterControl):
@@ -810,3 +821,31 @@ class FeederSimulator(object):
 
         self.set_properties_to_inverter(inverter, inv_control)
         return inverter
+
+    def get_incidences(self) -> IncidenceList:
+        """Get Incidence from line names to buses."""
+        assert self._state != OpenDSSState.UNLOADED, f"{self._state}"
+        from_list = []
+        to_list = []
+        equipment_ids = []
+        equipment_types = []
+        for line in dss.Lines.AllNames():
+            dss.Circuit.SetActiveElement("Line." + line)
+            from_bus, to_bus = dss.CktElement.BusNames()
+            from_list.append(from_bus.upper())
+            to_list.append(to_bus.upper())
+            equipment_ids.append(line)
+            equipment_types.append("Line")
+        for transformer in dss.Transformers.AllNames():
+            dss.Circuit.SetActiveElement("Transformer." + transformer)
+            from_bus, to_bus = dss.CktElement.BusNames()
+            from_list.append(from_bus.upper())
+            to_list.append(to_bus.upper())
+            equipment_ids.append(transformer)
+            equipment_types.append("Transformer")
+        return IncidenceList(
+            from_equipment=from_list,
+            to_equipment=to_list,
+            ids=equipment_ids,
+            equipment_types=equipment_types,
+        )

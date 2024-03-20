@@ -3,7 +3,6 @@ __pycache__/
 *.py[cod]
 *$py.class
 *.log
-.DS_Store
 
 # C extensions
 *.so
@@ -148,4 +147,7 @@ cython_debug/
 
 
 # Self additions
-lindistflow_rounak
+*.DS_Store
+.DS_Store
+*.csv
+*.feather
