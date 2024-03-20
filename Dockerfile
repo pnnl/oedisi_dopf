@@ -3,14 +3,6 @@ FROM python:3.10.6-slim-bullseye
 RUN apt-get update && apt-get install -y git ssh
 RUN mkdir -p /root/.ssh
 
-RUN apt update && apt install -y \
-  libboost-dev \
-  libboost-filesystem-dev \
-  libboost-program-options-dev \
-  libboost-test-dev \
-  libzmq5-dev python3-dev \
-  build-essential swig cmake git
-
 WORKDIR /simulation
 COPY . .
 RUN pip install -r requirements.txt
