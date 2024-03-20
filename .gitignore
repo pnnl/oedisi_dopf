@@ -149,4 +149,5 @@ cython_debug/
 # Self additions
 *.DS_Store
 .DS_Store
-outputs
+*.csv
+*.feather
