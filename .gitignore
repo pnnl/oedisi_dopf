@@ -148,8 +148,4 @@ cython_debug/
 
 # Self additions
 *.DS_Store
-lindistflow_primsec
-outputs/noopf
-scenario/noopf
-scenario/test
-outputs/test
+.DS_Store
