@@ -26,7 +26,6 @@
             "name": "feeder",
             "type": "LocalFeeder",
             "parameters": {
-                "existing_feeder_file": "opendss/master.dss",
                 "use_smartds": false,
                 "profile_location": "gadal_ieee123/profiles",
                 "opendss_location": "gadal_ieee123/qsts",
