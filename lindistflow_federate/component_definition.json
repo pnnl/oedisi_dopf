@@ -13,7 +13,7 @@
         {"type": "Injections", "port_id": "injections"}
     ],
     "dynamic_outputs": [
-        {"type": "ControlList", "port_id": "change_commands"},
+        {"type": "ControlList", "port_id": "pv_set"},
         {"type": "VoltagesMagnitude", "port_id": "opf_voltages_magnitude"}
     ]
 }
