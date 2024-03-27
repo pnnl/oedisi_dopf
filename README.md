@@ -20,6 +20,15 @@ source .venv/bin/activate
 pip install -r requirements.txt
 ```
 
+
+## Jupyter Notebook
+The following notebook provides a more interactive experiance and a frontend for the container if you are running in docker. Once the notebook is running open the notebook link with it's generated token.
+
+
+```shell
+jupyter notebook workflow.ipynb
+```
+
 ## Build and Run
 Replace the \<scenario\> below to point to the desired scenario folder name
 
