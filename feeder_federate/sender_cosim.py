@@ -1,4 +1,5 @@
 """HELICS wrapper for OpenDSS feeder simulation."""
+
 import json
 import logging
 from dataclasses import dataclass
@@ -9,6 +10,8 @@ import helics as h
 import numpy as np
 import numpy.typing as npt
 import xarray as xr
+from FeederSimulator import FeederConfig, FeederSimulator
+from oedisi.types.common import BrokerConfig
 from oedisi.types.data_types import (
     AdmittanceMatrix,
     AdmittanceSparse,
@@ -26,8 +29,6 @@ from oedisi.types.data_types import (
     VoltagesReal,
 )
 from scipy.sparse import coo_matrix
-from simulator import FeederConfig, FeederSimulator
-from oedisi.types.common import BrokerConfig
 
 logger = logging.getLogger(__name__)
 logger.addHandler(logging.StreamHandler())
@@ -144,6 +145,7 @@ class InitialData:
 
 def get_initial_data(sim: FeederSimulator, config: FeederConfig):
     """Get and calculate InitialData from simulation."""
+    incidences = sim.get_incidences()
     Y = sim.get_y_matrix()
     unique_ids = sim._AllNodeNames
 
@@ -187,6 +189,7 @@ def get_initial_data(sim: FeederSimulator, config: FeederConfig):
         injections=injections,
         base_voltage_magnitudes=base_voltagemagnitude,
         slack_bus=slack_ids,
+        incidences=incidences,
     )
     return InitialData(Y=Y, topology=topology)
 
@@ -224,7 +227,12 @@ def get_current_data(sim: FeederSimulator, Y):
     power_real, power_imaginary = get_powers(-PQ_load, -PQ_PV, -PQ_gen, -PQ_cap)
     injections = Injection(power_real=power_real, power_imaginary=power_imaginary)
 
-    ids = xr.DataArray(sim._AllNodeNames, coords={"ids": sim._AllNodeNames})
+    ids = xr.DataArray(
+        sim._AllNodeNames,
+        coords={
+            "ids": sim._AllNodeNames,
+        },
+    )
     PQ_injections_all = (
         agg_to_ids(PQ_load, ids)
         + agg_to_ids(PQ_PV, ids)
@@ -319,7 +327,7 @@ def go_cosim(
     )
     sub_command_set = vfed.register_subscription(command_set_key, "")
     sub_command_set.set_default("[]")
-    sub_command_set.option["CONNECTION_OPTIONAL"] = 1
+    sub_command_set.option["CONNECTION_OPTIONAL"] = True
 
     inv_control_key = (
         "unused/inv_control"
@@ -328,7 +336,7 @@ def go_cosim(
     )
     sub_invcontrol = vfed.register_subscription(inv_control_key, "")
     sub_invcontrol.set_default("[]")
-    sub_invcontrol.option["CONNECTION_OPTIONAL"] = 1
+    sub_invcontrol.option["CONNECTION_OPTIONAL"] = True
 
     pv_set_key = (
         "unused/pv_set" if "pv_set" not in input_mapping else input_mapping["pv_set"]
@@ -336,7 +344,7 @@ def go_cosim(
 
     sub_pv_set = vfed.register_subscription(pv_set_key, "")
     sub_pv_set.set_default("[]")
-    sub_pv_set.option["CONNECTION_OPTIONAL"] = 1
+    sub_pv_set.option["CONNECTION_OPTIONAL"] = True
 
     h.helicsFederateEnterExecutingMode(vfed)
     initial_data = get_initial_data(sim, config)
