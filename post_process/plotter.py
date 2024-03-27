@@ -11,7 +11,7 @@ from geopy.distance import geodesic
 
 def compare_voltages(
         df_opf_voltages, df_true_voltages, base_voltages,
-        bus=None, time=0, unit="kV", 
+        bus=None, time=[30,60,90], unit="kV", 
         **kwargs
         ):
     

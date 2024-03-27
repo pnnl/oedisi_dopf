@@ -727,6 +727,28 @@ class OMOOFederate:
             if set_power:
                 self.pub_P_set.publish(json.dumps(pv_settings))
 
+            # Publish control voltage magnitudes
+            time_ = voltages_imag.time
+            logger.info(time_)
+            V_slack = abs(self.V0)
+            node_ids = []
+            node_voltages = []
+            V_hat_index = 0
+            for k,nid in enumerate(ids):
+                node_ids.append(nid)
+                if k in slack_bus:
+                    V0_index = slack_bus.index(k)
+                    node_voltages.append(V_slack[V0_index,0])
+                else:
+                    node_voltages.append(V_hat[V_hat_index])
+                    V_hat_index += 1
+            pub_mags = VoltagesMagnitude(
+                ids=node_ids, 
+                values=node_voltages, 
+                time=time_
+                )
+            self.pub_voltage_mag.publish(pub_mags.json())
+
             logger.info("end time: " + str(datetime.now()))
 
             # There should be a HELICS way to do this? Set resolution?
