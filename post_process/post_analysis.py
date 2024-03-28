@@ -3,7 +3,8 @@ import plotter
 
 def plot_result_case(
         casename, alg, 
-        time = [30,60,90], coordsys="2D", 
+        time = ["07:30","12:30","15:30"], 
+        coordsys="2D", 
         root = "150", seperator = "    ", annotate=True, 
         ymin = 0.98, ymax = 1.06, 
         ):
@@ -51,7 +52,7 @@ def plot_result_case(
 if __name__ == "__main__":
     
     case = sys.argv[1]
-    time = [30,60,90]
+    time = ["07:30","12:30","15:30"]
 
     if case == "ieee123":
         root = "150"
