@@ -10,46 +10,6 @@ from geopy.distance import geodesic
 from datetime import datetime
 
 
-def compare_voltages(
-        df_opf_voltages, df_true_voltages, base_voltages,
-        bus=None, time=[30,60,90], unit="kV", 
-        **kwargs
-        ):
-    
-    # keyword arguments
-    label_fontsize = kwargs.get('fontsize', 25)
-    legend_fontsize = label_fontsize + 2
-    ticklabel_fontsize = label_fontsize - 2
-    title_fontsize = label_fontsize + 10
-
-    # common bus or common time: if bus=None, then plot for common time
-    if not bus:
-        opf_voltages = df_opf_voltages.iloc[time,:]
-        true_voltages = df_true_voltages.iloc[time,:] / base_voltages
-        xlabel = "Node number"
-        suptitle = f"Voltage magnitude comparison at t={time}"
-    else:
-        opf_voltages = df_opf_voltages[bus]
-        true_voltages = df_true_voltages[bus] / base_voltages[bus]
-        xlabel = "Time"
-        suptitle = f"Voltage magnitude comparison for bus {bus}"
-        
-
-    # Plot the comparison
-    fig, ax = plt.subplots(figsize=(20, 10))
-    x_axis = np.arange(true_voltages.shape[0])
-    ax.plot(x_axis, opf_voltages, "-o", color="crimson")
-    ax.plot(x_axis, true_voltages, "-o", color="royalblue")
-    # Formatting
-    ax.set_xlabel(xlabel, fontsize=label_fontsize)
-    ax.set_ylabel(f"Voltage Magnitudes ({unit})", fontsize=label_fontsize)
-    ax.legend(["OPF estimated voltages", "True voltages"], 
-              fontsize=legend_fontsize, markerscale=2)
-    ax.tick_params(axis="x", labelsize=ticklabel_fontsize)
-    ax.tick_params(axis="y", labelsize=ticklabel_fontsize)
-    fig.suptitle(suptitle, fontsize=title_fontsize)
-    return fig
-
 def plot_voltages(
         df_voltages, base_voltages, 
         bus=None, time=0, unit="kV", 
@@ -75,8 +35,6 @@ def plot_voltages(
         suptitle = f"Voltage magnitude time series for bus {bus}"
         x_axis = np.arange(voltages.shape[0])
         ax.plot(x_axis, voltages, "-o", color="royalblue")
-    
-    
     
     # Formatting
     ax.set_xlabel(xlabel, fontsize=label_fontsize)
@@ -386,9 +344,9 @@ def voltage_tree(
                     )
 
     if coordsys == "2D":
-        ax.set_xlabel("Distance from the root node (units)", fontsize=label_fontsize)
+        ax.set_xlabel("Feeder length from substation (units)", fontsize=label_fontsize)
     elif coordsys == "GEO":
-        ax.set_xlabel("Distance from the root node (miles)", fontsize=label_fontsize)
+        ax.set_xlabel("Feeder length from substation (miles)", fontsize=label_fontsize)
     
     ax.set_ylabel("Voltage at node (p.u.)", fontsize=label_fontsize)
     ax.set_title(title, fontsize=label_fontsize)
@@ -445,6 +403,103 @@ def plot_voltage_tree(
     else:
         suptitle = f"Voltage tree at a particular time step"
     
+    if suptitle_sfx:
+        suptitle = f"{suptitle}  {suptitle_sfx}"
+    fig.suptitle(suptitle, fontsize=title_fontsize)
+
+    if to_file:
+        fig.savefig(to_file, bbox_inches='tight')
+    if show:
+        plt.show()
+    plt.close(fig)
+    
+    if do_return:
+        return fig
+    pass
+
+
+def plot_opf_voltage_comparison(
+        topology_file,
+        realVfile, imagVfile, opfVfile,
+        true_volt_units = "kV",
+        time=["7:30","12:30","15:30"], 
+        to_file=None, show=False, do_return=False,
+        **kwargs
+        ):
+    # get base voltages
+    with open(topology_file) as f:
+        topology = Topology.parse_obj(json.load(f))
+        base_voltage_df = pd.DataFrame(
+            {
+                "id": topology.base_voltage_magnitudes.ids,
+                "value": topology.base_voltage_magnitudes.values,
+            }
+        )
+        base_voltage_df.set_index("id", inplace=True)
+        base_voltages = base_voltage_df["value"]
+
+    # get voltage data
+    df_true_voltages = get_voltage(realVfile, imagVfile)
+    true_voltage_columns = df_true_voltages.columns
+
+    # opf voltage magnitudes
+    df_opf_voltages = feather.read_feather(opfVfile)
+    df_opf_voltages["time"] = df_opf_voltages["time"].apply(get_time)
+    df_opf_voltages = df_opf_voltages.set_index("time")
+    opf_voltage_columns = df_opf_voltages.columns
+
+    # find columns which are present in both dataframes
+    node_names = [node for node in true_voltage_columns if node in opf_voltage_columns]
+    
+    # keyword arguments
+    figsize = kwargs.get('figsize', (10*len(time), 10))
+    constrained_layout = kwargs.get('constrained_layout', False)
+    label_fontsize = kwargs.get('fontsize', 25)
+    legend_fontsize = label_fontsize + 2
+    ticklabel_fontsize = label_fontsize - 2
+    title_fontsize = label_fontsize + 10
+    suptitle_sfx = kwargs.get('suptitle_sfx',None)
+
+    fig, axs = plt.subplots(
+        1, len(time), figsize=figsize, 
+        constrained_layout=constrained_layout
+        )
+
+    for i,hr in enumerate(time):
+
+        if len(time) > 1:
+            ax = axs[i]
+        else:
+            ax = axs
+
+        # pu voltage magnitudes
+        if true_volt_units == "pu":
+            true_voltages = df_true_voltages.loc[hr]
+        else:
+            true_voltages = df_true_voltages.loc[hr] / base_voltages
+        
+        opf_voltages = df_opf_voltages.loc[hr]
+        opf_volt_vals = [opf_voltages[n] for n in node_names]
+        true_volt_vals = [true_voltages[n] for n in node_names]
+        xlabel = "Node number"
+
+        # Plot the comparison
+        x_axis = np.arange(len(node_names))
+        ax.plot(x_axis, opf_volt_vals, "-o", 
+                color="crimson", lw=2.5, 
+                label="OPF estimated voltages")
+        ax.plot(x_axis, true_volt_vals, "-o", 
+                color="royalblue", lw=2.5, 
+                label="True voltages")
+        # Formatting
+        ax.set_xlabel(xlabel, fontsize=label_fontsize)
+        ax.set_ylabel(f"Voltage Magnitudes (pu)", fontsize=label_fontsize)
+        ax.legend(fontsize=legend_fontsize, markerscale=2)
+        ax.tick_params(axis="x", labelsize=ticklabel_fontsize)
+        ax.tick_params(axis="y", labelsize=ticklabel_fontsize)
+        ax.set_title(f"time={hr} hours")
+    
+    suptitle = "Voltage validation for DOPF algorithm"
     if suptitle_sfx:
         suptitle = f"{suptitle}  {suptitle_sfx}"
     fig.suptitle(suptitle, fontsize=title_fontsize)
