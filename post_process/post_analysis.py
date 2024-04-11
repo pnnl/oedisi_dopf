@@ -3,7 +3,8 @@ import plotter
 
 def plot_result_case(
         casename, alg, 
-        time = [30,60,90], coordsys="2D", 
+        time = ["07:30","12:30","15:30"], 
+        coordsys="2D", 
         root = "150", seperator = "    ", annotate=True, 
         ymin = 0.98, ymax = 1.06, 
         ):
@@ -14,44 +15,58 @@ def plot_result_case(
     buscoord_filepath = os.path.join(directory, "BusCoords.dat")
     real_voltage_filepath = os.path.join(directory, "voltage_real.feather")
     imag_voltage_filepath = os.path.join(directory, "voltage_imag.feather")
+    opf_voltage_filepath = os.path.join(directory, "opf_voltage_mag.feather")
 
     # Voltage heatmaps of time steps
     fig_filename = os.path.join(directory, f"network_{casename}.png")
-    plotter.plot_network(
-        topology_filepath,
-        buscoord_filepath, 
-        real_voltage_filepath, 
-        imag_voltage_filepath, 
-        root_node=root, sep=seperator,
-        time=time, node_size=50, 
-        show=False, to_file=fig_filename, 
-        suptitle_sfx = f"({alg} Algorithm)", 
-        )
+    # plotter.plot_network(
+    #     topology_filepath,
+    #     buscoord_filepath, 
+    #     real_voltage_filepath, 
+    #     imag_voltage_filepath, 
+    #     root_node=root, sep=seperator,
+    #     time=time, node_size=50, 
+    #     show=False, to_file=fig_filename, 
+    #     suptitle_sfx = f"({alg} Algorithm)", 
+    #     )
 
     # Voltage trees of time steps
     fig_filename = os.path.join(directory, f"vtree_{casename}.png")
-    plotter.plot_voltage_tree(
-        topology_filepath,
-        buscoord_filepath, 
+    # plotter.plot_voltage_tree(
+    #     topology_filepath,
+    #     buscoord_filepath, 
+    #     real_voltage_filepath, 
+    #     imag_voltage_filepath,
+    #     root_node=root, 
+    #     sep=seperator,
+    #     time=time,
+    #     show=False, to_file=fig_filename,
+    #     lw=2.5, ls='dashed', 
+    #     figsize=(60,15),
+    #     annotate=annotate,
+    #     suptitle_sfx = f"({alg} Algorithm)", 
+    #     coordsys=coordsys,
+    #     ymin = ymin, ymax = ymax, 
+    #     )
+    
+    # OPF voltage validation
+    fig_filename = os.path.join(directory, f"opf_valid_{casename}.png")
+    plotter.plot_opf_voltage_comparison(
+        topology_filepath, 
         real_voltage_filepath, 
         imag_voltage_filepath,
-        root_node=root, 
-        sep=seperator,
+        opf_voltage_filepath, 
         time=time,
         show=False, to_file=fig_filename,
-        lw=2.5, ls='dashed', 
         figsize=(60,15),
-        annotate=annotate,
         suptitle_sfx = f"({alg} Algorithm)", 
-        coordsys=coordsys,
-        ymin = ymin, ymax = ymax, 
-        )
+    )
     return
 
 if __name__ == "__main__":
     
     case = sys.argv[1]
-    time = [30,60,90]
+    time = ["07:30","12:30","15:30"]
 
     if case == "ieee123":
         root = "150"

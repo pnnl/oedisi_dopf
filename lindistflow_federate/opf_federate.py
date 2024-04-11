@@ -34,7 +34,7 @@ class Subscriptions(object):
     topology: Topology
 
 
-class EchoFederate(object):
+class OPFFederate(object):
     def __init__(self) -> None:
         self.sub = Subscriptions()
         self.load_static_inputs()
@@ -145,21 +145,16 @@ class EchoFederate(object):
                                 continue
 
                             if self.static.control_type == lindistflow.ControlType.WATT:
-                                logger.debug(
-                                    f"{eqid}, {setpoint}")
-                                commands.append(
-                                    Command(obj_name=eqid, obj_property='WattPriority', val=setpoint))
+                                commands.append((eqid, setpoint, 0))
                             elif self.static.control_type == lindistflow.ControlType.VAR:
-                                commands.append(
-                                    Command(obj_name=eqid, obj_property='kVAR', val=setpoint))
+                                commands.append((eqid, 0, setpoint))
                             elif self.static.control_type == lindistflow.ControlType.WATT_VAR:
-                                commands.append(
-                                    Command(obj_name=eqid, obj_property='kVA', val=setpoint))
+                                # todo
+                                pass
 
-            logger.info(commands)
             if commands:
                 self.pub_commands.publish(
-                    CommandList(__root__=commands).json()
+                    json.dumps(commands)
                 )
 
             pub_mags = adapter.pack_voltages(voltages, time)
@@ -177,5 +172,5 @@ class EchoFederate(object):
 
 
 if __name__ == "__main__":
-    fed = EchoFederate()
+    fed = OPFFederate()
     fed.run()

@@ -4,7 +4,7 @@ import plotter
 
 def plot_result_case(
         casename, alg, 
-        time = [30,60,90], coordsys="2D", 
+        time = ["07:30","12:30","15:30"], coordsys="2D", 
         root = "150", seperator = "    ", annotate=True, 
         ymin = 0.98, ymax = 1.06, 
         ):
@@ -52,7 +52,7 @@ def plot_result_case(
 def plot_result_set(
         casename1, casename2, 
         alg1, alg2, 
-        time = [30, 60, 90], coordsys="2D", 
+        time = ["07:30","12:30","15:30"], coordsys="2D", 
         root = "150", seperator = "    ", annotate=True, 
         ymin = 0.98, ymax = 1.06, 
         ):
@@ -162,13 +162,13 @@ if __name__ == "__main__":
     plot_result_set(
         case1, case2, 
         alg1="LinDistFlow", alg2="OMOO", 
-        time = [30, 60, 90], coordsys=cordsys, 
+        time = ["07:30","12:30","15:30"], coordsys=cordsys, 
         root = root, seperator = seperator, annotate=annotate,
         ymin = ymin, ymax = ymax, 
         )
     
     plot_result_comparison(
-        case1, case2, time=45, 
+        case1, case2, time="11:30", 
         coordsys=cordsys, root = root, 
         seperator = seperator, annotate=annotate,
         ymin = ymin, ymax = ymax, 

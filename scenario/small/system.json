@@ -118,9 +118,9 @@
         },
         {
             "source": "lindistflow",
-            "source_port": "change_commands",
+            "source_port": "pv_set",
             "target": "feeder",
-            "target_port": "change_commands"
+            "target_port": "pv_set"
         },
         {
             "source": "lindistflow",

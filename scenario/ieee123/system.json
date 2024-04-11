@@ -47,7 +47,6 @@
             "name": "feeder",
             "type": "Feeder",
             "parameters": {
-                "existing_feeder_file": "opendss/master.dss",
                 "use_smartds": false,
                 "profile_location": "gadal_ieee123/profiles",
                 "opendss_location": "gadal_ieee123/qsts",
@@ -119,9 +118,9 @@
         },
         {
             "source": "lindistflow",
-            "source_port": "change_commands",
+            "source_port": "pv_set",
             "target": "feeder",
-            "target_port": "change_commands"
+            "target_port": "pv_set"
         },
         {
             "source": "lindistflow",
