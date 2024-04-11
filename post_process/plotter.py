@@ -7,47 +7,8 @@ import numpy as np
 import json
 import pyarrow.feather as feather
 from geopy.distance import geodesic
+from datetime import datetime
 
-
-def compare_voltages(
-        df_opf_voltages, df_true_voltages, base_voltages,
-        bus=None, time=0, unit="kV", 
-        **kwargs
-        ):
-    
-    # keyword arguments
-    label_fontsize = kwargs.get('fontsize', 25)
-    legend_fontsize = label_fontsize + 2
-    ticklabel_fontsize = label_fontsize - 2
-    title_fontsize = label_fontsize + 10
-
-    # common bus or common time: if bus=None, then plot for common time
-    if not bus:
-        opf_voltages = df_opf_voltages.iloc[time,:]
-        true_voltages = df_true_voltages.iloc[time,:] / base_voltages
-        xlabel = "Node number"
-        suptitle = f"Voltage magnitude comparison at t={time}"
-    else:
-        opf_voltages = df_opf_voltages[bus]
-        true_voltages = df_true_voltages[bus] / base_voltages[bus]
-        xlabel = "Time"
-        suptitle = f"Voltage magnitude comparison for bus {bus}"
-        
-
-    # Plot the comparison
-    fig, ax = plt.subplots(figsize=(20, 10))
-    x_axis = np.arange(true_voltages.shape[0])
-    ax.plot(x_axis, opf_voltages, "-o", color="crimson")
-    ax.plot(x_axis, true_voltages, "-o", color="royalblue")
-    # Formatting
-    ax.set_xlabel(xlabel, fontsize=label_fontsize)
-    ax.set_ylabel(f"Voltage Magnitudes ({unit})", fontsize=label_fontsize)
-    ax.legend(["OPF estimated voltages", "True voltages"], 
-              fontsize=legend_fontsize, markerscale=2)
-    ax.tick_params(axis="x", labelsize=ticklabel_fontsize)
-    ax.tick_params(axis="y", labelsize=ticklabel_fontsize)
-    fig.suptitle(suptitle, fontsize=title_fontsize)
-    return fig
 
 def plot_voltages(
         df_voltages, base_voltages, 
@@ -74,8 +35,6 @@ def plot_voltages(
         suptitle = f"Voltage magnitude time series for bus {bus}"
         x_axis = np.arange(voltages.shape[0])
         ax.plot(x_axis, voltages, "-o", color="royalblue")
-    
-    
     
     # Formatting
     ax.set_xlabel(xlabel, fontsize=label_fontsize)
@@ -233,11 +192,24 @@ def get_network(branch_info, bus_info, pos, root_node='150R', open_buses=[], coo
     
     return network
 
+def get_time(x):
+    return datetime.strptime(
+        x, '%Y-%m-%d %H:%M:%S'
+        ).time().strftime("%H:%M")
+
+def get_voltage(realV, imagV):
+    voltage_real = feather.read_feather(realV)
+    voltage_imag = feather.read_feather(imagV)
+    df_voltages = np.abs(voltage_real.drop("time", axis=1) + 1j * voltage_imag.drop("time", axis=1))
+    df_voltages["time"] = voltage_real["time"].apply(get_time)
+    return df_voltages.set_index("time")
+
 def plot_network(
         topology_file, buscoord_file,
         realVfile, imagVfile,
         root_node = '150R', sep="    ",
-        time=[30, 60, 90], vmin=1.0, vmax=1.05,
+        time=['07:30', '12:30', '15:30'], 
+        vmin=1.0, vmax=1.05,
         to_file = None, show=False, do_return=False,
         **kwargs
         ) -> None:
@@ -251,9 +223,7 @@ def plot_network(
     title_fontsize = label_fontsize + 10
     
     # get voltage data
-    voltage_real = feather.read_feather(realVfile)
-    voltage_imag = feather.read_feather(imagVfile)
-    df_voltages = np.abs(voltage_real.drop("time", axis=1) + 1j * voltage_imag.drop("time", axis=1))
+    df_voltages = get_voltage(realVfile, imagVfile)
     
     # get open switches in the network
     open_buses = [bus for bus in df_voltages.columns if bus.find("OPEN") != -1]
@@ -266,7 +236,7 @@ def plot_network(
     cmap = plt.cm.plasma
     fig, axs = plt.subplots(1, len(time), figsize=figsize, constrained_layout=constrained_layout)
     for i,t in enumerate(time):
-        voltages = df_voltages.iloc[t,:] / base_voltages
+        voltages = df_voltages.loc[t] / base_voltages
         n_colors = [voltages[n] for n in network.nodes]
 
         if len(time) > 1:
@@ -274,10 +244,7 @@ def plot_network(
             
         else:
             ax = axs
-        ax.set_title(
-            f"Time: {t//4 :02d}:{15*(t%4) :02d} hours", 
-            fontsize=label_fontsize
-            )
+        ax.set_title(f"Time: {t} hours", fontsize=label_fontsize)
         
         # Draw the network
         pos = nx.get_node_attributes(network, 'cord')
@@ -377,9 +344,9 @@ def voltage_tree(
                     )
 
     if coordsys == "2D":
-        ax.set_xlabel("Distance from the root node (units)", fontsize=label_fontsize)
+        ax.set_xlabel("Feeder length from substation (units)", fontsize=label_fontsize)
     elif coordsys == "GEO":
-        ax.set_xlabel("Distance from the root node (miles)", fontsize=label_fontsize)
+        ax.set_xlabel("Feeder length from substation (miles)", fontsize=label_fontsize)
     
     ax.set_ylabel("Voltage at node (p.u.)", fontsize=label_fontsize)
     ax.set_title(title, fontsize=label_fontsize)
@@ -406,9 +373,7 @@ def plot_voltage_tree(
     suptitle_sfx = kwargs.get("suptitle_sfx", None)
 
     # get voltage data
-    voltage_real = feather.read_feather(realVfile)
-    voltage_imag = feather.read_feather(imagVfile)
-    df_voltages = np.abs(voltage_real.drop("time", axis=1) + 1j * voltage_imag.drop("time", axis=1))
+    df_voltages = get_voltage(realVfile, imagVfile)
     
     # get open switches in the network
     open_buses = [bus for bus in df_voltages.columns if bus.find("OPEN") != -1]
@@ -421,14 +386,14 @@ def plot_voltage_tree(
     fig, axs = plt.subplots(1, len(time), figsize=figsize, constrained_layout=constrained_layout)
     
     for i,t in enumerate(time):
-        voltages = df_voltages.iloc[t,:] / base_voltages
+        voltages = df_voltages.loc[t] / base_voltages
         if len(time) > 1:
             ax = axs[i]
         else:
             ax = axs
         voltage_tree(
             network, voltages, ax, 
-            title=f"Time: {t//4 :02d}:{15*(t%4) :2d} hours", 
+            title=f"Time: {t} hours", 
             coordsys=coordsys,
             **kwargs
             )
@@ -453,6 +418,103 @@ def plot_voltage_tree(
     pass
 
 
+def plot_opf_voltage_comparison(
+        topology_file,
+        realVfile, imagVfile, opfVfile,
+        true_volt_units = "kV",
+        time=["7:30","12:30","15:30"], 
+        to_file=None, show=False, do_return=False,
+        **kwargs
+        ):
+    # get base voltages
+    with open(topology_file) as f:
+        topology = Topology.parse_obj(json.load(f))
+        base_voltage_df = pd.DataFrame(
+            {
+                "id": topology.base_voltage_magnitudes.ids,
+                "value": topology.base_voltage_magnitudes.values,
+            }
+        )
+        base_voltage_df.set_index("id", inplace=True)
+        base_voltages = base_voltage_df["value"]
+
+    # get voltage data
+    df_true_voltages = get_voltage(realVfile, imagVfile)
+    true_voltage_columns = df_true_voltages.columns
+
+    # opf voltage magnitudes
+    df_opf_voltages = feather.read_feather(opfVfile)
+    df_opf_voltages["time"] = df_opf_voltages["time"].apply(get_time)
+    df_opf_voltages = df_opf_voltages.set_index("time")
+    opf_voltage_columns = df_opf_voltages.columns
+
+    # find columns which are present in both dataframes
+    node_names = [node for node in true_voltage_columns if node in opf_voltage_columns]
+    
+    # keyword arguments
+    figsize = kwargs.get('figsize', (10*len(time), 10))
+    constrained_layout = kwargs.get('constrained_layout', False)
+    label_fontsize = kwargs.get('fontsize', 25)
+    legend_fontsize = label_fontsize + 2
+    ticklabel_fontsize = label_fontsize - 2
+    title_fontsize = label_fontsize + 10
+    suptitle_sfx = kwargs.get('suptitle_sfx',None)
+
+    fig, axs = plt.subplots(
+        1, len(time), figsize=figsize, 
+        constrained_layout=constrained_layout
+        )
+
+    for i,hr in enumerate(time):
+
+        if len(time) > 1:
+            ax = axs[i]
+        else:
+            ax = axs
+
+        # pu voltage magnitudes
+        if true_volt_units == "pu":
+            true_voltages = df_true_voltages.loc[hr]
+        else:
+            true_voltages = df_true_voltages.loc[hr] / base_voltages
+        
+        opf_voltages = df_opf_voltages.loc[hr]
+        opf_volt_vals = [opf_voltages[n] for n in node_names]
+        true_volt_vals = [true_voltages[n] for n in node_names]
+        xlabel = "Node number"
+
+        # Plot the comparison
+        x_axis = np.arange(len(node_names))
+        ax.plot(x_axis, opf_volt_vals, "-o", 
+                color="crimson", lw=2.5, 
+                label="OPF estimated voltages")
+        ax.plot(x_axis, true_volt_vals, "-o", 
+                color="royalblue", lw=2.5, 
+                label="True voltages")
+        # Formatting
+        ax.set_xlabel(xlabel, fontsize=label_fontsize)
+        ax.set_ylabel(f"Voltage Magnitudes (pu)", fontsize=label_fontsize)
+        ax.legend(fontsize=legend_fontsize, markerscale=2)
+        ax.tick_params(axis="x", labelsize=ticklabel_fontsize)
+        ax.tick_params(axis="y", labelsize=ticklabel_fontsize)
+        ax.set_title(f"time={hr} hours")
+    
+    suptitle = "Voltage validation for DOPF algorithm"
+    if suptitle_sfx:
+        suptitle = f"{suptitle}  {suptitle_sfx}"
+    fig.suptitle(suptitle, fontsize=title_fontsize)
+
+    if to_file:
+        fig.savefig(to_file, bbox_inches='tight')
+    if show:
+        plt.show()
+    plt.close(fig)
+    
+    if do_return:
+        return fig
+    pass
+
+
 def compare_vtree(
         realVfile1, realVfile2, 
         imagVfile1, imagVfile2, 
@@ -461,7 +523,7 @@ def compare_vtree(
         alg1, alg2, 
         sep = "    ", root_node = "150",
         coordsys = "2D", 
-        time = 45,  
+        time = "11:15",  
         to_file = None, show=True, do_return=False, 
         **kwargs
 ):
@@ -472,13 +534,8 @@ def compare_vtree(
     title_fontsize = label_fontsize + 10
 
     # get voltage data
-    voltage_real1 = feather.read_feather(realVfile1)
-    voltage_imag1 = feather.read_feather(imagVfile1)
-    df_voltages1 = np.abs(voltage_real1.drop("time", axis=1) + 1j * voltage_imag1.drop("time", axis=1))
-
-    voltage_real2 = feather.read_feather(realVfile2)
-    voltage_imag2 = feather.read_feather(imagVfile2)
-    df_voltages2 = np.abs(voltage_real2.drop("time", axis=1) + 1j * voltage_imag2.drop("time", axis=1))
+    df_voltages1 = get_voltage(realVfile1, imagVfile1)
+    df_voltages2 = get_voltage(realVfile2, imagVfile2)
     
     # get open switches in the network
     open_buses1 = [bus for bus in df_voltages1.columns if bus.find("OPEN") != -1]
@@ -496,8 +553,8 @@ def compare_vtree(
         constrained_layout=constrained_layout
         )
     
-    voltages1 = df_voltages1.iloc[time,:] / base_voltages1
-    voltages2 = df_voltages2.iloc[time,:] / base_voltages2
+    voltages1 = df_voltages1.loc[time] / base_voltages1
+    voltages2 = df_voltages2.loc[time] / base_voltages2
     
     voltage_tree(
         network1, voltages1, axs[0], 
@@ -512,7 +569,7 @@ def compare_vtree(
         **kwargs
         )
     
-    suptitle = f"Voltage tree comparison of networks for two DOPF algorithms, time={time//4 :02d}:{15*(time%4) :2d} hours"
+    suptitle = f"Voltage tree comparison of networks for two DOPF algorithms, time={time} hours"
     fig.suptitle(suptitle, fontsize=title_fontsize)
 
     if to_file:
@@ -533,7 +590,7 @@ def compare_network(
         alg1, alg2, 
         sep = "    ", root_node = "150",
         coordsys = "2D", 
-        time = 45, vmin=1.0, vmax=1.05,
+        time = "11:30", vmin=1.0, vmax=1.05,
         to_file = None, show=True, do_return=False, 
         **kwargs
 ):
@@ -546,13 +603,8 @@ def compare_network(
     title_fontsize = label_fontsize + 5
 
     # get voltage data
-    voltage_real1 = feather.read_feather(realVfile1)
-    voltage_imag1 = feather.read_feather(imagVfile1)
-    df_voltages1 = np.abs(voltage_real1.drop("time", axis=1) + 1j * voltage_imag1.drop("time", axis=1))
-
-    voltage_real2 = feather.read_feather(realVfile2)
-    voltage_imag2 = feather.read_feather(imagVfile2)
-    df_voltages2 = np.abs(voltage_real2.drop("time", axis=1) + 1j * voltage_imag2.drop("time", axis=1))
+    df_voltages1 = get_voltage(realVfile1, imagVfile1)
+    df_voltages2 = get_voltage(realVfile2, imagVfile2)
     
     # get open switches in the network
     open_buses1 = [bus for bus in df_voltages1.columns if bus.find("OPEN") != -1]
@@ -571,9 +623,9 @@ def compare_network(
         constrained_layout=constrained_layout
         )
     
-    voltages1 = df_voltages1.iloc[time,:] / base_voltages1
+    voltages1 = df_voltages1.loc[time,:] / base_voltages1
     n_colors1 = [voltages1[n] for n in network1.nodes]
-    voltages2 = df_voltages2.iloc[time,:] / base_voltages2
+    voltages2 = df_voltages2.loc[time,:] / base_voltages2
     n_colors2 = [voltages2[n] for n in network2.nodes]
     
     # Draw the network
@@ -606,7 +658,7 @@ def compare_network(
     cbar.ax.tick_params(labelsize = ticklabel_fontsize)
 
     
-    suptitle = f"Voltage magnitude heatmaps for two DOPF algorithms, time={time//4 :02d}:{15*(time%4) :2d} hours"
+    suptitle = f"Voltage magnitude heatmaps for two DOPF algorithms, time={time} hours"
     fig.suptitle(suptitle, fontsize=title_fontsize)
 
     if to_file:

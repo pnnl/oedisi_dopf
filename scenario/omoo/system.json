@@ -16,6 +16,13 @@
                           }
         },
         {
+            "name": "recorder_opf_voltage_magnitude",
+            "type": "Recorder",
+            "parameters": {"feather_filename": "../../outputs/omoo/opf_voltage_mag.feather",
+                           "csv_filename": "../../outputs/omoo/opf_voltage_mag.csv"
+                          }
+        },
+        {
             "name": "optimal_pf",
             "type": "OMOOComponent",
             "parameters": {
@@ -26,7 +33,6 @@
             "name": "feeder",
             "type": "LocalFeeder",
             "parameters": {
-                "existing_feeder_file": "opendss/master.dss",
                 "use_smartds": false,
                 "profile_location": "gadal_ieee123/profiles",
                 "opendss_location": "gadal_ieee123/qsts",
@@ -98,6 +104,12 @@
             "source_port": "P_set",
             "target": "feeder",
             "target_port": "pv_set"
+        },
+        {
+            "source": "optimal_pf",
+            "source_port": "voltage_mag",
+            "target": "recorder_opf_voltage_magnitude",
+            "target_port": "subscription"
         }
     ]
 }

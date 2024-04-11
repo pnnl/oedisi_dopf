@@ -7,6 +7,7 @@ First `call_h` calculates the residual from the voltage magnitude and angle,
 and `call_H` calculates a jacobian. Then `scipy.optimize.least_squares`
 is used to solve.
 """
+
 import cmath
 import warnings
 import logging
@@ -32,7 +33,8 @@ from oedisi.types.data_types import (
     PowersReal,
     PowersImaginary,
     AdmittanceSparse,
-    Command
+    VoltagesMagnitude,
+    Command,
 )
 from scipy.sparse import csc_matrix, coo_matrix, diags, vstack, hstack
 from scipy.sparse.linalg import svds, inv
@@ -297,9 +299,9 @@ class UnitSystem(str, Enum):
 
 
 class OMOOParameters(BaseModel):
-    Vmax: float = 1.05 + 0.005  # Upper limit
-    Vmin_act: float = 0.945  # + 0.005
-    Vmin: float = 0.945 + 0.005 + 0.002  # Lower limit\
+    Vmax: float = 1.05  # + 0.005  # Upper limit
+    Vmin_act: float = 0.95  # + 0.005
+    Vmin: float = 0.95  # + 0.005 + 0.002  # Lower limit\
     # Linearized equation is overestimating. So increase the lower limit by 0.005.
     # The problem is not solved to the optimal, so increase another 0.002.
     alpha: float = 0.5  #  learning rate for dual and primal
@@ -602,7 +604,7 @@ class OMOOFederate:
         voltages = None
         power_P = None
         power_Q = None
-        while granted_time < 1000:
+        while granted_time < h.HELICS_TIME_MAXTIME:
             logger.debug("granted_time")
             logger.debug(granted_time)
             if not self.sub_voltages_real.is_updated():
@@ -685,8 +687,12 @@ class OMOOFederate:
             power_set = P_set + 1j * Q_set
             power_factor = power_set.real / (np.abs(power_set) + 1e-7)
             pmpp = power_set.real / pv["kVarRated"]
-            assert np.all(np.abs(power_factor) <= 1)
-            assert np.all((pmpp <= 1) & (pmpp >= 0))
+            assert np.all(
+                np.abs(power_factor) <= 1
+            ), f"Invalid power factor at index {np.argmax(np.abs(power_factor) > 1)}: {power_factor[np.argmax(np.abs(power_factor) > 1)]}"
+            assert np.all(
+                (pmpp <= 1) & (pmpp >= 0)
+            ), f"Invalid pmpp at index {np.argmax((pmpp > 1) | (pmpp < 0))}: {pmpp[np.argmax((pmpp > 1) | (pmpp < 0))]}"
 
             te = time.time()
             logger.debug(f"OMOO takes {(te-ts)/60} (min)")
@@ -720,6 +726,28 @@ class OMOOFederate:
             # Turn P_set and Q_set into commands
             if set_power:
                 self.pub_P_set.publish(json.dumps(pv_settings))
+
+            # Publish control voltage magnitudes
+            time_ = voltages_imag.time
+            logger.info(time_)
+            V_slack = abs(self.V0)
+            node_ids = []
+            node_voltages = []
+            V_hat_index = 0
+            for k,nid in enumerate(ids):
+                node_ids.append(nid)
+                if k in slack_bus:
+                    V0_index = slack_bus.index(k)
+                    node_voltages.append(V_slack[V0_index,0])
+                else:
+                    node_voltages.append(V_hat[V_hat_index])
+                    V_hat_index += 1
+            pub_mags = VoltagesMagnitude(
+                ids=node_ids, 
+                values=node_voltages, 
+                time=time_
+                )
+            self.pub_voltage_mag.publish(pub_mags.json())
 
             logger.info("end time: " + str(datetime.now()))
 
