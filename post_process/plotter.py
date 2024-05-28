@@ -670,3 +670,52 @@ def compare_network(
     if do_return:
         return fig
     pass
+
+
+def plot_delta_setpoint(
+        delta_setpoint_file, 
+        pv_systems=None,
+        to_file = None, show=True, do_return=False, 
+        **kwargs
+        ):
+    df_delta_setpt = feather.read_feather(delta_setpoint_file)
+    df_delta_setpt["time"] = df_delta_setpt["time"].apply(get_time)
+    df_delta_setpt.set_index("time")
+
+    if not pv_systems:
+        pv_systems = df_delta_setpt.columns.tolist()
+    
+    # keyword arguments
+    figsize = kwargs.get('figsize', (20, 10))
+    constrained_layout = kwargs.get('constrained_layout', False)
+    label_fontsize = kwargs.get('fontsize', 25)
+    ticklabel_fontsize = label_fontsize - 2
+    title_fontsize = label_fontsize + 5
+
+    fig, ax = plt.subplots(1,1,figsize=figsize, constrained_layout=constrained_layout)
+    df_delta_setpt.plot.line(
+        y = pv_systems, ax=ax, 
+        marker="^", markersize=10, 
+        linestyle="dashed", linewidth=2.0
+    )
+    # Formatting
+    x_pts = [0,20,40,60,80]
+    xtix = [df_delta_setpt["time"][x] for x in x_pts]
+    ax.set_xlabel("Time of day (HH:MM)", fontsize=label_fontsize)
+    ax.set_ylabel("Increase in PV set point (kW)", fontsize=label_fontsize)
+    ax.legend(fontsize=label_fontsize, markerscale=2, ncols=1)
+    ax.set_xticks(x_pts, labels=xtix, fontsize=ticklabel_fontsize)
+    ax.tick_params(axis="y", labelsize=ticklabel_fontsize)
+
+    suptitle = "Change in PV setpoint from forecasted"
+    fig.suptitle(suptitle, fontsize=title_fontsize)
+
+    if to_file:
+        fig.savefig(to_file, bbox_inches='tight')
+    if show:
+        plt.show()
+    plt.close(fig)
+    
+    if do_return:
+        return fig
+    pass

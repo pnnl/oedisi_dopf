@@ -35,7 +35,7 @@ from scipy.sparse import coo_matrix, csc_matrix
 
 logger = logging.getLogger(__name__)
 logger.addHandler(logging.StreamHandler())
-logger.setLevel(logging.INFO)
+logger.setLevel(logging.DEBUG)
 
 
 def permutation(from_list, to_list):
@@ -150,6 +150,34 @@ class FeederSimulator(object):
 
         self.snapshot_run()
         assert self._state == OpenDSSState.SNAPSHOT_RUN, f"{self._state}"
+    
+    def forcast_pv(self, steps: int) -> list:
+        cmd = f'Set stepsize={self._simulation_time_step} Number=1'
+        dss.Text.Command(cmd)
+        forecast = []
+        for k in range(steps):
+            dss.Solution.Solve()
+            
+            # names of PV systems and forecasted power output
+            pv_names = []
+            powers = []
+
+            # compute average irradiance for the current timestep
+            flag = dss.PVsystems.First()
+            avg_irradiance = dss.PVsystems.IrradianceNow()
+            while flag:
+                avg_irradiance = (avg_irradiance + dss.PVsystems.IrradianceNow())/2
+                flag = dss.PVsystems.Next()
+
+            # now compute the power output from the evaluated average irradiance
+            flag = dss.PVsystems.First()
+            while flag:
+                pv_names.append(f"PVSystem.{dss.PVsystems.Name()}")
+                powers.append(dss.PVsystems.Pmpp() * avg_irradiance)
+                flag = dss.PVsystems.Next()
+            
+            forecast.append(xr.DataArray(powers, coords={"ids": pv_names}))
+        return forecast
 
     def snapshot_run(self):
         """Run snapshot of simuation without specifying a time.

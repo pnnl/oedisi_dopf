@@ -22,7 +22,7 @@ from oedisi.types.data_types import (
 
 logger = logging.getLogger(__name__)
 logger.addHandler(logging.StreamHandler())
-logger.setLevel(logging.DEBUG)
+logger.setLevel(logging.INFO)
 
 
 class Phase(IntEnum):
@@ -98,6 +98,22 @@ def pack_voltages(voltages: dict, time: int) -> VoltagesMagnitude:
             values.append(voltage)
     return VoltagesMagnitude(ids=ids, values=values, time=time)
 
+def extract_forecast(bus:dict, forecast) -> dict:
+    for eq, power in zip(forecast["ids"], forecast["values"]):
+        [_, name] = eq.split('.')
+
+        if name not in bus:
+            continue
+        
+        phases = bus[name]["phases"]
+        for ph in phases:
+            phase = int(ph) - 1
+            logger.debug(f"{eq}.{ph} : {power/len(phases)}")
+            bus[name]["eqid"] = eq
+            bus[name]["pv"][phase][0] = power*1000/len(phases)
+            bus[name]["pv"][phase][1] = 0.0
+    return bus
+
 
 def extract_powers(bus: dict, real: PowersReal, imag: PowersImaginary) -> dict:
     for id, eq, power in zip(real.ids, real.equipment_ids, real.values):
@@ -108,7 +124,7 @@ def extract_powers(bus: dict, real: PowersReal, imag: PowersImaginary) -> dict:
         [type, _] = eq.split('.')
         phase = int(phase) - 1
         if type == "PVSystem":
-            logger.info(f"{id} : {power}")
+            logger.debug(f"{id} : {power}")
             bus[name]["eqid"] = eq
             bus[name]["pv"][phase][0] = power*1000
         else:

@@ -11,14 +11,21 @@ from oedisi.types.data_types import (
     Injection,
     Topology,
     VoltagesMagnitude,
+    MeasurementArray,
 )
 import adapter
 import lindistflow
 from area import area_info
+import xarray as xr
 
 logger = logging.getLogger(__name__)
 logger.addHandler(logging.StreamHandler())
 logger.setLevel(logging.DEBUG)
+
+def xarray_to_dict(data):
+    """Convert xarray to dict with values and ids for JSON serialization."""
+    coords = {key: list(data.coords[key].data) for key in data.coords.keys()}
+    return {"values": list(data.data), **coords}
 
 
 class StaticConfig(object):
@@ -32,6 +39,7 @@ class Subscriptions(object):
     voltages_mag: VoltagesMagnitude
     injections: Injection
     topology: Topology
+    pv_forecast: list
 
 
 class OPFFederate(object):
@@ -85,6 +93,11 @@ class OPFFederate(object):
             self.inputs["voltages_magnitude"], "")
         self.sub.injections = self.fed.register_subscription(
             self.inputs["injections"], "")
+        # Optional subscription: PV forecast
+        self.sub.pv_forecast = self.fed.register_subscription(
+            self.inputs["pv_forecast"], "")
+        self.sub.pv_forecast.set_default("[]")
+        self.sub.pv_forecast.option["CONNECTION_OPTIONAL"] = True
 
     def register_publication(self) -> None:
         self.pub_commands = self.fed.register_publication(
@@ -95,11 +108,31 @@ class OPFFederate(object):
             "opf_voltages_magnitude", h.HELICS_DATA_TYPE_STRING, ""
         )
 
+        self.pub_delta_setpt = self.fed.register_publication(
+            "delta_setpoint", h.HELICS_DATA_TYPE_STRING, ""
+        )
+    
+    def get_set_points(self, control, bus_info, conversion):
+        setpoint = {}
+        for key, val in control.items():
+            if key in bus_info:
+                bus = bus_info[key]
+                if 'eqid' in bus:
+                    eqid = bus['eqid']
+                    [eq_type, _] = eqid.split('.')
+                    if eq_type == "PVSystem":
+                        sp = lindistflow.ignore_phase(val)*conversion
+                        setpoint[eqid] = 0.0 if sp < 0.1 else sp
+        return setpoint
+
     def run(self) -> None:
         logger.info(f"Federate connected: {datetime.now()}")
         self.fed.enter_executing_mode()
         granted_time = h.helicsFederateRequestTime(
             self.fed, h.HELICS_TIME_MAXTIME)
+
+        grab_forecast_flag = False
+        time_ctr = -1
 
         while granted_time < h.HELICS_TIME_MAXTIME:
 
@@ -123,6 +156,35 @@ class OPFFederate(object):
 
             area_bus = adapter.extract_voltages(area_bus, voltages_mag)
 
+            
+            # evaluate the forecasted PV set points
+            if not grab_forecast_flag:
+                pv_forecast = self.sub.pv_forecast.json
+                forecast_setp = {}
+                for k, forecast in enumerate(pv_forecast):
+                    logger.debug(f"Forecasting for time step {k}")
+                    area_bus = adapter.extract_forecast(
+                        area_bus, 
+                        json.loads(forecast)
+                        )
+                    voltages, power_flow, forecast_control, conv = lindistflow.optimal_power_flow(
+                        area_branch, area_bus, slack_bus, 
+                        self.static.control_type, self.static.pf_flag
+                        )
+                    forecast_setpts = self.get_set_points(
+                        forecast_control, 
+                        area_bus, conv
+                        )
+                    # add the set points to the forecast setpoint dictionary
+                    for eqid in forecast_setpts:
+                        if eqid not in forecast_setp:
+                            forecast_setp[eqid] = [forecast_setpts[eqid]]
+                        else:
+                            forecast_setp[eqid].append(forecast_setpts[eqid])
+                        
+                grab_forecast_flag = True
+                
+
             time = voltages_mag.time
             logger.info(time)
 
@@ -131,7 +193,25 @@ class OPFFederate(object):
 
             voltages, power_flow, control, conversion = lindistflow.optimal_power_flow(
                 area_branch, area_bus, slack_bus, self.static.control_type, self.static.pf_flag)
-
+            real_setpts = self.get_set_points(control, area_bus, conversion)
+            
+            # Compute the delta change in setpoints
+            time_ctr += 1
+            pveq_id = []
+            delta_setpt = []
+            for eq_id in real_setpts:
+                pveq_id.append(eq_id)
+                delta_setpt.append(real_setpts[eq_id]-forecast_setp[eq_id][time_ctr])
+            delta_sp = xr.DataArray(delta_setpt, coords={"ids": pveq_id})
+            self.pub_delta_setpt.publish(
+                MeasurementArray(
+                    **xarray_to_dict(delta_sp),time=time,
+                    units="kVA",
+                    ).json()
+                )
+            
+            
+            # get the control commands for the feeder federate
             commands = []
             for key, val in control.items():
                 if key in area_bus:

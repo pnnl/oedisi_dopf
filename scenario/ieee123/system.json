@@ -44,6 +44,13 @@
                           }
         },
         {
+            "name": "recorder_delta_setpoint",
+            "type": "Recorder",
+            "parameters": {"feather_filename": "../../outputs/ieee123/delta_setpoint.feather",
+                           "csv_filename": "../../outputs/ieee123/delta_setpoint.csv"
+                          }
+        },
+        {
             "name": "feeder",
             "type": "Feeder",
             "parameters": {
@@ -117,6 +124,12 @@
             "target_port": "voltages_magnitude"
         },
         {
+            "source": "feeder",
+            "source_port": "pv_forecast",
+            "target": "lindistflow",
+            "target_port": "pv_forecast"
+        },
+        {
             "source": "lindistflow",
             "source_port": "pv_set",
             "target": "feeder",
@@ -126,6 +139,12 @@
             "source": "lindistflow",
             "source_port": "opf_voltages_magnitude",
             "target": "recorder_opf_voltage_magnitude",
+            "target_port": "subscription"
+        },
+        {
+            "source": "lindistflow",
+            "source_port": "delta_setpoint",
+            "target": "recorder_delta_setpoint",
             "target_port": "subscription"
         }
     ]
