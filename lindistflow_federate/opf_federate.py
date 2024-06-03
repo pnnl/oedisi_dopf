@@ -111,6 +111,10 @@ class OPFFederate(object):
         self.pub_delta_setpt = self.fed.register_publication(
             "delta_setpoint", h.HELICS_DATA_TYPE_STRING, ""
         )
+
+        self.pub_curtail_forecast = self.fed.register_publication(
+            "forecast_curtail", h.HELICS_DATA_TYPE_STRING, ""
+        )
     
     def get_set_points(self, control, bus_info, conversion):
         setpoint = {}
@@ -157,32 +161,57 @@ class OPFFederate(object):
             area_bus = adapter.extract_voltages(area_bus, voltages_mag)
 
             
-            # evaluate the forecasted PV set points
+            # evaluate the forecasted PV set points and forecasted curtailment
             if not grab_forecast_flag:
                 pv_forecast = self.sub.pv_forecast.json
                 forecast_setp = {}
+                forecast_curt = {}
                 for k, forecast in enumerate(pv_forecast):
-                    logger.debug(f"Forecasting for time step {k}")
+                    logger.info(f"Forecasting for time step {k}")
+                    
+                    forecast_generation = json.loads(forecast)
+                    dict_forecast_gen = dict(zip(
+                        forecast_generation["ids"], 
+                        forecast_generation["values"]
+                        ))
+                    
+                    # insert forecasted generation values to the PV injection vector
                     area_bus = adapter.extract_forecast(
                         area_bus, 
-                        json.loads(forecast)
+                        forecast_generation
                         )
+                    
+                    # perform forecast LinDistFlow
                     voltages, power_flow, forecast_control, conv = lindistflow.optimal_power_flow(
                         area_branch, area_bus, slack_bus, 
                         self.static.control_type, self.static.pf_flag
                         )
+                    
+                    # compute the forecatsed set points
                     forecast_setpts = self.get_set_points(
                         forecast_control, 
                         area_bus, conv
                         )
-                    # add the set points to the forecast setpoint dictionary
+                    
+                    # make outputs ready for publishing
                     for eqid in forecast_setpts:
+                        setpt = forecast_setpts[eqid]
+                        curt = dict_forecast_gen[eqid] - setpt
+
+                        # add the forecasted set points
                         if eqid not in forecast_setp:
-                            forecast_setp[eqid] = [forecast_setpts[eqid]]
+                            forecast_setp[eqid] = [setpt]
                         else:
-                            forecast_setp[eqid].append(forecast_setpts[eqid])
+                            forecast_setp[eqid].append(setpt)
+
+                        # add the forecasted curtailments
+                        if eqid not in forecast_curt:
+                            forecast_curt[eqid] = [curt]
+                        else:
+                            forecast_curt[eqid].append(curt)
                         
                 grab_forecast_flag = True
+                
                 
 
             time = voltages_mag.time
@@ -195,18 +224,27 @@ class OPFFederate(object):
                 area_branch, area_bus, slack_bus, self.static.control_type, self.static.pf_flag)
             real_setpts = self.get_set_points(control, area_bus, conversion)
             
-            # Compute the delta change in setpoints
+            # Compute the delta change in setpoints and publish
             time_ctr += 1
             pveq_id = []
             delta_setpt = []
+            forecast_curtail = []
             for eq_id in real_setpts:
                 pveq_id.append(eq_id)
                 delta_setpt.append(real_setpts[eq_id]-forecast_setp[eq_id][time_ctr])
+                forecast_curtail.append(forecast_curt[eq_id][time_ctr])
             delta_sp = xr.DataArray(delta_setpt, coords={"ids": pveq_id})
+            fore_curt = xr.DataArray(forecast_curtail, coords={"ids": pveq_id})
             self.pub_delta_setpt.publish(
                 MeasurementArray(
                     **xarray_to_dict(delta_sp),time=time,
-                    units="kVA",
+                    units="kW",
+                    ).json()
+                )
+            self.pub_curtail_forecast.publish(
+                MeasurementArray(
+                    **xarray_to_dict(fore_curt),time=time,
+                    units="kW",
                     ).json()
                 )
             

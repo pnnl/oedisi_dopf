@@ -19,7 +19,7 @@ def plot_result_case(
     real_voltage_filepath = os.path.join(directory, "voltage_real.feather")
     imag_voltage_filepath = os.path.join(directory, "voltage_imag.feather")
     opf_voltage_filepath = os.path.join(directory, "opf_voltage_mag.feather")
-    delta_setpoint_file = os.path.join(directory, "delta_setpoint.feather")
+    delta_setpoint_file = os.path.join(directory, "forecast_curtail.feather")
 
     # Voltage heatmaps of time steps
     fig_filename = os.path.join(directory, f"network_{casename}.png")
@@ -67,8 +67,8 @@ def plot_result_case(
     )
 
     # Plot delta setpoints (DOPF 2 use case results)
-    fig_filename = os.path.join(directory, f"delta_setpoint_{casename}.png")
-    plotter.plot_delta_setpoint(
+    fig_filename = os.path.join(directory, f"forecast_curtail_{casename}.png")
+    plotter.plot_curtail_forecast(
         delta_setpoint_file,
         show=False, 
         to_file=fig_filename

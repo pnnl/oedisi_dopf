@@ -16,6 +16,7 @@
     "dynamic_outputs": [
         {"type": "ControlList", "port_id": "pv_set"},
         {"type": "VoltagesMagnitude", "port_id": "opf_voltages_magnitude"},
-        {"type": "", "port_id": "delta_setpoint"}
+        {"type": "", "port_id": "delta_setpoint"},
+        {"type": "", "port_id": "forecast_curtail"}
     ]
 }

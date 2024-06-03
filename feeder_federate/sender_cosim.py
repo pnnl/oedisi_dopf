@@ -360,7 +360,7 @@ def go_cosim(
     logger.info("Evaluating the forecasted PV")
     forecast_data = sim.forcast_pv(int(config.number_of_timesteps))
     PVforecast = [MeasurementArray(**xarray_to_dict(forecast), 
-                    units="kWA").json() for forecast in forecast_data]
+                    units="kW").json() for forecast in forecast_data]
     pub_pv_forecast.publish(json.dumps(PVforecast))
 
     granted_time = -1

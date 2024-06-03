@@ -51,6 +51,13 @@
                           }
         },
         {
+            "name": "recorder_forecast_curtail",
+            "type": "Recorder",
+            "parameters": {"feather_filename": "../../outputs/ieee123/forecast_curtail.feather",
+                           "csv_filename": "../../outputs/ieee123/forecast_curtail.csv"
+                          }
+        },
+        {
             "name": "feeder",
             "type": "Feeder",
             "parameters": {
@@ -145,6 +152,12 @@
             "source": "lindistflow",
             "source_port": "delta_setpoint",
             "target": "recorder_delta_setpoint",
+            "target_port": "subscription"
+        },
+        {
+            "source": "lindistflow",
+            "source_port": "forecast_curtail",
+            "target": "recorder_forecast_curtail",
             "target_port": "subscription"
         }
     ]
