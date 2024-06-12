@@ -93,6 +93,11 @@ class OPFFederate(object):
             self.inputs["voltages_magnitude"], "")
         self.sub.injections = self.fed.register_subscription(
             self.inputs["injections"], "")
+        
+        # add subscription to get available PV
+        self.sub.available_pv = self.fed.register_subscription(
+            self.inputs["pv_available"], "")
+
         # Optional subscription: PV forecast
         self.sub.pv_forecast = self.fed.register_subscription(
             self.inputs["pv_forecast"], "")
@@ -114,6 +119,9 @@ class OPFFederate(object):
 
         self.pub_curtail_forecast = self.fed.register_publication(
             "forecast_curtail", h.HELICS_DATA_TYPE_STRING, ""
+        )
+        self.pub_curtail = self.fed.register_publication(
+            "real_curtail", h.HELICS_DATA_TYPE_STRING, ""
         )
     
     def get_set_points(self, control, bus_info, conversion):
@@ -220,6 +228,11 @@ class OPFFederate(object):
             injection = Injection.parse_obj(self.sub.injections.json)
             area_bus = adapter.extract_injection(area_bus, injection)
 
+            # get the available power in real time
+            available_power = self.sub.available_pv.json
+            available_power = {available_power["ids"][i]:available_power["values"][i] for i in range(len(available_power["ids"]))}
+            
+
             voltages, power_flow, control, conversion = lindistflow.optimal_power_flow(
                 area_branch, area_bus, slack_bus, self.static.control_type, self.static.pf_flag)
             real_setpts = self.get_set_points(control, area_bus, conversion)
@@ -229,12 +242,16 @@ class OPFFederate(object):
             pveq_id = []
             delta_setpt = []
             forecast_curtail = []
+            real_curtail = []
             for eq_id in real_setpts:
                 pveq_id.append(eq_id)
                 delta_setpt.append(real_setpts[eq_id]-forecast_setp[eq_id][time_ctr])
                 forecast_curtail.append(forecast_curt[eq_id][time_ctr])
+                real_curtail.append(available_power[eq_id] - real_setpts[eq_id])
+
             delta_sp = xr.DataArray(delta_setpt, coords={"ids": pveq_id})
             fore_curt = xr.DataArray(forecast_curtail, coords={"ids": pveq_id})
+            real_curt = xr.DataArray(real_curtail, coords={"ids": pveq_id})
             self.pub_delta_setpt.publish(
                 MeasurementArray(
                     **xarray_to_dict(delta_sp),time=time,
@@ -244,6 +261,12 @@ class OPFFederate(object):
             self.pub_curtail_forecast.publish(
                 MeasurementArray(
                     **xarray_to_dict(fore_curt),time=time,
+                    units="kW",
+                    ).json()
+                )
+            self.pub_curtail.publish(
+                MeasurementArray(
+                    **xarray_to_dict(real_curt),time=time,
                     units="kW",
                     ).json()
                 )

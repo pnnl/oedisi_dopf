@@ -101,6 +101,7 @@ def pack_voltages(voltages: dict, time: int) -> VoltagesMagnitude:
 def extract_forecast(bus:dict, forecast) -> dict:
     for eq, power in zip(forecast["ids"], forecast["values"]):
         [_, name] = eq.split('.')
+        name = name.split('_')[-1].upper()
 
         if name not in bus:
             continue

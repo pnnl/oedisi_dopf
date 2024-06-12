@@ -58,6 +58,13 @@
                           }
         },
         {
+            "name": "recorder_real_curtail",
+            "type": "Recorder",
+            "parameters": {"feather_filename": "../../outputs/ieee123/real_curtail.feather",
+                           "csv_filename": "../../outputs/ieee123/real_curtail.csv"
+                          }
+        },
+        {
             "name": "feeder",
             "type": "Feeder",
             "parameters": {
@@ -137,6 +144,12 @@
             "target_port": "pv_forecast"
         },
         {
+            "source": "feeder",
+            "source_port": "available_power",
+            "target": "lindistflow",
+            "target_port": "pv_available"
+        },
+        {
             "source": "lindistflow",
             "source_port": "pv_set",
             "target": "feeder",
@@ -158,6 +171,12 @@
             "source": "lindistflow",
             "source_port": "forecast_curtail",
             "target": "recorder_forecast_curtail",
+            "target_port": "subscription"
+        },
+        {
+            "source": "lindistflow",
+            "source_port": "real_curtail",
+            "target": "recorder_real_curtail",
             "target_port": "subscription"
         }
     ]

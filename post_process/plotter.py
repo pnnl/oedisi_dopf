@@ -672,18 +672,18 @@ def compare_network(
     pass
 
 
-def plot_curtail_forecast(
-        curtail_forecast_file, 
+def plot_curtail(
+        curtail_file, 
         pv_systems=None,
         to_file = None, show=True, do_return=False, 
         **kwargs
         ):
-    df_curtail_forecast = feather.read_feather(curtail_forecast_file)
-    df_curtail_forecast["time"] = df_curtail_forecast["time"].apply(get_time)
-    df_curtail_forecast.set_index("time")
+    df_curtail = feather.read_feather(curtail_file)
+    df_curtail["time"] = df_curtail["time"].apply(get_time)
+    df_curtail.set_index("time")
 
     if not pv_systems:
-        pv_systems = df_curtail_forecast.columns.tolist()
+        pv_systems = df_curtail.columns.tolist()[:10]
     
     # keyword arguments
     figsize = kwargs.get('figsize', (20, 10))
@@ -691,23 +691,24 @@ def plot_curtail_forecast(
     label_fontsize = kwargs.get('fontsize', 25)
     ticklabel_fontsize = label_fontsize - 2
     title_fontsize = label_fontsize + 5
+    suptitle_pfx = kwargs.get('suptitle_pfx', "Forecasted ")
 
     fig, ax = plt.subplots(1,1,figsize=figsize, constrained_layout=constrained_layout)
-    df_curtail_forecast.plot.line(
+    df_curtail.plot.line(
         y = pv_systems, ax=ax, 
         marker="^", markersize=10, 
         linestyle="dashed", linewidth=2.0
     )
     # Formatting
     x_pts = [0,20,40,60,80]
-    xtix = [df_curtail_forecast["time"][x] for x in x_pts]
+    xtix = [df_curtail["time"][x] for x in x_pts]
     ax.set_xlabel("Time of day (HH:MM)", fontsize=label_fontsize)
-    ax.set_ylabel("Forecasted curtailment (kW)", fontsize=label_fontsize)
-    ax.legend(fontsize=label_fontsize, markerscale=2, ncols=1)
+    ax.set_ylabel("PV Curtailment (kW)", fontsize=label_fontsize)
+    ax.legend(fontsize=label_fontsize-4, markerscale=2, ncols=1)
     ax.set_xticks(x_pts, labels=xtix, fontsize=ticklabel_fontsize)
     ax.tick_params(axis="y", labelsize=ticklabel_fontsize)
 
-    suptitle = "Forecasted curtailment for the PV systems"
+    suptitle = f"{suptitle_pfx}Curtailment for the PV systems"
     fig.suptitle(suptitle, fontsize=title_fontsize)
 
     if to_file:
