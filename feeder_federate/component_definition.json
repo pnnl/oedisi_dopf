@@ -76,6 +76,10 @@
         {
             "type": "PowersReal",
             "port_id": "available_power"
+        },
+        {
+            "type": "",
+            "port_id": "pv_forecast"
         }
     ]
 }

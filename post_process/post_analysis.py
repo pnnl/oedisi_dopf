@@ -19,6 +19,8 @@ def plot_result_case(
     real_voltage_filepath = os.path.join(directory, "voltage_real.feather")
     imag_voltage_filepath = os.path.join(directory, "voltage_imag.feather")
     opf_voltage_filepath = os.path.join(directory, "opf_voltage_mag.feather")
+    forecast_curtail_file = os.path.join(directory, "forecast_curtail.feather")
+    real_curtail_file = os.path.join(directory, "real_curtail.feather")
 
     # Voltage heatmaps of time steps
     fig_filename = os.path.join(directory, f"network_{casename}.png")
@@ -63,6 +65,22 @@ def plot_result_case(
         show=False, to_file=fig_filename,
         figsize=(60, 15),
         suptitle_sfx=f"({alg} Algorithm)",
+    )
+
+    # Plot delta setpoints (DOPF 2 use case results)
+    fig_filename = os.path.join(directory, f"forecast_curtail_{casename}.png")
+    plotter.plot_curtail(
+        forecast_curtail_file,
+        show=False, 
+        to_file=fig_filename,
+        suptitle_pfx = "Forecasted "
+    )
+    fig_filename = os.path.join(directory, f"real_curtail_{casename}.png")
+    plotter.plot_curtail(
+        real_curtail_file,
+        show=False, 
+        to_file=fig_filename,
+        suptitle_pfx = "Real-time "
     )
     return
 
