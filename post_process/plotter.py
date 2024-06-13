@@ -682,8 +682,15 @@ def plot_curtail(
     df_curtail["time"] = df_curtail["time"].apply(get_time)
     df_curtail.set_index("time")
 
+    # get the 10 PV Systems with maximum curtailment
+    curtail = df_curtail.to_numpy()[:,:-1]
+    max_curtail = np.mean(curtail, axis=0)
+    max_indices = np.argsort(max_curtail)[::-1]
+    sorted_pv_systems = df_curtail.columns.to_numpy()[max_indices]
+
+
     if not pv_systems:
-        pv_systems = df_curtail.columns.tolist()[:10]
+        pv_systems = sorted_pv_systems[:10]
     
     # keyword arguments
     figsize = kwargs.get('figsize', (20, 10))
