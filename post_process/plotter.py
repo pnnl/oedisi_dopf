@@ -8,6 +8,7 @@ import json
 import pyarrow.feather as feather
 from geopy.distance import geodesic
 from datetime import datetime
+from errors import errors
 
 
 def plot_voltages(
@@ -454,8 +455,8 @@ def plot_opf_voltage_comparison(
     # keyword arguments
     figsize = kwargs.get('figsize', (10*len(time), 10))
     constrained_layout = kwargs.get('constrained_layout', False)
-    label_fontsize = kwargs.get('fontsize', 25)
-    legend_fontsize = label_fontsize + 2
+    label_fontsize = kwargs.get('fontsize', 30)
+    legend_fontsize = label_fontsize
     ticklabel_fontsize = label_fontsize - 2
     title_fontsize = label_fontsize + 10
     suptitle_sfx = kwargs.get('suptitle_sfx',None)
@@ -481,6 +482,7 @@ def plot_opf_voltage_comparison(
         opf_voltages = df_opf_voltages.loc[hr]
         opf_volt_vals = [opf_voltages[n] for n in node_names]
         true_volt_vals = [true_voltages[n] for n in node_names]
+        MAE = errors(true_volt_vals, opf_volt_vals)
         xlabel = "Node number"
 
         # Plot the comparison
@@ -497,7 +499,7 @@ def plot_opf_voltage_comparison(
         ax.legend(fontsize=legend_fontsize, markerscale=2)
         ax.tick_params(axis="x", labelsize=ticklabel_fontsize)
         ax.tick_params(axis="y", labelsize=ticklabel_fontsize)
-        ax.set_title(f"time={hr} hours")
+        ax.set_title(f"time={hr} hours, MAE={MAE:0.3f}", fontsize=label_fontsize)
     
     suptitle = "Voltage validation for DOPF algorithm"
     if suptitle_sfx:
