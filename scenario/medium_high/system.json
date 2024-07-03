@@ -1,67 +1,67 @@
 {
-    "name": "medium",
+    "name": "medium_high",
     "components": [
         {
             "name": "recorder_power_real",
             "type": "Recorder",
-            "parameters": {"feather_filename": "../../outputs/medium/power_real.feather",
-                           "csv_filename": "../../outputs/medium/power_real.csv"
+            "parameters": {"feather_filename": "../../outputs/medium_high/power_real.feather",
+                           "csv_filename": "../../outputs/medium_high/power_real.csv"
                           }
         },
         {
             "name": "recorder_power_imag",
             "type": "Recorder",
-            "parameters": {"feather_filename": "../../outputs/medium/power_imag.feather",
-                           "csv_filename": "../../outputs/medium/power_imag.csv"
+            "parameters": {"feather_filename": "../../outputs/medium_high/power_imag.feather",
+                           "csv_filename": "../../outputs/medium_high/power_imag.csv"
                           }
         },
         {
             "name": "recorder_voltage_real",
             "type": "Recorder",
-            "parameters": {"feather_filename": "../../outputs/medium/voltage_real.feather",
-                           "csv_filename": "../../outputs/medium/voltage_real.csv"
+            "parameters": {"feather_filename": "../../outputs/medium_high/voltage_real.feather",
+                           "csv_filename": "../../outputs/medium_high/voltage_real.csv"
                           }
         },
         {
             "name": "recorder_voltage_imag",
             "type": "Recorder",
-            "parameters": {"feather_filename": "../../outputs/medium/voltage_imag.feather",
-                           "csv_filename": "../../outputs/medium/voltage_imag.csv"
+            "parameters": {"feather_filename": "../../outputs/medium_high/voltage_imag.feather",
+                           "csv_filename": "../../outputs/medium_high/voltage_imag.csv"
                           }
         },
         {
             "name": "recorder_voltage_magnitude",
             "type": "Recorder",
-            "parameters": {"feather_filename": "../../outputs/medium/voltage_mag.feather",
-                           "csv_filename": "../../outputs/medium/voltage_mag.csv"
+            "parameters": {"feather_filename": "../../outputs/medium_high/voltage_mag.feather",
+                           "csv_filename": "../../outputs/medium_high/voltage_mag.csv"
                           }
         },
         {
             "name": "recorder_opf_voltage_magnitude",
             "type": "Recorder",
-            "parameters": {"feather_filename": "../../outputs/medium/opf_voltage_mag.feather",
-                           "csv_filename": "../../outputs/medium/opf_voltage_mag.csv"
+            "parameters": {"feather_filename": "../../outputs/medium_high/opf_voltage_mag.feather",
+                           "csv_filename": "../../outputs/medium_high/opf_voltage_mag.csv"
                           }
         },
         {
             "name": "recorder_delta_setpoint",
             "type": "Recorder",
-            "parameters": {"feather_filename": "../../outputs/medium/delta_setpoint.feather",
-                           "csv_filename": "../../outputs/medium/delta_setpoint.csv"
+            "parameters": {"feather_filename": "../../outputs/medium_high/delta_setpoint.feather",
+                           "csv_filename": "../../outputs/medium_high/delta_setpoint.csv"
                           }
         },
         {
             "name": "recorder_forecast_curtail",
             "type": "Recorder",
-            "parameters": {"feather_filename": "../../outputs/medium/forecast_curtail.feather",
-                           "csv_filename": "../../outputs/medium/forecast_curtail.csv"
+            "parameters": {"feather_filename": "../../outputs/medium_high/forecast_curtail.feather",
+                           "csv_filename": "../../outputs/medium_high/forecast_curtail.csv"
                           }
         },
         {
             "name": "recorder_real_curtail",
             "type": "Recorder",
-            "parameters": {"feather_filename": "../../outputs/medium/real_curtail.feather",
-                           "csv_filename": "../../outputs/medium/real_curtail.csv"
+            "parameters": {"feather_filename": "../../outputs/medium_high/real_curtail.feather",
+                           "csv_filename": "../../outputs/medium_high/real_curtail.csv"
                           }
         },
         {
@@ -70,11 +70,11 @@
             "parameters": {
                 "use_smartds": true,
                 "profile_location": "SMART-DS/v1.0/2017/SFO/P6U/profiles",
-                "opendss_location": "SMART-DS/v1.0/2017/SFO/P6U/scenarios/solar_medium_batteries_none_timeseries/opendss/p6uhs10_1247/p6uhs10_1247--p6udt5293",
+                "opendss_location": "SMART-DS/v1.0/2017/SFO/P6U/scenarios/solar_high_batteries_none_timeseries/opendss/p6uhs10_1247/p6uhs10_1247--p6udt5293",
                 "start_date": "2017-05-01 00:00:00",
                 "number_of_timesteps": 96,
                 "run_freq_sec": 900,
-                "topology_output": "../../outputs/medium/topology.json",
+                "topology_output": "../../outputs/medium_high/topology.json",
                 "use_sparse_admittance": true
             }
         },
