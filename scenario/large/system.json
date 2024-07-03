@@ -4,43 +4,64 @@
         {
             "name": "recorder_power_real",
             "type": "Recorder",
-            "parameters": {"feather_filename": "../../outputs/large/power_real.feather",
-                           "csv_filename": "../../outputs/large/power_real.csv"
+            "parameters": {"feather_filename": "../../outputs/medium/power_real.feather",
+                           "csv_filename": "../../outputs/medium/power_real.csv"
                           }
         },
         {
             "name": "recorder_power_imag",
             "type": "Recorder",
-            "parameters": {"feather_filename": "../../outputs/large/power_imag.feather",
-                           "csv_filename": "../../outputs/large/power_imag.csv"
+            "parameters": {"feather_filename": "../../outputs/medium/power_imag.feather",
+                           "csv_filename": "../../outputs/medium/power_imag.csv"
                           }
         },
         {
             "name": "recorder_voltage_real",
             "type": "Recorder",
-            "parameters": {"feather_filename": "../../outputs/large/voltage_real.feather",
-                           "csv_filename": "../../outputs/large/voltage_real.csv"
+            "parameters": {"feather_filename": "../../outputs/medium/voltage_real.feather",
+                           "csv_filename": "../../outputs/medium/voltage_real.csv"
                           }
         },
         {
             "name": "recorder_voltage_imag",
             "type": "Recorder",
-            "parameters": {"feather_filename": "../../outputs/large/voltage_imag.feather",
-                           "csv_filename": "../../outputs/large/voltage_imag.csv"
+            "parameters": {"feather_filename": "../../outputs/medium/voltage_imag.feather",
+                           "csv_filename": "../../outputs/medium/voltage_imag.csv"
                           }
         },
         {
             "name": "recorder_voltage_magnitude",
             "type": "Recorder",
-            "parameters": {"feather_filename": "../../outputs/large/voltage_mag.feather",
-                           "csv_filename": "../../outputs/large/voltage_mag.csv"
+            "parameters": {"feather_filename": "../../outputs/medium/voltage_mag.feather",
+                           "csv_filename": "../../outputs/medium/voltage_mag.csv"
                           }
         },
         {
             "name": "recorder_opf_voltage_magnitude",
             "type": "Recorder",
-            "parameters": {"feather_filename": "../../outputs/large/opf_voltage_mag.feather",
-                           "csv_filename": "../../outputs/large/opf_voltage_mag.csv"
+            "parameters": {"feather_filename": "../../outputs/medium/opf_voltage_mag.feather",
+                           "csv_filename": "../../outputs/medium/opf_voltage_mag.csv"
+                          }
+        },
+        {
+            "name": "recorder_delta_setpoint",
+            "type": "Recorder",
+            "parameters": {"feather_filename": "../../outputs/medium/delta_setpoint.feather",
+                           "csv_filename": "../../outputs/medium/delta_setpoint.csv"
+                          }
+        },
+        {
+            "name": "recorder_forecast_curtail",
+            "type": "Recorder",
+            "parameters": {"feather_filename": "../../outputs/medium/forecast_curtail.feather",
+                           "csv_filename": "../../outputs/medium/forecast_curtail.csv"
+                          }
+        },
+        {
+            "name": "recorder_real_curtail",
+            "type": "Recorder",
+            "parameters": {"feather_filename": "../../outputs/medium/real_curtail.feather",
+                           "csv_filename": "../../outputs/medium/real_curtail.csv"
                           }
         },
         {
@@ -117,6 +138,18 @@
             "target_port": "voltages_magnitude"
         },
         {
+            "source": "feeder",
+            "source_port": "pv_forecast",
+            "target": "lindistflow",
+            "target_port": "pv_forecast"
+        },
+        {
+            "source": "feeder",
+            "source_port": "available_power",
+            "target": "lindistflow",
+            "target_port": "pv_available"
+        },
+        {
             "source": "lindistflow",
             "source_port": "pv_set",
             "target": "feeder",
@@ -126,6 +159,24 @@
             "source": "lindistflow",
             "source_port": "opf_voltages_magnitude",
             "target": "recorder_opf_voltage_magnitude",
+            "target_port": "subscription"
+        },
+        {
+            "source": "lindistflow",
+            "source_port": "delta_setpoint",
+            "target": "recorder_delta_setpoint",
+            "target_port": "subscription"
+        },
+        {
+            "source": "lindistflow",
+            "source_port": "forecast_curtail",
+            "target": "recorder_forecast_curtail",
+            "target_port": "subscription"
+        },
+        {
+            "source": "lindistflow",
+            "source_port": "real_curtail",
+            "target": "recorder_real_curtail",
             "target_port": "subscription"
         }
     ]
