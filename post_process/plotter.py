@@ -8,7 +8,7 @@ import json
 import pyarrow.feather as feather
 from geopy.distance import geodesic
 from datetime import datetime
-from errors import errors
+from post_process.errors import errors
 
 
 def plot_voltages(
@@ -423,7 +423,7 @@ def plot_opf_voltage_comparison(
         topology_file,
         realVfile, imagVfile, opfVfile,
         true_volt_units = "kV",
-        time=["7:30","12:30","15:30"], 
+        time=["07:30","12:30","15:30"], 
         to_file=None, show=False, do_return=False,
         **kwargs
         ):

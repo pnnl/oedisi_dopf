@@ -172,7 +172,7 @@ class FeederSimulator(object):
             # now compute the power output from the evaluated average irradiance
             flag = dss.PVsystems.First()
             while flag:
-                pv_names.append(f"PVSystem.{dss.PVsystems.Name()}")
+                pv_names.append(f"PVSystem.{dss.PVsystems.Name().lower()}")
                 powers.append(dss.PVsystems.Pmpp() * avg_irradiance)
                 flag = dss.PVsystems.Next()
             
