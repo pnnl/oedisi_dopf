@@ -24,6 +24,7 @@ logger = logging.getLogger(__name__)
 logger.addHandler(logging.StreamHandler())
 logger.setLevel(logging.INFO)
 
+
 class Phase(IntEnum):
     A = 1
     B = 2
@@ -32,10 +33,12 @@ class Phase(IntEnum):
     def __repr__(self):
         return self.value
 
-def convert_id(eqid: str) -> (str,str):
-    [bus, phase] = eqid.split('.',1)
-    return (bus,phase)
-    
+
+def convert_id(eqid: str) -> (str, str):
+    [bus, phase] = eqid.split('.', 1)
+    return (bus, phase)
+
+
 def init_branch() -> dict:
     branch = {}
     branch["fr_bus"] = ""
@@ -76,7 +79,7 @@ def index_info(branch: dict, bus: dict) -> Tuple[dict, dict]:
 
 def extract_voltages(bus: dict, voltages: VoltagesMagnitude) -> dict:
     for id, voltage in zip(voltages.ids, voltages.values):
-        name,phase = convert_id(id)
+        name, phase = convert_id(id)
 
         if name not in bus:
             continue
@@ -100,15 +103,20 @@ def pack_voltages(voltages: dict, time: int) -> VoltagesMagnitude:
             values.append(voltage)
     return VoltagesMagnitude(ids=ids, values=values, time=time)
 
-def extract_forecast(bus:dict, forecast) -> dict:
+
+def extract_forecast(bus: dict, forecast) -> dict:
     for eq, power in zip(forecast["ids"], forecast["values"]):
-        [_, name] = eq.rsplit("_", 1)
+        print(eq)
+        if "_" in eq:
+            [_, name] = eq.rsplit("_", 1)
+        else:
+            name = eq
         name = name.upper()
 
         if name not in bus:
-            print("NOT IN BUS: ",name)
+            print("NOT IN BUS: ", name)
             continue
-        
+
         phases = bus[name]["phases"]
         for ph in phases:
             phase = int(ph) - 1
@@ -121,7 +129,7 @@ def extract_forecast(bus:dict, forecast) -> dict:
 
 def extract_powers(bus: dict, real: PowersReal, imag: PowersImaginary) -> dict:
     for id, eq, power in zip(real.ids, real.equipment_ids, real.values):
-        name,phase = convert_id(id)
+        name, phase = convert_id(id)
 
         if name not in bus:
             continue
@@ -136,7 +144,7 @@ def extract_powers(bus: dict, real: PowersReal, imag: PowersImaginary) -> dict:
             bus[name]["pq"][phase][0] = -power*1000
 
     for id, eq, power in zip(imag.ids, imag.equipment_ids, imag.values):
-        name,phase = convert_id(id)
+        name, phase = convert_id(id)
 
         if name not in bus:
             continue
@@ -157,7 +165,7 @@ def extract_injection(bus: dict, powers: Injection) -> dict:
     imag = powers.power_imaginary
 
     for id, eq, power in zip(real.ids, real.equipment_ids, real.values):
-        name,phase = convert_id(id)
+        name, phase = convert_id(id)
 
         if name not in bus:
             continue
@@ -175,7 +183,7 @@ def extract_injection(bus: dict, powers: Injection) -> dict:
             bus[name]["pq"][phase][0] = -power*1000
 
     for id, eq, power in zip(imag.ids, imag.equipment_ids, imag.values):
-        name,phase = convert_id(id)
+        name, phase = convert_id(id)
 
         if name not in bus:
             continue
