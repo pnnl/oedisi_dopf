@@ -110,7 +110,7 @@ def extract_forecast(bus: dict, forecast) -> dict:
         if "_" in eq:
             [_, name] = eq.rsplit("_", 1)
         else:
-            name = eq
+            [_, name] = eq.rsplit(".", 1)
         name = name.upper()
 
         if name not in bus:
