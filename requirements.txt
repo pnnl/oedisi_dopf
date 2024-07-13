@@ -6,6 +6,7 @@ geopy
 scipy
 cvxpy
 matplotlib
+seaborn
 numpy
 pandas
 OpenDSSDirect.py[extras]==0.7.0

@@ -10,7 +10,6 @@ from geopy.distance import geodesic
 from datetime import datetime
 from post_process.errors import errors
 
-
 def plot_voltages(
         df_voltages, base_voltages, 
         bus=None, time=0, unit="kV", 
@@ -204,6 +203,13 @@ def get_voltage(realV, imagV):
     df_voltages = np.abs(voltage_real.drop("time", axis=1) + 1j * voltage_imag.drop("time", axis=1))
     df_voltages["time"] = voltage_real["time"].apply(get_time)
     return df_voltages.set_index("time")
+
+def get_power(real, imag):
+    p = feather.read_feather(real)
+    q = feather.read_feather(imag)
+    df_power = np.abs(p.drop("time", axis=1) + 1j * q.drop("time", axis=1))
+    df_power["time"] = p["time"].apply(get_time)
+    return df_power.set_index("time")
 
 def plot_network(
         topology_file, buscoord_file,
@@ -729,3 +735,43 @@ def plot_curtail(
     if do_return:
         return fig
     pass
+
+def add_data_from_df(
+        data_dict, 
+        df, pq="p", type="actual",
+        ):
+    nodes = [n for n in df.columns.to_list() if n != "time"]
+    for k in range(len(df)):
+        for n in nodes:
+            data_dict["nodes"].append(n)
+            data_dict["value"].append(df.iloc[k][n])
+            data_dict["pq"].append(pq)
+            data_dict["type"].append(type)
+    return data_dict
+
+def plot_pv_estimation(
+    power_real,
+    power_imag,
+    power_real_est,
+    power_imag_est,
+    time=["07:30","12:30","15:30"],
+    show=True,
+    to_file = None):
+    df_act_p = feather.read_feather(power_real)
+    df_act_p["time"] = df_act_p["time"].apply(get_time)
+    df_act_q = feather.read_feather(power_imag)
+    df_act_q["time"] = df_act_q["time"].apply(get_time)
+    df_est_p = feather.read_feather(power_real_est)
+    df_est_p["time"] = df_est_p["time"].apply(get_time)
+    df_est_q = feather.read_feather(power_imag_est)
+    df_est_q["time"] = df_est_q["time"].apply(get_time)
+    
+    fig, ax = plt.subplots(layout='constrained')
+    df_act_p.plot(kind='bar', ax=ax)
+    df_est_p.plot(kind='bar',ax=ax)
+    
+    
+    if show:
+        plt.show()
+    if to_file:
+        fig.savefig(to_file, bbox_inches='tight')

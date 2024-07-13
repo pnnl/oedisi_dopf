@@ -15,7 +15,7 @@ from oedisi.types.data_types import (
 )
 import adapter
 import lindistflow
-from area import area_info
+from area import area_info, check_network_radiality
 import xarray as xr
 
 logger = logging.getLogger(__name__)
@@ -163,6 +163,8 @@ class OPFFederate(object):
 
             area_branch, area_bus = area_info(
                 branch_info, bus_info, slack_bus)
+
+            assert (check_network_radiality(bus=bus_info, branch=branch_info))
 
             voltages_mag = VoltagesMagnitude.parse_obj(
                 self.sub.voltages_mag.json)

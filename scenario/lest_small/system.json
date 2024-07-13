@@ -1,0 +1,163 @@
+{
+    "name": "lest_small",
+    "components": [
+        {
+            "name": "recorder_power_real",
+            "type": "Recorder",
+            "parameters": {"feather_filename": "../../outputs/lest_small/power_real.feather",
+                           "csv_filename": "../../outputs/lest_small/power_real.csv"
+                          }
+        },
+        {
+            "name": "recorder_power_imag",
+            "type": "Recorder",
+            "parameters": {"feather_filename": "../../outputs/lest_small/power_imag.feather",
+                           "csv_filename": "../../outputs/lest_small/power_imag.csv"
+                          }
+        },
+        {
+            "name": "recorder_voltage_mag",
+            "type": "Recorder",
+            "parameters": {"feather_filename": "../../outputs/lest_small/voltage_mag.feather",
+                           "csv_filename": "../../outputs/lest_small/voltage_mag.csv"
+                          }
+        },
+        {
+            "name": "recorder_lest_power_real",
+            "type": "Recorder",
+            "parameters": {"feather_filename": "../../outputs/lest_small/lest_power_real.feather",
+                           "csv_filename": "../../outputs/lest_small/lest_power_real.csv"
+                          }
+        },
+        {
+            "name": "recorder_lest_power_imag",
+            "type": "Recorder",
+            "parameters": {"feather_filename": "../../outputs/lest_small/lest_power_imag.feather",
+                           "csv_filename": "../../outputs/lest_small/lest_power_imag.csv"
+                          }
+        },        
+        {
+            "name": "feeder",
+            "type": "Feeder",
+            "parameters": {
+                "use_smartds": true,
+                "profile_location": "SMART-DS/v1.0/2017/SFO/P1U/profiles",
+                "opendss_location": "SMART-DS/v1.0/2017/SFO/P1U/scenarios/solar_medium_batteries_none_timeseries/opendss/p1uhs0_1247/p1uhs0_1247--p1udt942",
+                "start_date": "2017-05-01 12:00:00",
+                "number_of_timesteps": 1,
+                "run_freq_sec": 900,
+                "topology_output": "../../outputs/lest_small/topology.json",
+                "use_sparse_admittance": true
+            }
+        },
+        {
+            "name": "sensor_voltage_mag",
+            "type": "Sensor",
+            "parameters": {
+                "additive_noise_stddev": 0.01,
+                "measurement_file": "../feeder/sensors/voltage_ids.json"
+            }
+        },
+        {
+            "name": "sensor_power_real",
+            "type": "Sensor",
+            "parameters": {
+                "additive_noise_stddev": 0.01,
+                "measurement_file": "../feeder/sensors/real_ids.json"
+            }
+        },
+        {
+            "name": "sensor_power_imag",
+            "type": "Sensor",
+            "parameters": {
+                "additive_noise_stddev": 0.01,
+                "measurement_file": "../feeder/sensors/reactive_ids.json"
+            }
+        },
+        {
+            "name": "pv_estimator",
+            "type": "Estimator",
+            "parameters": {
+                "tol": 1e3,
+                "v_sigma": 0.005,
+                "l_sigma": 0.02,
+                "i_sigma": 0.001,
+                "deltat": 0.1
+            }
+        }
+    ],
+    "links": [
+        {
+            "source": "feeder",
+            "source_port": "voltages_magnitude",
+            "target": "recorder_voltage_mag",
+            "target_port": "subscription"
+        },
+        {
+            "source": "feeder",
+            "source_port": "powers_real",
+            "target": "recorder_power_real",
+            "target_port": "subscription"
+        },
+        {
+            "source": "feeder",
+            "source_port": "powers_imag",
+            "target": "recorder_power_imag",
+            "target_port": "subscription"
+        },
+        {
+            "source": "feeder",
+            "source_port": "topology",
+            "target": "pv_estimator",
+            "target_port": "topology"
+        },
+        {
+            "source": "feeder",
+            "source_port": "voltages_magnitude",
+            "target": "sensor_voltage_mag",
+            "target_port": "subscription"
+        },
+        {
+            "source": "feeder",
+            "source_port": "powers_real",
+            "target": "sensor_power_real",
+            "target_port": "subscription"
+        },
+        {
+            "source": "feeder",
+            "source_port": "powers_imag",
+            "target": "sensor_power_imag",
+            "target_port": "subscription"
+        },
+        {
+            "source": "sensor_voltage_mag",
+            "source_port": "publication",
+            "target": "pv_estimator",
+            "target_port": "voltages_mag"
+        },
+        {
+            "source": "sensor_power_real",
+            "source_port": "publication",
+            "target": "pv_estimator",
+            "target_port": "powers_real"
+        },
+        {
+            "source": "sensor_power_imag",
+            "source_port": "publication",
+            "target": "pv_estimator",
+            "target_port": "powers_imag"
+        },
+        {
+            "source": "pv_estimator",
+            "source_port": "powers_real",
+            "target": "recorder_lest_power_real",
+            "target_port": "subscription"
+        },
+        {
+            "source": "pv_estimator",
+            "source_port": "powers_imag",
+            "target": "recorder_lest_power_imag",
+            "target_port": "subscription"
+        }   
+    ]
+}

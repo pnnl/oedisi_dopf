@@ -25,7 +25,29 @@ def graph_process(branch_info: dict):
     return graph, edges
 
 
+def remove_disconnected(branch: dict, bus: dict, source_bus: str) -> (dict, dict):
+    G, open_switches = graph_process(branch)
+
+    sp_graph = list(nx.connected_components(G))
+    for graph in sp_graph:
+        if source_bus in graph:
+            connected_ids = graph
+        else:
+            print("Not connected: ", graph)
+
+    connected_keys = []
+    for key in branch.keys():
+        [bus1, bus2] = key.split("_", 1)
+        if bus1 in connected_ids and bus2 in connected_ids:
+            connected_keys.append(key)
+
+    branch = {k: v for k, v in branch.items() if k in connected_keys}
+    bus = {k: v for k, v in bus.items() if k in connected_ids}
+    return (branch, bus)
+
+
 def area_info(branch_info: dict, bus_info: dict, source_bus: str):
+    remove_disconnected(branch_info, bus_info, source_bus)
     # System's base definition
     mult_pv = 1.0
     mult_sec_pv = 1.0
@@ -159,4 +181,4 @@ def check_network_radiality(branch: dict, bus: dict) -> bool:
         logger.debug(f"Branch: {branch.keys()}")
         logger.debug(f"Bus: {bus.keys()}")
         return False
-    return Trueebug("Network is not Radial. Please check the network data")
+    return True

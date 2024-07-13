@@ -1,0 +1,22 @@
+{
+    "directory": "lest_federate",
+    "execute_function": "python dsse_federate.py",
+    "static_inputs": [
+        {"type": "", "port_id": "tol"},
+        {"type": "", "port_id": "v_sigma"},
+        {"type": "", "port_id": "l_sigma"},
+        {"type": "", "port_id": "i_sigma"},
+        {"type": "", "port_id": "deltat"}
+    ],
+    "dynamic_inputs": [
+        {"type": "VoltagesMagnitude", "port_id": "voltages_mag"},
+        {"type": "PowersReal", "port_id": "powers_real"},
+        {"type": "PowersImaginary", "port_id": "powers_imag"},
+        {"type": "Topology", "port_id": "topology"}
+    ],
+    "dynamic_outputs": [
+        {"type": "PowersReal", "port_id": "powers_real"},
+        {"type": "PowersImaginary", "port_id": "powers_imag"},
+        {"type": "Injections", "port_id": "injections"}
+    ]
+}
