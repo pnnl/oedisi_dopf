@@ -55,7 +55,7 @@
             "name": "sensor_voltage_mag",
             "type": "Sensor",
             "parameters": {
-                "additive_noise_stddev": 0.01,
+                "additive_noise_stddev": 0.001,
                 "measurement_file": "../feeder/sensors/sensors.json"
             }
         },
@@ -63,7 +63,7 @@
             "name": "sensor_power_real",
             "type": "Sensor",
             "parameters": {
-                "additive_noise_stddev": 0.01,
+                "additive_noise_stddev": 0.001,
                 "measurement_file": "../feeder/sensors/sensors.json"
             }
         },
@@ -71,7 +71,7 @@
             "name": "sensor_power_imag",
             "type": "Sensor",
             "parameters": {
-                "additive_noise_stddev": 0.01,
+                "additive_noise_stddev": 0.001,
                 "measurement_file": "../feeder/sensors/sensors.json"
             }
         },

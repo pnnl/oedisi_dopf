@@ -122,6 +122,8 @@ class EstimatorFederate(object):
 
             injections: Injection = Injection.parse_obj(topology.injections)
 
+            bus_info = adapter.extract_injection(bus_info, injections)
+
             slack = topology.slack_bus[0]
             [slack_bus, phase] = slack.split('.')
 
@@ -138,7 +140,6 @@ class EstimatorFederate(object):
 
             powers_imag: PowersImaginary
             powers_imag = PowersImaginary.parse_obj(self.sub.powers_imag.json)
-
             bus_info = adapter.extract_powers(
                 bus_info, powers_real, powers_imag)
 
