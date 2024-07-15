@@ -130,7 +130,8 @@ def extract_forecast(bus: dict, forecast) -> dict:
         name = name.upper()
 
         if name not in bus:
-            logger.debug("NOT IN BUS: ", name)
+            continue
+        if "OPEN" in name:
             continue
 
         phases = bus[name]["phases"]
@@ -147,23 +148,25 @@ def extract_powers(bus: dict, real: PowersReal, imag: PowersImaginary) -> dict:
         name, phase = convert_id(id)
 
         if name not in bus:
-            logger.debug("NOT IN BUS: ", name)
+            continue
+        if "OPEN" in name:
             continue
 
         phase = int(phase) - 1
         bus[name]["eqid"] = eq
-        bus[name]["pq"][phase][0] = -power*1000
+        bus[name]["pq"][phase][0] = power*1000
 
     for id, eq, power in zip(imag.ids, imag.equipment_ids, imag.values):
         name, phase = convert_id(id)
 
         if name not in bus:
-            logger.debug("NOT IN BUS: ", name)
+            continue
+        if "OPEN" in name:
             continue
 
         phase = int(phase) - 1
         bus[name]["eqid"] = eq
-        bus[name]["pq"][phase][1] = -power*1000
+        bus[name]["pq"][phase][1] = power*1000
     return bus
 
 
@@ -176,7 +179,7 @@ def extract_injection(bus: dict, powers: Injection) -> dict:
 
         if name not in bus:
             continue
-        if name.find('OPEN') != -1:
+        if "OPEN" in name:
             continue
 
         [type, _] = eq.split('.')
@@ -186,14 +189,14 @@ def extract_injection(bus: dict, powers: Injection) -> dict:
             bus[name]["pv"][phase][0] = power*1000
         else:
             bus[name]["eqid"] = eq
-            bus[name]["pq_forecast"][phase][0] = -power*1000
+            bus[name]["pq_forecast"][phase][0] = power*1000
 
     for id, eq, power in zip(imag.ids, imag.equipment_ids, imag.values):
         name, phase = convert_id(id)
 
         if name not in bus:
             continue
-        if name.find('OPEN') != -1:
+        if "OPEN" in name:
             continue
 
         [type, _] = eq.split('.')
@@ -203,7 +206,7 @@ def extract_injection(bus: dict, powers: Injection) -> dict:
             bus[name]["pv"][phase][1] = power*1000
         else:
             bus[name]["eqid"] = eq
-            bus[name]["pq_forecast"][phase][1] = -power*1000
+            bus[name]["pq_forecast"][phase][1] = power*1000
     return bus
 
 
