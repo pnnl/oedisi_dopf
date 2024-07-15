@@ -55,7 +55,7 @@
             "name": "sensor_voltage_mag",
             "type": "Sensor",
             "parameters": {
-                "additive_noise_stddev": 0.001,
+                "additive_noise_stddev": 0.02,
                 "measurement_file": "../feeder/sensors/sensors.json"
             }
         },
@@ -80,8 +80,8 @@
             "type": "Estimator",
             "parameters": {
                 "tol": 1e3,
-                "v_sigma": 0.005,
-                "l_sigma": 0.02,
+                "v_sigma": 0.02,
+                "l_sigma": 0.001,
                 "i_sigma": 0.001,
                 "deltat": 0.1
             }

@@ -7,7 +7,7 @@ scipy
 cvxpy
 matplotlib
 seaborn
-numpy
+numpy==1.26.4
 pandas
 OpenDSSDirect.py[extras]==0.7.0
 boto3

@@ -364,18 +364,24 @@ def get_pq2(
         if keyb != source_bus:
             # Real power injection at a bus
             # Phase A Real Power
-            pq[count + n_bus * 0] = val_bus['pv'][0][0] + val_bus['pq'][0][0]
+            pq[count + n_bus * 0] = val_bus['pv'][0][0] + \
+                val_bus['pq_forecast'][0][0]
             # Phase B Real Power
-            pq[count + n_bus * 1] = val_bus['pv'][1][0] + val_bus['pq'][1][0]
+            pq[count + n_bus * 1] = val_bus['pv'][1][0] + \
+                val_bus['pq_forecast'][1][0]
             # Phase C Real Power
-            pq[count + n_bus * 2] = val_bus['pv'][2][0] + val_bus['pq'][2][0]
+            pq[count + n_bus * 2] = val_bus['pv'][2][0] + \
+                val_bus['pq_forecast'][2][0]
 
             # Phase A Reactive Power
-            pq[count + n_bus * 3] = val_bus['pv'][0][1] + val_bus['pq'][0][1]
+            pq[count + n_bus * 3] = val_bus['pv'][0][1] + \
+                val_bus['pq_forecast'][0][1]
             # Phase B Reactive Power
-            pq[count + n_bus * 4] = val_bus['pv'][1][1] + val_bus['pq'][1][1]
+            pq[count + n_bus * 4] = val_bus['pv'][1][1] + \
+                val_bus['pq_forecast'][1][1]
             # Phase C Reactive Power
-            pq[count + n_bus * 5] = val_bus['pv'][2][1] + val_bus['pq'][2][1]
+            pq[count + n_bus * 5] = val_bus['pv'][2][1] + \
+                val_bus['pq_forecast'][2][1]
 
             count += 1
     pq_load = np.zeros(shape=(6 * n_bus,))
@@ -384,18 +390,18 @@ def get_pq2(
         if keyb != source_bus:
             # Real power injection at a bus
             # Phase A Real Power
-            pq_load[count + n_bus * 0] = val_bus['pq'][0][0]
+            pq_load[count + n_bus * 0] = val_bus['pq_forecast'][0][0]
             # Phase B Real Power
-            pq_load[count + n_bus * 1] = val_bus['pq'][1][0]
+            pq_load[count + n_bus * 1] = val_bus['pq_forecast'][1][0]
             # Phase C Real Power
-            pq_load[count + n_bus * 2] = val_bus['pq'][2][0]
+            pq_load[count + n_bus * 2] = val_bus['pq_forecast'][2][0]
 
             # Phase A Reactive Power
-            pq_load[count + n_bus * 3] = val_bus['pq'][0][1]
+            pq_load[count + n_bus * 3] = val_bus['pq_forecast'][0][1]
             # Phase B Reactive Power
-            pq_load[count + n_bus * 4] = val_bus['pq'][1][1]
+            pq_load[count + n_bus * 4] = val_bus['pq_forecast'][1][1]
             # Phase C Reactive Power
-            pq_load[count + n_bus * 5] = val_bus['pq'][2][1]
+            pq_load[count + n_bus * 5] = val_bus['pq_forecast'][2][1]
 
             count += 1
     return pq/(SBASE), -1*pq_load/(SBASE)
@@ -573,9 +579,9 @@ def run_dsse(
 ) -> (dict, dict):
     H_check, A_inc = get_hmat(bus_info, branch_info, source_bus, SBASE=base_s)
 
-    pq = get_pq(bus_info, source_bus, SBASE=base_s)
-    pq_load = get_pq_forecast(bus_info, source_bus, SBASE=base_s)
-    # pq, pq_load = get_pq2(bus_info, source_bus, SBASE=base_s)
+    # pq = get_pq(bus_info, source_bus, SBASE=base_s)
+    # pq_load = get_pq_forecast(bus_info, source_bus, SBASE=base_s)
+    pq, pq_load = get_pq2(bus_info, source_bus, SBASE=base_s)
     vmag, vslack = get_v(bus_info, source_bus)
     values, ids = base_voltage_dict2(bus_info)
     base_v = get_vbase(bus_info)
