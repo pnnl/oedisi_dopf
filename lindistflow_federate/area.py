@@ -159,4 +159,4 @@ def check_network_radiality(branch: dict, bus: dict) -> bool:
         logger.debug(f"Branch: {branch.keys()}")
         logger.debug(f"Bus: {bus.keys()}")
         return False
-    return Trueebug("Network is not Radial. Please check the network data")
+    return True

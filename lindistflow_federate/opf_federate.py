@@ -155,21 +155,29 @@ class OPFFederate(object):
                 )
                 continue
 
-            topology = Topology.parse_obj(self.sub.topology.json)
+            topology: Topology = Topology.parse_obj(self.sub.topology.json)
             [branch_info, bus_info] = adapter.extract_info(topology)
+
+            injections: Injection = Injection.parse_obj(topology.injections)
+            bus_info = adapter.extract_injection(bus_info, injections)
 
             slack = topology.slack_bus[0]
             [slack_bus, phase] = slack.split('.')
 
-            area_branch, area_bus = area_info(
-                branch_info, bus_info, slack_bus)
-
-            assert (check_network_radiality(bus=bus_info, branch=branch_info))
-
             voltages_mag = VoltagesMagnitude.parse_obj(
                 self.sub.voltages_mag.json)
+            bus_info = adapter.extract_voltages(bus_info, voltages_mag)
 
-            area_bus = adapter.extract_voltages(area_bus, voltages_mag)
+            time = voltages_mag.time
+            logger.debug(time)
+
+            with open("bus_info_oedisi_ieee123.json", "w") as outfile:
+                outfile.write(json.dumps(bus_info))
+
+            with open("branch_info_oedisi_ieee123.json", "w") as outfile:
+                outfile.write(json.dumps(branch_info))
+
+            assert (check_network_radiality(bus=bus_info, branch=branch_info))
 
             # evaluate the forecasted PV set points and forecasted curtailment
             if not grab_forecast_flag:
@@ -186,21 +194,21 @@ class OPFFederate(object):
                     ))
 
                     # insert forecasted generation values to the PV injection vector
-                    area_bus = adapter.extract_forecast(
-                        area_bus,
+                    bus_info = adapter.extract_forecast(
+                        bus_info,
                         forecast_generation
                     )
 
                     # perform forecast LinDistFlow
                     voltages, power_flow, forecast_control, conv = lindistflow.optimal_power_flow(
-                        area_branch, area_bus, slack_bus,
+                        branch_info, bus_info, slack_bus,
                         self.static.control_type, self.static.pf_flag
                     )
 
                     # compute the forecatsed set points
                     forecast_setpts = self.get_set_points(
                         forecast_control,
-                        area_bus, conv
+                        bus_info, conv
                     )
 
                     # make outputs ready for publishing
@@ -225,17 +233,14 @@ class OPFFederate(object):
             time = voltages_mag.time
             logger.info(time)
 
-            injection = Injection.parse_obj(self.sub.injections.json)
-            area_bus = adapter.extract_injection(area_bus, injection)
-
             # get the available power in real time
             available_power = self.sub.available_pv.json
             available_power = {available_power["ids"][i]: available_power["values"][i] for i in range(
                 len(available_power["ids"]))}
 
             voltages, power_flow, control, conversion = lindistflow.optimal_power_flow(
-                area_branch, area_bus, slack_bus, self.static.control_type, self.static.pf_flag)
-            real_setpts = self.get_set_points(control, area_bus, conversion)
+                branch_info, bus_info, slack_bus, self.static.control_type, self.static.pf_flag)
+            real_setpts = self.get_set_points(control, bus_info, conversion)
 
             # Compute the delta change in setpoints and publish
             time_ctr += 1
@@ -277,8 +282,8 @@ class OPFFederate(object):
             # get the control commands for the feeder federate
             commands = []
             for key, val in control.items():
-                if key in area_bus:
-                    bus = area_bus[key]
+                if key in bus_info:
+                    bus = bus_info[key]
                     if 'eqid' in bus:
                         eqid = bus['eqid']
                         [type, _] = eqid.split('.')

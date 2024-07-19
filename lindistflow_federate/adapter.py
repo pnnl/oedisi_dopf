@@ -13,6 +13,7 @@ from oedisi.types.data_types import (
     PowersImaginary,
     PowersReal,
     Topology,
+    Incidence,
     VoltagesAngle,
     VoltagesImaginary,
     VoltagesMagnitude,
@@ -75,6 +76,18 @@ def index_info(branch: dict, bus: dict) -> Tuple[dict, dict]:
             branch[name]["zprim"][row][col] = [value.real, value.imag]
 
     return branch, bus
+
+
+def extract_base_voltages(bus: dict, voltages: VoltagesMagnitude) -> dict:
+    for id, voltage in zip(voltages.ids, voltages.values):
+        name, phase = convert_id(id)
+
+        if name not in bus:
+            continue
+
+        phase = int(phase) - 1
+        bus[name]['kv'] = voltage/1000.0
+    return bus
 
 
 def extract_voltages(bus: dict, voltages: VoltagesMagnitude) -> dict:
@@ -201,23 +214,51 @@ def extract_injection(bus: dict, powers: Injection) -> dict:
     return bus
 
 
-def extract_info(topology: Topology) -> Tuple[dict, dict]:
+class SwitchInfo:
+    def __init__(self, name: str, from_bus: str, to_bus: str) -> None:
+        self.name = name
+        self.from_bus = from_bus
+        self.to_bus = to_bus
+
+
+def extract_switches(incidences: Incidence) -> list[SwitchInfo]:
+    switches = []
+    from_eq = incidences.from_equipment
+    to_eq = incidences.to_equipment
+    ids = incidences.ids
+    for fr_eq, to_eq, eq_id in zip(from_eq, to_eq, ids):
+        if ("sw" in eq_id or "fuse" in eq_id) and "padswitch" not in eq_id:
+            if "." in fr_eq:
+                [fr_eq, _] = fr_eq.split('.', 1)
+            if "." in to_eq:
+                [to_eq, _] = to_eq.split('.', 1)
+            switches.append(
+                SwitchInfo(
+                    name=eq_id,
+                    from_bus=fr_eq,
+                    to_bus=to_eq))
+
+    return switches
+
+
+def extract_info(topology: Topology) -> (dict, dict):
     branch_info = {}
     bus_info = {}
+    switches = extract_switches(topology.incidences)
+    fr_buses = [switch.from_bus for switch in switches]
+    to_buses = [switch.to_bus for switch in switches]
     from_equip = topology.admittance.from_equipment
     to_equip = topology.admittance.to_equipment
     admittance = topology.admittance.admittance_list
 
     for fr_eq, to_eq, y in zip(from_equip, to_equip, admittance):
-        [from_name, from_phase] = fr_eq.split('.')
         type = "LINE"
-        if from_name.find('OPEN') != -1:
-            [from_name, _] = from_name.split('_')
-            type = "SWITCH"
-
+        [from_name, from_phase] = fr_eq.split('.')
         [to_name, to_phase] = to_eq.split('.')
-        if to_name.find('OPEN') != -1:
-            [to_name, _] = to_name.split('_')
+
+        forward_link = from_name in fr_buses and to_name in to_buses
+        reverse_link = to_name in fr_buses and from_name in to_buses
+        if forward_link or reverse_link:
             type = "SWITCH"
 
         if from_name == to_name:
@@ -237,6 +278,9 @@ def extract_info(topology: Topology) -> Tuple[dict, dict]:
         if to_name not in bus_info:
             bus_info[to_name] = init_bus()
 
+        if from_phase not in branch_info[key]['phases']:
+            branch_info[key]['phases'].append(from_phase)
+
         row = int(from_phase) - 1
         col = int(to_phase) - 1
         branch_info[key]["y"][row][col] = complex(y[0], y[1])
@@ -251,9 +295,10 @@ def extract_info(topology: Topology) -> Tuple[dict, dict]:
             bus_info[to_name]['phases'].append(to_phase)
 
         branch_info[key]['type'] = type
-        branch_info[key]['fr_bus'] = from_name
-        branch_info[key]['to_bus'] = to_name
+        branch_info[key]['fr_bus'] = from_name.upper()
+        branch_info[key]['to_bus'] = to_name.upper()
 
-    bus_info = extract_voltages(bus_info, topology.base_voltage_magnitudes)
+    base_v = topology.base_voltage_magnitudes
+    bus_info = extract_base_voltages(bus_info, base_v)
 
     return index_info(branch_info, bus_info)
