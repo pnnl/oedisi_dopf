@@ -1,0 +1,16 @@
+{
+    "directory": "ekf_federate",
+    "execute_function": "./state-estimator-gadal",
+    "static_inputs": [],
+    "dynamic_inputs": [
+        {"type": "VoltagesMagnitude", "port_id": "sensor_voltage_magnitude"},
+        {"type": "VoltagesAngle", "port_id": "sensor_voltage_angle"},
+        {"type": "PowersReal", "port_id": "sensor_power_real"},
+        {"type": "PowersImaginary", "port_id": "sensor_power_imaginary"},
+        {"type": "Topology", "port_id": "topology"}
+    ],
+    "dynamic_outputs": [
+        {"type": "VoltagesMagnitude", "port_id": "Vmag_SE"},
+        {"type": "VoltagesAngle", "port_id": "Vang_SE"}
+    ]
+}

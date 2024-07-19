@@ -1,32 +1,32 @@
 {
-    "name": "ieee123",
+    "name": "ekf_ieee123",
     "components": [
         {
             "name": "recorder_voltage_real",
             "type": "Recorder",
-            "parameters": {"feather_filename": "../../outputs/ieee123/voltage_real.feather",
-                           "csv_filename": "../../outputs/ieee123/voltage_real.csv"
+            "parameters": {"feather_filename": "../../outputs/ekf_ieee123/voltage_real.feather",
+                           "csv_filename": "../../outputs/ekf_ieee123/voltage_real.csv"
                           }
         },
         {
             "name": "recorder_voltage_imag",
             "type": "Recorder",
-            "parameters": {"feather_filename": "../../outputs/ieee123/voltage_imag.feather",
-                           "csv_filename": "../../outputs/ieee123/voltage_imag.csv"
+            "parameters": {"feather_filename": "../../outputs/ekf_ieee123/voltage_imag.feather",
+                           "csv_filename": "../../outputs/ekf_ieee123/voltage_imag.csv"
                           }
         },
         {
             "name": "recorder_voltage_mag",
             "type": "Recorder",
-            "parameters": {"feather_filename": "../../outputs/ieee123/voltage_mag.feather",
-                           "csv_filename": "../../outputs/ieee123/voltage_mag.csv"
+            "parameters": {"feather_filename": "../../outputs/ekf_ieee123/voltage_mag.feather",
+                           "csv_filename": "../../outputs/ekf_ieee123/voltage_mag.csv"
                           }
         },
         {
             "name": "recorder_voltage_angle",
             "type": "Recorder",
-            "parameters": {"feather_filename": "../../outputs/ieee123/voltage_angle.feather",
-                           "csv_filename": "../../outputs/ieee123/voltage_angle.csv"
+            "parameters": {"feather_filename": "../../outputs/ekf_ieee123/voltage_angle.feather",
+                           "csv_filename": "../../outputs/ekf_ieee123/voltage_angle.csv"
                           }
         },
         {
@@ -48,7 +48,7 @@
                 "start_date": "2017-01-01 00:00:00",
                 "number_of_timesteps": 96,
                 "run_freq_sec": 900,
-                "topology_output": "../../outputs/ieee123/topology.json",
+                "topology_output": "../../outputs/ekf_ieee123/topology.json",
                 "use_sparse_admittance": true
             }
         },

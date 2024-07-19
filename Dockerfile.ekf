@@ -1,0 +1,85 @@
+FROM ubuntu:20.04
+USER root
+# ----------------------------------------------------
+# INSTALL HELICS
+# ----------------------------------------------------
+
+RUN apt-get update \
+    && export DEBIAN_FRONTEND="noninteractive" \
+    && export TZ="America/Pacific" \
+    && apt install -y \
+       libboost-dev \
+       libzmq5-dev \
+       git \
+       cmake-curses-gui \
+       build-essential
+
+RUN mkdir /build \
+    && cd /build \
+    && git clone https://github.com/GMLC-TDC/HELICS \
+    && cd HELICS \
+    && mkdir build \
+    && cd build \
+    && cmake -DHELICS_BUILD_CXX_SHARED_LIB=True ../ \
+    && make \
+    && make install
+
+# ----------------------------------------------------
+# INSTALL Activemq c++ extensions
+# ----------------------------------------------------
+RUN apt install -y m4 \
+       wget \
+       libaprutil1-dev
+       
+RUN cd /build \
+    && wget http://archive.apache.org/dist/activemq/activemq-cpp/3.9.5/activemq-cpp-library-3.9.5-src.tar.gz \
+    && tar -xzf activemq-cpp-library-3.9.5-src.tar.gz \
+    && cd activemq-cpp-library-3.9.5 \
+    && ./configure \
+    && make \
+    && make install 
+
+RUN apt install -y liblapack-dev \
+       libblas-dev \
+       libssl-dev
+
+# ----------------------------------------------------
+# INSTALL State Estimator
+# ----------------------------------------------------
+RUN cd /build \
+    && git clone --depth 1 --branch OEDISI.1.1.0 https://github.com/GRIDAPPSD/gridappsd-state-estimator \
+    && cd gridappsd-state-estimator \
+    && git clone https://github.com/GRIDAPPSD/SuiteSparse \
+    && git clone https://github.com/GRIDAPPSD/json \
+    && LD_LIBRARY_PATH=/build/gridappsd-state-estimator/SuiteSparse/lib/ make -C SuiteSparse LAPACK=-llapack BLAS=-lblas \
+    && make -C state-estimator \
+    && rm -rf .git SuiteSparse/.git json/.git 
+
+
+
+# ----------------------------------------------------
+# INSTALL Python requirements 
+# ----------------------------------------------------
+RUN apt install -y python3 \
+        python3-pip \
+        python-is-python3 \
+        sudo \
+        vim
+		
+COPY requirements.txt /home/requirements.txt
+RUN pip install -r /home/requirements.txt
+	
+ARG SCENARIO
+COPY feeder_federate /home/feeder_federate
+COPY measuring_federate /home/measuring_federate
+COPY recorder_federate /home/recorder_federate
+COPY ekf_federate /home/ekf_federate
+COPY scenario/${SCENARIO} /home/scenario/${SCENARIO}
+RUN cp build/gridappsd-state-estimator/state-estimator/bin/* /home/ekf_federate
+RUN mkdir -p /home/outputs/${SCENARIO} 
+COPY ekf_workflow.ipynb /home/ekf_workflow.ipynb
+
+WORKDIR /home/
+EXPOSE 8888
+ENTRYPOINT ["jupyter", "notebook", "--allow-root", "--ip=0.0.0.0", "--no-browser"] 
+
