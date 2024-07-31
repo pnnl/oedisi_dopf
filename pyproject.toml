@@ -1,0 +1,27 @@
+[tool.poetry]
+name = "oedisi-dopf"
+version = "0.1.0"
+description = ""
+authors = ["pnnl"]
+readme = "README.md"
+
+[tool.poetry.dependencies]
+python = "^3.12"
+helics-apps = "^3.2.1"
+helics = "^3.2.1"
+pydantic = "^1.7"
+cvxpy = "^1.5"
+numpy = "^2.0.0"
+pandas = "^2.0.0"
+'OpenDSSDirect.py' = "^0.7.0"
+oedisi = "^2.0.0"
+jupyter = "*"
+boto3 = "*"
+pyarrow = "*"
+xarray = "*"
+networkx = "*"
+matplotlib = "*"
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
