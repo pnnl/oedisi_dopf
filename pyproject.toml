@@ -12,7 +12,7 @@ helics = "^3.2.1"
 pydantic = "^1.7"
 cvxpy = "^1.5"
 numpy = "^2.0.0"
-pandas = "^2.0.0"
+pandas = "^2.2.2"
 'OpenDSSDirect.py' = "^0.7.0"
 oedisi = "^2.0.0"
 jupyter = "*"
@@ -21,6 +21,7 @@ pyarrow = "*"
 xarray = "*"
 networkx = "*"
 matplotlib = "*"
+geopy = "*"
 
 [build-system]
 requires = ["poetry-core"]
