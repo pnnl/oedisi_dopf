@@ -668,8 +668,8 @@ class FeederSimulator(object):
             assert entry.obj_property.lower() in map(
                 lambda x: x.lower(), properties
             ), f"{entry.obj_property} not in {properties} for {element_name}"
-            dss.Text.Command(f"{entry.obj_name}.{
-                             entry.obj_property}={entry.val}")
+            dss.Text.Command(
+                f"{entry.obj_name}.{entry.obj_property}={entry.val}")
 
     def create_inverter(self, pvsystem_set: Set[str]):
         """Create new inverter from set of pvsystem.
@@ -734,8 +734,8 @@ class FeederSimulator(object):
         assert len(x) == len(y), "Length of curves do not match"
         x_str = ",".join(str(i) for i in x)
         y_str = ",".join(str(i) for i in y)
-        dss.Text.Command(f"New {name} npts={
-                         npts} Yarray=({y_str}) Xarray=({x_str})")
+        dss.Text.Command(
+            f"New {name} npts={npts} Yarray=({y_str}) Xarray=({x_str})")
         self._xycurve_counter += 1
         return name
 
@@ -745,34 +745,29 @@ class FeederSimulator(object):
             vvc_curve = self.create_xy_curve(
                 inv_control.vvcontrol.voltage, inv_control.vvcontrol.reactive_response
             )
-            dss.Text.Command(f"{inverter}.vvc_curve1={
-                             vvc_curve.split('.')[1]}")
             dss.Text.Command(
-                f"{inverter}.deltaQ_factor={
-                    inv_control.vvcontrol.deltaq_factor}"
+                f"{inverter}.vvc_curve1={vvc_curve.split('.')[1]}")
+            dss.Text.Command(
+                f"{inverter}.deltaQ_factor={inv_control.vvcontrol.deltaq_factor}"
             )
             dss.Text.Command(
-                f"{inverter}.VarChangeTolerance={
-                    inv_control.vvcontrol.varchangetolerance}"
+                f"{inverter}.VarChangeTolerance={inv_control.vvcontrol.varchangetolerance}"
             )
             dss.Text.Command(
-                f"{inverter}.VoltageChangeTolerance={
-                    inv_control.vvcontrol.voltagechangetolerance}"
+                f"{inverter}.VoltageChangeTolerance={inv_control.vvcontrol.voltagechangetolerance}"
             )
             dss.Text.Command(
-                f"{inverter}.VV_RefReactivePower={
-                    inv_control.vvcontrol.vv_refreactivepower}"
+                f"{inverter}.VV_RefReactivePower={inv_control.vvcontrol.vv_refreactivepower}"
             )
         if inv_control.vwcontrol is not None:
             vw_curve = self.create_xy_curve(
                 inv_control.vwcontrol.voltage,
                 inv_control.vwcontrol.power_response,
             )
-            dss.Text.Command(f"{inverter}.voltwatt_curve={
-                             vw_curve.split('.')[1]}")
             dss.Text.Command(
-                f"{inverter}.deltaP_factor={
-                    inv_control.vwcontrol.deltap_factor}"
+                f"{inverter}.voltwatt_curve={vw_curve.split('.')[1]}")
+            dss.Text.Command(
+                f"{inverter}.deltaP_factor={inv_control.vwcontrol.deltap_factor}"
             )
         if inv_control.mode == InverterControlMode.voltvar_voltwatt:
             dss.Text.Command(f"{inverter}.CombiMode = VV_VW")
@@ -887,8 +882,7 @@ class FeederSimulator(object):
                 names = list(dict.fromkeys(bus_names))
                 if len(names) != 2:
                     logging.info(
-                        f"Line {line} has {
-                            len(names)} terminals, skipping in incidence matrix"
+                        f"Line {line} has {len(names)} terminals, skipping in incidence matrix"
                     )
                     continue
             from_bus, to_bus = names
@@ -904,8 +898,7 @@ class FeederSimulator(object):
                 names = list(dict.fromkeys(bus_names))
                 if len(names) != 2:
                     logging.info(
-                        f"Transformer {transformer} has {
-                            len(names)} terminals, skipping in incidence matrix"
+                        f"Transformer {transformer} has {len(names)} terminals, skipping in incidence matrix"
                     )
                     continue
             from_bus, to_bus = names
