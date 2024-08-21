@@ -25,6 +25,13 @@ or
 poetry update
 ```
 
+### Building EKF
+There is one federate that is not a python script that must be built. Use the following script which will build the dependencies and copy the exe files into the ekf_federate directory. You may be prompted to entry your password multiple times.
+
+```shell
+./build_ekf.sh
+```
+
 
 ## Jupyter Notebook
 The following notebook provides a more interactive experiance and a frontend for the container if you are running in docker. Once the notebook is running open the notebook link with it's generated token.
