@@ -37,6 +37,5 @@ git clone https://github.com/GRIDAPPSD/SuiteSparse
 git clone https://github.com/GRIDAPPSD/json 
 LD_LIBRARY_PATH=/build/gridappsd-state-estimator/SuiteSparse/lib/ 
 make -C SuiteSparse LAPACK=-llapack BLAS=-lblas 
-make -C state-estimator 
-make install
+make -C state-estimator gadal
 cp state-estimator/bin/* $pwd/ekf_federate/
