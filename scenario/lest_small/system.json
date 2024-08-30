@@ -59,27 +59,30 @@
             }
         },
         {
-            "name": "sensor_voltage_magnitude",
-            "type": "Sensor",
-            "parameters": {
-                "additive_noise_stddev": 0.01,
-                "measurement_file": "../local_feeder/sensors/voltage_ids.json"
-            }
-        },
-        {
             "name": "sensor_power_real",
             "type": "Sensor",
             "parameters": {
                 "additive_noise_stddev": 0.01,
-                "measurement_file": "../local_feeder/sensors/real_ids.json"
+                "measurement_file": "../feeder/sensors/real_ids.json"
             }
         },
         {
-            "name": "sensor_power_imaginary",
+            "name": "sensor_power_imag",
             "type": "Sensor",
             "parameters": {
                 "additive_noise_stddev": 0.01,
-                "measurement_file": "../local_feeder/sensors/reactive_ids.json"
+                "measurement_file": "../feeder/sensors/reactive_ids.json"
+            }
+        },
+        {
+            "name": "pv_estimator",
+            "type": "Estimator",
+            "parameters": {
+                "tol": 1e3,
+                "v_sigma": 0.02,
+                "l_sigma": 0.001,
+                "i_sigma": 0.001,
+                "deltat": 0.1
             }
         }
     ],
