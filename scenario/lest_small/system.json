@@ -79,8 +79,8 @@
             "type": "Estimator",
             "parameters": {
                 "tol": 1e3,
-                "v_sigma": 0.005,
-                "l_sigma": 0.02,
+                "v_sigma": 0.02,
+                "l_sigma": 0.001,
                 "i_sigma": 0.001,
                 "deltat": 0.1
             }
