@@ -76,7 +76,6 @@
                 "run_freq_sec": 900,
                 "topology_output": "../../outputs/small_medium/topology.json",
                 "use_sparse_admittance": true
-            }
         },
         {
             "name": "lindistflow",

@@ -3,6 +3,7 @@ import numpy as np
 import cvxpy as cp
 import math
 import logging
+import copy
 
 logger = logging.getLogger(__name__)
 logger.addHandler(logging.StreamHandler())
@@ -73,14 +74,25 @@ def voltage_cons_pri(A, b, p, frm, to, counteq, pii, qii, pij, qij, pik, qik, nb
     return A, b
 
 
+def update_base_kv(bus: dict) -> dict:
+    bus = copy.deepcopy(bus)
+    for k, b in bus.items():
+        b['base_kv'] = b['base_kv']*b['tap_ratio']
+    return bus
+
+
 def optimal_power_flow(branch_info: dict, bus_info: dict, source_bus: str, control: ControlType, pf_flag: bool):
     # System's base definition
     BASE_S = 1 / (1000000 * 100)
     S_CAPACITY = 1.2
     PRIMARY_V = 0.12
-    SOURCE_V = [1.04, 1.04, 1.04]
-    basekV = bus_info[source_bus]['kv'] / np.sqrt(3)
+    bus_info = update_base_kv(bus_info)
+
+    slack_v = max([b['base_kv'] for b in bus_info.values()])
+    print("Slack Voltage: ", slack_v)
+    basekV = bus_info[source_bus]['base_kv']
     baseZ = basekV ** 2 / 100
+    SOURCE_V = [slack_v/basekV]*3
 
     # Find the ABC phase and s1s2 phase triplex line and bus numbers
     nbranch_ABC = 0
@@ -98,7 +110,7 @@ def optimal_power_flow(branch_info: dict, bus_info: dict, source_bus: str, contr
 
     for b_eq in bus_info:
         name.append(b_eq)
-        if bus_info[b_eq]['kv'] > PRIMARY_V:
+        if bus_info[b_eq]['base_kv'] > PRIMARY_V:
             nbus_ABC += 1
         else:
             nbus_s1s2 += 1
@@ -170,7 +182,7 @@ def optimal_power_flow(branch_info: dict, bus_info: dict, source_bus: str, contr
             # Find bus idx in "from" of branch_sw_data
             ind_frm = 0
             ind_to = 0
-            if val_bus['kv'] < PRIMARY_V:
+            if val_bus['base_kv'] < PRIMARY_V:
                 for key, val_br in branch_info.items():
                     if val_bus['idx'] == val_br['from']:
                         k_frm_1p.append(ind_frm - nbranch_ABC)
@@ -190,7 +202,7 @@ def optimal_power_flow(branch_info: dict, bus_info: dict, source_bus: str, contr
             else:
                 for key, val_br in branch_info.items():
                     if val_bus['idx'] == val_br['from']:
-                        if bus_info[val_br['to_bus']]['kv'] > PRIMARY_V:
+                        if bus_info[val_br['to_bus']]['base_kv'] > PRIMARY_V:
                             k_frm_3p.append(ind_frm)
                         else:
                             if key[-1] == 'a':
@@ -210,7 +222,7 @@ def optimal_power_flow(branch_info: dict, bus_info: dict, source_bus: str, contr
                                     nbranch_ABC * 1 + ind_frm - nbranch_ABC + nbranch_s1s2)
 
                     if val_bus['idx'] == val_br['to']:
-                        if bus_info[val_br['fr_bus']]['kv'] > PRIMARY_V:
+                        if bus_info[val_br['fr_bus']]['base_kv'] > PRIMARY_V:
                             k_to_3p.append(ind_to)
                         else:
                             k_to_1p.append(ind_to - nbranch_ABC)
@@ -388,7 +400,7 @@ def optimal_power_flow(branch_info: dict, bus_info: dict, source_bus: str, contr
         for keyb, val_bus in bus_info.items():
             if keyb != source_bus:
                 # Real power injection at a bus
-                if val_bus['kv'] > PRIMARY_V:
+                if val_bus['base_kv'] > PRIMARY_V:
                     # p_inj  + p_gen(control var) =  p_load
                     # Phase A Real Power
                     A_eq[counteq, nbus_ABC * 3 + nbus_s1s2 +
@@ -458,7 +470,7 @@ def optimal_power_flow(branch_info: dict, bus_info: dict, source_bus: str, contr
         for keyb, val_bus in bus_info.items():
             if keyb != source_bus:
                 # Real power injection at a bus
-                if val_bus['kv'] > PRIMARY_V:
+                if val_bus['base_kv'] > PRIMARY_V:
                     # p_inj   =  - p_d_gen + p_load
                     # Phase A Real Power
                     A_eq[counteq, nbus_ABC * 3 + nbus_s1s2 +
@@ -528,7 +540,7 @@ def optimal_power_flow(branch_info: dict, bus_info: dict, source_bus: str, contr
     countineq = 0
 
     for keyb, val_bus in bus_info.items():
-        if val_bus['kv'] < PRIMARY_V:
+        if val_bus['base_kv'] < PRIMARY_V:
 
             A_eq[counteq, n_Qdg + nbus_ABC * 2 + val_bus['idx']] = 1
             b_eq[counteq] = 0. * val_bus['s_rated'] * BASE_S

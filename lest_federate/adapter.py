@@ -57,8 +57,9 @@ def init_bus() -> dict:
     bus["kv"] = 0
     bus["vmag"] = [0]*3
     bus["pq"] = np.zeros((3, 2)).tolist()
-    bus["pq_forecast"] = np.zeros((3, 2)).tolist()
     bus["pv"] = np.zeros((3, 2)).tolist()
+    bus["pq_forecast"] = np.zeros((3, 2)).tolist()
+    bus["pv_forecast"] = np.zeros((3, 2)).tolist()
     return bus
 
 
@@ -152,9 +153,9 @@ def extract_powers(bus: dict, real: PowersReal, imag: PowersImaginary) -> dict:
         if "OPEN" in name:
             continue
 
+        print(id, eq, power)
         phase = int(phase) - 1
-        bus[name]["eqid"] = eq
-        bus[name]["pq"][phase][0] = power*1000
+        bus[name]["pq"][phase][0] += power*1000
 
     for id, eq, power in zip(imag.ids, imag.equipment_ids, imag.values):
         name, phase = convert_id(id)
@@ -165,8 +166,7 @@ def extract_powers(bus: dict, real: PowersReal, imag: PowersImaginary) -> dict:
             continue
 
         phase = int(phase) - 1
-        bus[name]["eqid"] = eq
-        bus[name]["pq"][phase][1] = power*1000
+        bus[name]["pq"][phase][1] += power*1000
     return bus
 
 
@@ -185,11 +185,9 @@ def extract_injection(bus: dict, powers: Injection) -> dict:
         [type, _] = eq.split('.')
         phase = int(phase) - 1
         if type == "PVSystem":
-            bus[name]["eqid"] = eq
-            bus[name]["pv"][phase][0] = power*1000
+            bus[name]["pv_forecast"][phase][0] += power*1000
         else:
-            bus[name]["eqid"] = eq
-            bus[name]["pq_forecast"][phase][0] = power*1000
+            bus[name]["pq_forecast"][phase][0] += power*1000
 
     for id, eq, power in zip(imag.ids, imag.equipment_ids, imag.values):
         name, phase = convert_id(id)
@@ -202,11 +200,9 @@ def extract_injection(bus: dict, powers: Injection) -> dict:
         [type, _] = eq.split('.')
         phase = int(phase) - 1
         if type == "PVSystem":
-            bus[name]["eqid"] = eq
-            bus[name]["pv"][phase][1] = power*1000
+            bus[name]["pv_forecast"][phase][1] += power*1000
         else:
-            bus[name]["eqid"] = eq
-            bus[name]["pq_forecast"][phase][1] = power*1000
+            bus[name]["pq_forecast"][phase][1] += power*1000
     return bus
 
 

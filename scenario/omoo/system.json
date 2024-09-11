@@ -2,24 +2,45 @@
     "name": "test_omoo",
     "components": [
         {
+            "name": "recorder_power_real",
+            "type": "Recorder",
+            "parameters": {"feather_filename": "../../outputs/ieee123/power_real.feather",
+                           "csv_filename": "../../outputs/ieee123/power_real.csv"
+                          }
+        },
+        {
+            "name": "recorder_power_imag",
+            "type": "Recorder",
+            "parameters": {"feather_filename": "../../outputs/ieee123/power_imag.feather",
+                           "csv_filename": "../../outputs/ieee123/power_imag.csv"
+                          }
+        },
+        {
             "name": "recorder_voltage_real",
             "type": "Recorder",
-            "parameters": {"feather_filename": "../../outputs/omoo/voltage_real.feather",
-                           "csv_filename": "../../outputs/omoo/voltage_real.csv"
+            "parameters": {"feather_filename": "../../outputs/ieee123/voltage_real.feather",
+                           "csv_filename": "../../outputs/ieee123/voltage_real.csv"
                           }
         },
         {
             "name": "recorder_voltage_imag",
             "type": "Recorder",
-            "parameters": {"feather_filename": "../../outputs/omoo/voltage_imag.feather",
-                           "csv_filename": "../../outputs/omoo/voltage_imag.csv"
+            "parameters": {"feather_filename": "../../outputs/ieee123/voltage_imag.feather",
+                           "csv_filename": "../../outputs/ieee123/voltage_imag.csv"
+                          }
+        },
+        {
+            "name": "recorder_voltage_magnitude",
+            "type": "Recorder",
+            "parameters": {"feather_filename": "../../outputs/ieee123/voltage_mag.feather",
+                           "csv_filename": "../../outputs/ieee123/voltage_mag.csv"
                           }
         },
         {
             "name": "recorder_opf_voltage_magnitude",
             "type": "Recorder",
-            "parameters": {"feather_filename": "../../outputs/omoo/opf_voltage_mag.feather",
-                           "csv_filename": "../../outputs/omoo/opf_voltage_mag.csv"
+            "parameters": {"feather_filename": "../../outputs/ieee123/opf_voltage_mag.feather",
+                           "csv_filename": "../../outputs/ieee123/opf_voltage_mag.csv"
                           }
         },
         {
