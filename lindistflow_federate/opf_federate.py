@@ -167,6 +167,7 @@ class OPFFederate(object):
             voltages_mag = VoltagesMagnitude.parse_obj(
                 self.sub.voltages_mag.json)
             bus_info = adapter.extract_voltages(bus_info, voltages_mag)
+            bus_info = adapter.update_ratios(bus_info, branch_info)
 
             time = voltages_mag.time
             logger.debug(time)

@@ -53,7 +53,9 @@ def init_branch() -> dict:
 def init_bus() -> dict:
     bus = {}
     bus["phases"] = []
-    bus["kv"] = 0
+    bus["kv"] = 0.0
+    bus["base_kv"] = 0.0
+    bus["tap_ratio"] = 1.0
     bus["pq"] = np.zeros((3, 2)).tolist()
     bus["pv"] = np.zeros((3, 2)).tolist()
     return bus
@@ -86,7 +88,7 @@ def extract_base_voltages(bus: dict, voltages: VoltagesMagnitude) -> dict:
             continue
 
         phase = int(phase) - 1
-        bus[name]['kv'] = voltage/1000.0
+        bus[name]['base_kv'] = voltage/1000.0
     return bus
 
 
@@ -98,6 +100,25 @@ def extract_voltages(bus: dict, voltages: VoltagesMagnitude) -> dict:
             continue
 
         bus[name]['kv'] = voltage/1000.0
+    return bus
+
+
+def update_ratios(bus: dict, branch: dict) -> dict:
+    for node in branch.values():
+        if "XFMR" == node["type"]:
+            src = node["fr_bus"]
+            dst = node["to_bus"]
+            v1 = bus[src]["kv"]
+            v2 = bus[dst]["kv"]
+            r = v1/v2
+
+            print(src, dst, v1, v2, r)
+
+            if v1 < 0.3 or v2 < 0.3:
+                continue
+
+            bus[src]["tap_ratio"] = r
+
     return bus
 
 
@@ -241,10 +262,27 @@ def extract_switches(incidences: Incidence) -> list[SwitchInfo]:
     return switches
 
 
+def extract_transformers(incidences: Incidence) -> (list[str], list[str]):
+    xfmrs = []
+    to_eq = incidences.to_equipment
+    fr_eq = incidences.from_equipment
+    ids = incidences.ids
+    for fr_eq, to_eq, eq_id in zip(fr_eq, to_eq, ids):
+        if "tr" in eq_id or "reg" in eq_id or "xfm" in eq_id:
+            print("XFMR: ", eq_id, fr_eq, to_eq)
+            if "." in to_eq:
+                [to_eq, _] = to_eq.split('.', 1)
+            if "." in fr_eq:
+                [fr_eq, _] = fr_eq.split('.', 1)
+            xfmrs.append(f"{fr_eq}_{to_eq}")
+    return xfmrs
+
+
 def extract_info(topology: Topology) -> (dict, dict):
     branch_info = {}
     bus_info = {}
     switches = extract_switches(topology.incidences)
+    xfmrs = extract_transformers(topology.incidences)
     fr_buses = [switch.from_bus for switch in switches]
     to_buses = [switch.to_bus for switch in switches]
     from_equip = topology.admittance.from_equipment
@@ -266,6 +304,9 @@ def extract_info(topology: Topology) -> (dict, dict):
 
         key = f"{from_name}_{to_name}"
         key_back = f"{to_name}_{from_name}"
+
+        if key in xfmrs or key_back in xfmrs:
+            type = "XFMR"
 
         if key not in branch_info and key_back not in branch_info:
             branch_info[key] = init_branch()
