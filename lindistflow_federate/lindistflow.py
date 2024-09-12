@@ -57,11 +57,36 @@ def power_balance(A, b, k_frm, k_to, counteq, col, val):
     return A, b
 
 
+def convert_pu(bus: dict, branch: dict, base_s: int) -> (dict, dict):
+    pq_pu = 1 / base_s
+    bus_pu = copy.deepcopy(bus)
+    branch_pu = copy.deepcopy(branch)
+
+    for k, v in bus.items():
+        bus_pu[k]["pq"] = [[pq * pq_pu for pq in phase] for phase in v["pq"]]
+        bus_pu[k]["pv"] = [[pq * pq_pu for pq in phase] for phase in v["pv"]]
+
+    for k, v in branch.items():
+        if "XFMR" == v["type"]:
+            v1 = bus[v["fr_bus"]]["kv"]
+            v2 = bus[v["to_bus"]]["kv"]
+            base_kv = v2
+            if v1 > v2:
+                base_kv = v1
+        else:
+            base_kv = bus[v["fr_bus"]]["kv"]
+
+        z_pu = 1 / (base_kv**2 / base_s)
+        p1 = [p in v["zprime"]]
+        branch_pu[k]["zprim"] = [[[e*z_pu for e in p2] for p2 in p1]]
+
+    return (bus_pu, branch_pu)
+
+
 def voltage_cons_pri(A, b, p, frm, to, counteq, pii, qii, pij, qij, pik, qik, nbus_ABC, nbus_s1s2, nbranch_ABC, baseZ):
     A[counteq, frm] = 1
     A[counteq, to] = -1
-    n_flow_ABC = (nbus_ABC * 3 + nbus_s1s2) + \
-        (nbus_ABC * 6 + nbus_s1s2 * 2)
+    n_flow_ABC = (nbus_ABC * 3 + nbus_s1s2) + (nbus_ABC * 6 + nbus_s1s2 * 2)
     # real power drop
     A[counteq, p + n_flow_ABC + + nbranch_ABC * 0] = pii / baseZ
     A[counteq, p + n_flow_ABC + nbranch_ABC * 1] = pij / baseZ
@@ -72,13 +97,6 @@ def voltage_cons_pri(A, b, p, frm, to, counteq, pii, qii, pij, qij, pik, qik, nb
     A[counteq, p + n_flow_ABC + nbranch_ABC * 5] = qik / baseZ
     b[counteq] = 0.0
     return A, b
-
-
-def update_base_kv(bus: dict) -> dict:
-    bus = copy.deepcopy(bus)
-    for k, b in bus.items():
-        b['base_kv'] = b['base_kv']*b['tap_ratio']
-    return bus
 
 
 def optimal_power_flow(branch_info: dict, bus_info: dict, source_bus: str, control: ControlType, pf_flag: bool):
@@ -191,8 +209,8 @@ def optimal_power_flow(branch_info: dict, bus_info: dict, source_bus: str, contr
                         k_to_1p.append(ind_to - nbranch_ABC)
                     ind_to += 1
                     ind_frm += 1
-                loc = (nbus_ABC * 3 + nbus_s1s2) + \
-                    (nbus_ABC * 6 + nbus_s1s2 * 2) + nbranch_ABC * 6
+                loc = (nbus_ABC * 3 + nbus_s1s2) +
+                (nbus_ABC * 6 + nbus_s1s2 * 2) + nbranch_ABC * 6
                 A_eq, b_eq = power_balance(A_eq, b_eq, k_frm_1p, k_to_1p, counteq, loc,
                                            val_bus['idx'] + nbus_ABC * 3 + nbus_s1s2 + nbus_ABC * 5)
                 counteq += 1
@@ -228,8 +246,8 @@ def optimal_power_flow(branch_info: dict, bus_info: dict, source_bus: str, contr
                             k_to_1p.append(ind_to - nbranch_ABC)
                     ind_to += 1
                     ind_frm += 1
-                loc = (nbus_ABC * 3 + nbus_s1s2) + \
-                    (nbus_ABC * 6 + nbus_s1s2 * 2)
+                loc = (nbus_ABC * 3 + nbus_s1s2) +
+                (nbus_ABC * 6 + nbus_s1s2 * 2)
                 # Finding the kfrms
                 k_frm_A = k_frm_3p + k_frm_1pa
                 k_frm_B = k_frm_3p + k_frm_1pb
@@ -254,8 +272,8 @@ def optimal_power_flow(branch_info: dict, bus_info: dict, source_bus: str, contr
                 k_frm_C = k_frm_3p + k_frm_1qc
 
                 # Reactive Power balance equations
-                loc = (nbus_ABC * 3 + nbus_s1s2) + \
-                    (nbus_ABC * 6 + nbus_s1s2 * 2) + nbranch_ABC * 3
+                loc = (nbus_ABC * 3 + nbus_s1s2) +
+                (nbus_ABC * 6 + nbus_s1s2 * 2) + nbranch_ABC * 3
                 # Phase A
                 A_eq, b_eq = power_balance(A_eq, b_eq, k_frm_A, k_to_A, counteq, loc,
                                            val_bus['idx'] + nbus_ABC * 3 + nbus_s1s2 + nbus_ABC * 3)
@@ -319,8 +337,8 @@ def optimal_power_flow(branch_info: dict, bus_info: dict, source_bus: str, contr
     def voltage_cons_sec(A, b, p, frm, to, counteq, p_pri, q_pri, p_sec, q_sec):
         A[counteq, frm] = 1
         A[counteq, to] = -1
-        n_flow_s1s2 = (nbus_ABC * 3 + nbus_s1s2) + \
-            (nbus_ABC * 6 + nbus_s1s2 * 2) + nbranch_ABC * 6
+        n_flow_s1s2 = (nbus_ABC * 3 + nbus_s1s2) +
+        (nbus_ABC * 6 + nbus_s1s2 * 2) + nbranch_ABC * 6
         # real power drop
         A[counteq, p + n_flow_s1s2] = p_pri + 0.5 * p_sec
         # reactive power drop
@@ -475,20 +493,20 @@ def optimal_power_flow(branch_info: dict, bus_info: dict, source_bus: str, contr
                     # Phase A Real Power
                     A_eq[counteq, nbus_ABC * 3 + nbus_s1s2 +
                          nbus_ABC * 0 + val_bus['idx']] = 1
-                    b_eq[counteq] = - val_bus['pv'][0][0] * \
-                        BASE_S + val_bus['pq'][0][0] * BASE_S * mult
+                    b_eq[counteq] = - val_bus['pv'][0][0] *
+                    BASE_S + val_bus['pq'][0][0] * BASE_S * mult
                     counteq += 1
                     # Phase B Real Power
                     A_eq[counteq, nbus_ABC * 3 + nbus_s1s2 +
                          nbus_ABC * 1 + val_bus['idx']] = 1
-                    b_eq[counteq] = - val_bus['pv'][1][0] * \
-                        BASE_S + val_bus['pq'][1][0] * BASE_S * mult
+                    b_eq[counteq] = - val_bus['pv'][1][0] *
+                    BASE_S + val_bus['pq'][1][0] * BASE_S * mult
                     counteq += 1
                     # Phase C Real Power
                     A_eq[counteq, nbus_ABC * 3 + nbus_s1s2 +
                          nbus_ABC * 2 + val_bus['idx']] = 1
-                    b_eq[counteq] = - val_bus['pv'][2][0] * \
-                        BASE_S + val_bus['pq'][2][0] * BASE_S * mult
+                    b_eq[counteq] = - val_bus['pv'][2][0] *
+                    BASE_S + val_bus['pq'][2][0] * BASE_S * mult
                     counteq += 1
 
                     # Q_inj  + Q_gen(control var) =  Q_load
@@ -607,7 +625,7 @@ def optimal_power_flow(branch_info: dict, bus_info: dict, source_bus: str, contr
 
     prob = cp.Problem(cp.Minimize(q_obj_vector.T @ x),
                       [A_ineq @ x <= b_ineq,
-                       A_eq @ x == b_eq])
+                      A_eq @ x == b_eq])
 
     prob.solve(solver=cp.ECOS, verbose=True)
     logger.info(prob.status)
@@ -639,8 +657,8 @@ def optimal_power_flow(branch_info: dict, bus_info: dict, source_bus: str, contr
                                    x.value[k + nbranch_ABC * 5] * mul * 1000]
         i += 1
 
-    n_flow_s1s2 = (nbus_ABC * 3 + nbus_s1s2) + \
-        (nbus_ABC * 6 + nbus_s1s2 * 2) + nbranch_ABC * 6
+    n_flow_s1s2 = (nbus_ABC * 3 + nbus_s1s2) +
+    (nbus_ABC * 6 + nbus_s1s2 * 2) + nbranch_ABC * 6
     name = []
     for key, val_br in bus_info.items():
         name.append(key)
