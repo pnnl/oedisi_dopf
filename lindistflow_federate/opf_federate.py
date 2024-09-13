@@ -94,16 +94,12 @@ class OPFFederate(object):
             self.inputs["voltages_magnitude"], "")
         self.sub.injections = self.fed.register_subscription(
             self.inputs["injections"], "")
-
-        # add subscription to get available PV
-        self.sub.available_pv = self.fed.register_subscription(
-            self.inputs["pv_available"], "")
-
-        # Optional subscription: PV forecast
-        self.sub.pv_forecast = self.fed.register_subscription(
-            self.inputs["pv_forecast"], "")
-        self.sub.pv_forecast.set_default("[]")
-        self.sub.pv_forecast.option["CONNECTION_OPTIONAL"] = True
+        self.sub.power_real = self.fed.register_subscription(
+            self.inputs["power_real"], "")
+        self.sub.power_imag = self.fed.register_subscription(
+            self.inputs["power_imag"], "")
+        self.sub.available_power = self.fed.register_subscription(
+            self.inputs["available_power"], "")
 
     def register_publication(self) -> None:
         self.pub_commands = self.fed.register_publication(
@@ -112,17 +108,6 @@ class OPFFederate(object):
 
         self.pub_voltages = self.fed.register_publication(
             "opf_voltages_magnitude", h.HELICS_DATA_TYPE_STRING, ""
-        )
-
-        self.pub_delta_setpt = self.fed.register_publication(
-            "delta_setpoint", h.HELICS_DATA_TYPE_STRING, ""
-        )
-
-        self.pub_curtail_forecast = self.fed.register_publication(
-            "forecast_curtail", h.HELICS_DATA_TYPE_STRING, ""
-        )
-        self.pub_curtail = self.fed.register_publication(
-            "real_curtail", h.HELICS_DATA_TYPE_STRING, ""
         )
 
     def get_set_points(self, control, bus_info, conversion):
@@ -144,9 +129,6 @@ class OPFFederate(object):
         granted_time = h.helicsFederateRequestTime(
             self.fed, h.HELICS_TIME_MAXTIME)
 
-        grab_forecast_flag = False
-        time_ctr = -1
-
         while granted_time < h.HELICS_TIME_MAXTIME:
 
             if not self.sub.voltages_mag.is_updated():
@@ -156,150 +138,75 @@ class OPFFederate(object):
                 continue
 
             topology: Topology = Topology.parse_obj(self.sub.topology.json)
-            [branch_info, bus_info] = adapter.extract_info(topology)
+            branch_info, bus_info, slack_bus = adapter.extract_info(topology)
 
             injections: Injection = Injection.parse_obj(topology.injections)
             bus_info = adapter.extract_injection(bus_info, injections)
 
-            slack = topology.slack_bus[0]
-            [slack_bus, phase] = slack.split('.')
+            p = PowersReal.parse_obj(self.sub.power_real.json)
+            bus_info = adapter.extract_powers_real(bus_info, p)
+            for id, eid, v in zip(p.ids, p.equipment_ids, p.values):
+                logger.debug(id, eid, v)
+
+            q = PowersImaginary.parse_obj(self.sub.power_imag.json)
+            bus_info = adapter.extract_powers_imag(bus_info, q)
+            for id, eid, v in zip(q.ids, q.equipment_ids, q.values):
+                logger.debug(id, eid, v)
+
+            injections = Injection.parse_obj(self.sub.injections.json)
+            p_inj = injections.power_real
+            for id, eid, v in zip(
+                    p_inj.ids, p_inj.equipment_ids, p_inj.values):
+                logger.debug(id, eid, v)
 
             voltages_mag = VoltagesMagnitude.parse_obj(
                 self.sub.voltages_mag.json)
             bus_info = adapter.extract_voltages(bus_info, voltages_mag)
-            bus_info = adapter.update_ratios(bus_info, branch_info)
 
             time = voltages_mag.time
-            logger.debug(time)
+            logger.debug("Timestep: ", time)
 
-            with open("bus_info_oedisi_ieee123.json", "w") as outfile:
+            with open("bus_info.json", "w") as outfile:
                 outfile.write(json.dumps(bus_info))
 
-            with open("branch_info_oedisi_ieee123.json", "w") as outfile:
+            with open("branch_info.json", "w") as outfile:
                 outfile.write(json.dumps(branch_info))
 
-            assert (check_network_radiality(bus=bus_info, branch=branch_info))
+            assert (check_network_radiality(branch_info, bus_info))
 
-            # evaluate the forecasted PV set points and forecasted curtailment
-            if not grab_forecast_flag:
-                pv_forecast = self.sub.pv_forecast.json
-                forecast_setp = {}
-                forecast_curt = {}
-                for k, forecast in enumerate(pv_forecast):
-                    logger.info(f"Forecasting for time step {k}")
-
-                    forecast_generation = json.loads(forecast)
-                    dict_forecast_gen = dict(zip(
-                        forecast_generation["ids"],
-                        forecast_generation["values"]
-                    ))
-
-                    # insert forecasted generation values to the PV injection vector
-                    bus_info = adapter.extract_forecast(
-                        bus_info,
-                        forecast_generation
-                    )
-
-                    # perform forecast LinDistFlow
-                    voltages, power_flow, forecast_control, conv = lindistflow.optimal_power_flow(
-                        branch_info, bus_info, slack_bus,
-                        self.static.control_type, self.static.pf_flag
-                    )
-
-                    # compute the forecatsed set points
-                    forecast_setpts = self.get_set_points(
-                        forecast_control,
-                        bus_info, conv
-                    )
-
-                    # make outputs ready for publishing
-                    for eqid in forecast_setpts:
-                        setpt = forecast_setpts[eqid]
-                        curt = dict_forecast_gen[eqid] - setpt
-
-                        # add the forecasted set points
-                        if eqid not in forecast_setp:
-                            forecast_setp[eqid] = [setpt]
-                        else:
-                            forecast_setp[eqid].append(setpt)
-
-                        # add the forecasted curtailments
-                        if eqid not in forecast_curt:
-                            forecast_curt[eqid] = [curt]
-                        else:
-                            forecast_curt[eqid].append(curt)
-
-                grab_forecast_flag = True
-
-            time = voltages_mag.time
-            logger.info(time)
-
-            # get the available power in real time
-            available_power = self.sub.available_pv.json
-            available_power = {available_power["ids"][i]: available_power["values"][i] for i in range(
-                len(available_power["ids"]))}
+            pv_available = MeasurementArray.parse_obj(
+                self.sub.available_pv.json)
+            for id, v in zip(
+                    pv_available.ids, p_inj.values):
+                logger.debug(id,  v)
 
             voltages, power_flow, control, conversion = lindistflow.optimal_power_flow(
                 branch_info, bus_info, slack_bus, self.static.control_type, self.static.pf_flag)
             real_setpts = self.get_set_points(control, bus_info, conversion)
 
-            # Compute the delta change in setpoints and publish
-            time_ctr += 1
-            pveq_id = []
-            delta_setpt = []
-            forecast_curtail = []
-            real_curtail = []
-            for eq_id in real_setpts:
-                if eq_id in forecast_setp:
-                    pveq_id.append(eq_id)
-                    delta_setpt.append(
-                        real_setpts[eq_id]-forecast_setp[eq_id][time_ctr])
-                    forecast_curtail.append(forecast_curt[eq_id][time_ctr])
-                    real_curtail.append(
-                        available_power[eq_id] - real_setpts[eq_id])
-
-            delta_sp = xr.DataArray(delta_setpt, coords={"ids": pveq_id})
-            fore_curt = xr.DataArray(forecast_curtail, coords={"ids": pveq_id})
-            real_curt = xr.DataArray(real_curtail, coords={"ids": pveq_id})
-            self.pub_delta_setpt.publish(
-                MeasurementArray(
-                    **xarray_to_dict(delta_sp), time=time,
-                    units="kW",
-                ).json()
-            )
-            self.pub_curtail_forecast.publish(
-                MeasurementArray(
-                    **xarray_to_dict(fore_curt), time=time,
-                    units="kW",
-                ).json()
-            )
-            self.pub_curtail.publish(
-                MeasurementArray(
-                    **xarray_to_dict(real_curt), time=time,
-                    units="kW",
-                ).json()
-            )
-
             # get the control commands for the feeder federate
             commands = []
             for key, val in control.items():
-                if key in bus_info:
-                    bus = bus_info[key]
-                    if 'eqid' in bus:
-                        eqid = bus['eqid']
-                        [type, _] = eqid.split('.')
-                        if type == "PVSystem":
-                            setpoint = lindistflow.ignore_phase(val)*conversion
-                            if setpoint < 0.1:
-                                continue
+                if key not in bus_info.buses:
+                    continue
 
-                            if self.static.control_type == lindistflow.ControlType.WATT:
-                                commands.append((eqid, setpoint, 0))
-                            elif self.static.control_type == lindistflow.ControlType.VAR:
-                                commands.append((eqid, 0, setpoint))
-                            elif self.static.control_type == lindistflow.ControlType.WATT_VAR:
-                                # todo
-                                pass
+                bus = bus_info.buses[key]
+                if all([pv == 0.0 for pv in bus.pv]):
+                    continue
+
+                setpoint = max([abs(v) for v in val])*conversion
+                if setpoint < 0.1:
+                    continue
+
+                pv = [tag for tag in bus.tags if "PVSystem" in tag]
+                ctrl = self.static.control_type
+                for tag in pv:
+                    if ctrl == lindistflow.ControlType.WATT:
+                        commands.append((tag, setpoint, 0))
+                    elif ctrl == lindistflow.ControlType.VAR:
+                        commands.append((tag, 0, setpoint))
+                    elif ctrl == lindistflow.ControlType.WATT_VAR:
+                        continue
 
             if commands:
                 self.pub_commands.publish(

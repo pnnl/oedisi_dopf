@@ -51,6 +51,7 @@ class BranchInfo:
 @dataclass
 class Bus:
     idx: int = 0
+    tags: list[str] = field(default_factory=list)
     phases: list[int] = field(default_factory=lambda: [0]*3)
     base_kv: float = field(default_factory=lambda: [0]*3)
     base_pq: float = field(default_factory=lambda: np.zeros((3, 2)).tolist())
@@ -65,6 +66,16 @@ class Bus:
 @dataclass
 class BusInfo:
     buses: dict[Bus] = field(default_factory=dict)
+
+
+def check_radiality(branch_info: BranchInfo, bus_info: BusInfo) -> bool:
+    if len(bus_info.buses)-len(branch_info.branches) == 1:
+        return True
+
+    logger.debug("Network is not Radial")
+    logger.debug(f"Branch: {branch_info.branches.keys()}")
+    logger.debug(f"Bus: {bus_info.buses.keys()}")
+    return False
 
 
 def index_info(
@@ -186,6 +197,7 @@ def extract_injection(bus_info: BusInfo, powers: Injection) -> dict:
         if name not in bus_info.buses:
             continue
 
+        bus_info.buses[name].tag.append(eq)
         if "PVSystem" in eq:
             bus_info.buses[name].base_pv[phase][0] -= power*1000
         else:
@@ -253,7 +265,7 @@ def generate_graph(inc: Incidence, slack_bus: str) -> nx.Graph:
             return graph.subgraph(c).copy()
 
 
-def extract_info(topology: Topology) -> (BranchInfo, BusInfo):
+def extract_info(topology: Topology) -> (BranchInfo, BusInfo, str):
     branch_info = BranchInfo()
     bus_info = BusInfo()
     slack_bus, _ = topology.slack_bus[0].split(".", 1)
@@ -270,4 +282,4 @@ def extract_info(topology: Topology) -> (BranchInfo, BusInfo):
     bus_info = extract_base_kv(bus_info, topology.base_voltage_magnitudes)
     bus_info = extract_injection(bus_info, topology.injections)
 
-    return index_info(branch_info, bus_info)
+    return index_info(branch_info, bus_info, slack_bus)

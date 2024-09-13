@@ -16,20 +16,6 @@
                           }
         },
         {
-            "name": "recorder_voltage_real",
-            "type": "Recorder",
-            "parameters": {"feather_filename": "../../outputs/ieee123/voltage_real.feather",
-                           "csv_filename": "../../outputs/ieee123/voltage_real.csv"
-                          }
-        },
-        {
-            "name": "recorder_voltage_imag",
-            "type": "Recorder",
-            "parameters": {"feather_filename": "../../outputs/ieee123/voltage_imag.feather",
-                           "csv_filename": "../../outputs/ieee123/voltage_imag.csv"
-                          }
-        },
-        {
             "name": "recorder_voltage_magnitude",
             "type": "Recorder",
             "parameters": {"feather_filename": "../../outputs/ieee123/voltage_mag.feather",
@@ -44,27 +30,6 @@
                           }
         },
         {
-            "name": "recorder_delta_setpoint",
-            "type": "Recorder",
-            "parameters": {"feather_filename": "../../outputs/ieee123/delta_setpoint.feather",
-                           "csv_filename": "../../outputs/ieee123/delta_setpoint.csv"
-                          }
-        },
-        {
-            "name": "recorder_forecast_curtail",
-            "type": "Recorder",
-            "parameters": {"feather_filename": "../../outputs/ieee123/forecast_curtail.feather",
-                           "csv_filename": "../../outputs/ieee123/forecast_curtail.csv"
-                          }
-        },
-        {
-            "name": "recorder_real_curtail",
-            "type": "Recorder",
-            "parameters": {"feather_filename": "../../outputs/ieee123/real_curtail.feather",
-                           "csv_filename": "../../outputs/ieee123/real_curtail.csv"
-                          }
-        },
-        {
             "name": "feeder",
             "type": "Feeder",
             "parameters": {
@@ -72,7 +37,7 @@
                 "profile_location": "gadal_ieee123/profiles",
                 "opendss_location": "gadal_ieee123/qsts",
                 "start_date": "2017-05-01 00:00:00",
-                "number_of_timesteps": 96,
+                "number_of_timesteps": 1,
                 "run_freq_sec": 900,
                 "topology_output": "../../outputs/ieee123/topology.json",
                 "use_sparse_admittance": true
@@ -83,7 +48,7 @@
             "type": "OptimalPowerFlow",
             "parameters": {
                 "deltat": 0.1,
-                "pf_flag": true,
+                "pf_flag": false,
                 "control_type": 1
             }
         }
@@ -93,18 +58,6 @@
             "source": "feeder",
             "source_port": "voltages_magnitude",
             "target": "recorder_voltage_magnitude",
-            "target_port": "subscription"
-        },
-        {
-            "source": "feeder",
-            "source_port": "voltages_real",
-            "target": "recorder_voltage_real",
-            "target_port": "subscription"
-        },
-        {
-            "source": "feeder",
-            "source_port": "voltages_imag",
-            "target": "recorder_voltage_imag",
             "target_port": "subscription"
         },
         {
@@ -139,15 +92,21 @@
         },
         {
             "source": "feeder",
-            "source_port": "pv_forecast",
+            "source_port": "power_real",
             "target": "lindistflow",
-            "target_port": "pv_forecast"
+            "target_port": "power_real"
+        },
+        {
+            "source": "feeder",
+            "source_port": "power_imag",
+            "target": "lindistflow",
+            "target_port": "power_imag"
         },
         {
             "source": "feeder",
             "source_port": "available_power",
             "target": "lindistflow",
-            "target_port": "pv_available"
+            "target_port": "available_power"
         },
         {
             "source": "lindistflow",
@@ -159,24 +118,6 @@
             "source": "lindistflow",
             "source_port": "opf_voltages_magnitude",
             "target": "recorder_opf_voltage_magnitude",
-            "target_port": "subscription"
-        },
-        {
-            "source": "lindistflow",
-            "source_port": "delta_setpoint",
-            "target": "recorder_delta_setpoint",
-            "target_port": "subscription"
-        },
-        {
-            "source": "lindistflow",
-            "source_port": "forecast_curtail",
-            "target": "recorder_forecast_curtail",
-            "target_port": "subscription"
-        },
-        {
-            "source": "lindistflow",
-            "source_port": "real_curtail",
-            "target": "recorder_real_curtail",
             "target_port": "subscription"
         }
     ]

@@ -4,6 +4,12 @@ import cvxpy as cp
 import math
 import logging
 import copy
+from adapter import (
+    BranchInfo,
+    Branch,
+    BusInfo,
+    Bus
+)
 
 logger = logging.getLogger(__name__)
 logger.addHandler(logging.StreamHandler())
@@ -38,14 +44,6 @@ class ControlType(Enum):
     WATT_VAR = 3
 
 
-def ignore_phase(control: dict) -> float:
-    setpoint = 0
-    for key, val in control.items():
-        if np.abs(val) > np.abs(setpoint):
-            setpoint = val
-    return setpoint
-
-
 def power_balance(A, b, k_frm, k_to, counteq, col, val):
     for k in k_frm:
         A[counteq, col + k] = -1
@@ -57,28 +55,31 @@ def power_balance(A, b, k_frm, k_to, counteq, col, val):
     return A, b
 
 
-def convert_pu(bus: dict, branch: dict, base_s: int) -> (dict, dict):
+def convert_pu(
+        branch_info: BranchInfo,
+        bus_info: BusInfo,
+        base_s: int) -> (BranchInfo, BusInfo):
     pq_pu = 1 / base_s
     bus_pu = copy.deepcopy(bus)
     branch_pu = copy.deepcopy(branch)
 
-    for k, v in bus.items():
-        bus_pu[k]["pq"] = [[pq * pq_pu for pq in phase] for phase in v["pq"]]
-        bus_pu[k]["pv"] = [[pq * pq_pu for pq in phase] for phase in v["pv"]]
+    for k, v in bus_info.buses.items():
+        bus_pu.buses[k].pq = [[pq * pq_pu for pq in phase] for phase in v.pq]
+        bus_pu.buses[k].pv = [[pq * pq_pu for pq in phase] for phase in v.pv]
 
-    for k, v in branch.items():
-        if "XFMR" == v["type"]:
-            v1 = bus[v["fr_bus"]]["kv"]
-            v2 = bus[v["to_bus"]]["kv"]
+    for k, v in branch_info.items():
+        if "XFMR" == v.tag:
+            v1 = bus[v.fr_bus].kv
+            v2 = bus[v.to_bus].kv
             base_kv = v2
             if v1 > v2:
                 base_kv = v1
         else:
-            base_kv = bus[v["fr_bus"]]["kv"]
+            base_kv = bus[v.fr_bus].kv
 
         z_pu = 1 / (base_kv**2 / base_s)
-        p1 = [p in v["zprime"]]
-        branch_pu[k]["zprim"] = [[[e*z_pu for e in p2] for p2 in p1]]
+        p1 = [p in v.zprim]
+        branch_pu.branches[k].zprim = [[[e*z_pu for e in p2] for p2 in p1]]
 
     return (bus_pu, branch_pu)
 
@@ -104,7 +105,7 @@ def optimal_power_flow(branch_info: dict, bus_info: dict, source_bus: str, contr
     BASE_S = 1 / (1000000 * 100)
     S_CAPACITY = 1.2
     PRIMARY_V = 0.12
-    bus_info = update_base_kv(bus_info)
+    branch_info, bus_info = convert_pu(branch_info, bus_info, BASE_S)
 
     slack_v = max([b['base_kv'] for b in bus_info.values()])
     print("Slack Voltage: ", slack_v)
