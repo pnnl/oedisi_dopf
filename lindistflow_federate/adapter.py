@@ -1,5 +1,6 @@
 import numpy as np
 import logging
+import networkx as nx
 from enum import IntEnum
 from typing import Tuple
 from oedisi.types.data_types import (
@@ -276,6 +277,22 @@ def extract_transformers(incidences: Incidence) -> (list[str], list[str]):
                 [fr_eq, _] = fr_eq.split('.', 1)
             xfmrs.append(f"{fr_eq}_{to_eq}")
     return xfmrs
+
+
+def generate_graph(topology: Topology) -> nx.Graph:
+    to_eq = topology.admittance.to_equipment
+    fr_eq = topology.admittance.from_equipment
+    graph = nx.Graph()
+    for src, dst in zip(fr_eq, to_eq):
+        if "OPEN" in src or "OPEN" in dst:
+            continue
+        if src == dst:
+            continue
+        graph.add_edge(src, dst)
+    disconnected = list(nx.connected_components(graph))
+    for d in disconnected:
+        if any([b in d for b in topology.slack_bus]):
+            return d
 
 
 def extract_info(topology: Topology) -> (dict, dict):
