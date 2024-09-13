@@ -28,15 +28,6 @@ logger.addHandler(logging.StreamHandler())
 logger.setLevel(logging.INFO)
 
 
-class Phase(IntEnum):
-    A = 1
-    B = 2
-    C = 3
-
-    def __repr__(self):
-        return self.value
-
-
 @dataclass
 class Branch:
     fr_bus: str
@@ -45,7 +36,7 @@ class Branch:
     idx: int = 0
     fr_idx: int = 0
     to_idx: int = 0
-    phases: list[int] = field(default_factory=list)
+    phases: list[int] = field(default_factory=lambda: [0]*3)
     zprim: list[list[list[float]]] = field(
         default_factory=lambda: np.zeros((3, 3, 2)).tolist())
     y: list[list[complex]] = field(
@@ -60,8 +51,8 @@ class BranchInfo:
 @dataclass
 class Bus:
     idx: int = 0
-    phases: list[int] = field(default_factory=list)
-    base_kv: float = 0.0
+    phases: list[int] = field(default_factory=lambda: [0]*3)
+    base_kv: float = field(default_factory=lambda: [0]*3)
     base_pq: float = field(default_factory=lambda: np.zeros((3, 2)).tolist())
     base_pv: float = field(default_factory=lambda: np.zeros((3, 2)).tolist())
     kv: float = 0.0
@@ -76,70 +67,52 @@ class BusInfo:
     buses: dict[Bus] = field(default_factory=dict)
 
 
-def convert_id(eqid: str) -> (str, str):
-    [bus, phase] = eqid.split('.', 1)
-    return (bus, phase)
+def index_info(
+        branch_info: BranchInfo, bus_info: BusInfo) -> (BranchInfo, BusInfo):
+    for i, bus in enumerate(bus_info.buses.values()):
+        bus.idx = i
+
+    for i, branch in enumerate(branch_info.branches.values()):
+        branch.idx = i
+        branch.fr_idx = bus_info.buses[branch.fr_bus].idx
+        branch.to_idx = bus_info.buses[branch.to_bus].idx
+
+    return (branch_info, bus_info)
 
 
-def index_info(branch: dict, bus: dict) -> Tuple[dict, dict]:
-    for i, name in enumerate(bus):
-        bus[name]["idx"] = i
-
-    for i, name in enumerate(branch):
-        branch[name]["idx"] = i
-        branch[name]["from"] = bus[branch[name]["fr_bus"]]["idx"]
-        branch[name]["to"] = bus[branch[name]["to_bus"]]["idx"]
-        y = branch[name]["y"]
-        del branch[name]["y"]
-        z = -1*np.linalg.pinv(y)
+def generate_zprim(branch_info: BranchInfo) -> BranchInfo:
+    for branch in branch_info.branches.values():
+        z = -1*np.linalg.pinv(branch.y)
         for idx, value in np.ndenumerate(z):
             row = idx[0]
             col = idx[1]
-            branch[name]["zprim"][row][col] = [value.real, value.imag]
+            branch.zprim[row][col] = [float(value.real), float(value.imag)]
+    return branch_info
 
-    return branch, bus
 
-
-def extract_base_voltages(bus: dict, voltages: VoltagesMagnitude) -> dict:
+def extract_base_kv(bus_info: BusInfo, voltages: VoltagesMagnitude) -> dict:
     for id, voltage in zip(voltages.ids, voltages.values):
-        name, phase = convert_id(id)
-
-        if name not in bus:
-            continue
-
+        name, phase = id.split(".", 1)
         phase = int(phase) - 1
-        bus[name]['base_kv'] = voltage/1000.0
-    return bus
 
-
-def extract_voltages(bus: dict, voltages: VoltagesMagnitude) -> dict:
-    for id, voltage in zip(voltages.ids, voltages.values):
-        name, phase = convert_id(id)
-
-        if name not in bus:
+        if name not in bus_info.buses:
             continue
 
-        bus[name]['kv'] = voltage/1000.0
-    return bus
+        bus_info.buses[name].base_kv[phase] = voltage/1000.0
+        bus_info.buses[name].phases[phase] = phase+1
+    return bus_info
 
 
-def update_ratios(bus: dict, branch: dict) -> dict:
-    for node in branch.values():
-        if "XFMR" == node["type"]:
-            src = node["fr_bus"]
-            dst = node["to_bus"]
-            v1 = bus[src]["kv"]
-            v2 = bus[dst]["kv"]
-            r = v1/v2
+def extract_kv(bus_info: BusInfo, voltages: VoltagesMagnitude) -> dict:
+    for id, voltage in zip(voltages.ids, voltages.values):
+        name, phase = id.split(".", 1)
+        phase = int(phase) - 1
 
-            print(src, dst, v1, v2, r)
+        if name not in bus_info.buses:
+            continue
 
-            if v1 < 0.3 or v2 < 0.3:
-                continue
-
-            bus[src]["tap_ratio"] = r
-
-    return bus
+        bus_info.buses[name].kv[phase] = voltage/1000.0
+    return bus_info
 
 
 def pack_voltages(voltages: dict, time: int) -> VoltagesMagnitude:
@@ -147,12 +120,9 @@ def pack_voltages(voltages: dict, time: int) -> VoltagesMagnitude:
     values = []
     for key, value in voltages.items():
         for phase, voltage in value.items():
-            if phase == 'A':
-                id = f"{key}.1"
-            if phase == 'B':
-                id = f"{key}.2"
-            if phase == 'C':
-                id = f"{key}.3"
+            if voltage == 0.0:
+                continue
+            id = f"{key}.{phase}"
             ids.append(id)
             values.append(voltage)
     return VoltagesMagnitude(ids=ids, values=values, time=time)
@@ -181,201 +151,123 @@ def extract_forecast(bus: dict, forecast) -> dict:
     return bus
 
 
-def extract_powers(bus: dict, real: PowersReal, imag: PowersImaginary) -> dict:
+def extract_powers_real(bus_info: BusInfo, real: PowersReal) -> BusInfo:
     for id, eq, power in zip(real.ids, real.equipment_ids, real.values):
-        name, phase = convert_id(id)
-
-        if name not in bus:
-            continue
-        [type, _] = eq.split('.')
+        name, phase = id.split(".", 1)
         phase = int(phase) - 1
-        if type == "PVSystem":
-            logger.debug(f"{id} : {power}")
-            bus[name]["eqid"] = eq
-            bus[name]["pv"][phase][0] = power*1000
-        else:
-            bus[name]["eqid"] = eq
-            bus[name]["pq"][phase][0] = -power*1000
 
+        if name not in bus_info.buses:
+            continue
+
+        bus_info.buses[name].pq[phase][0] += power*1000
+    return bus_info
+
+
+def extract_powers_imag(bus_info: BusInfo, imag: PowersImaginary) -> BusInfo:
     for id, eq, power in zip(imag.ids, imag.equipment_ids, imag.values):
-        name, phase = convert_id(id)
+        name, phase = id.split(".", 1)
+        phase = int(phase) - 1
 
-        if name not in bus:
+        if name not in bus_info.buses:
             continue
 
-        [type, _] = eq.split('.')
-        phase = int(phase) - 1
-        if type == "PVSystem":
-            bus[name]["eqid"] = eq
-            bus[name]["pv"][phase][1] = power*1000
-        else:
-            bus[name]["eqid"] = eq
-            bus[name]["pq"][phase][1] = -power*1000
-    return bus
+        bus_info.buses[name].pq[phase][1] += power*1000
+    return bus_info
 
 
-def extract_injection(bus: dict, powers: Injection) -> dict:
+def extract_injection(bus_info: BusInfo, powers: Injection) -> dict:
     real = powers.power_real
     imag = powers.power_imaginary
 
     for id, eq, power in zip(real.ids, real.equipment_ids, real.values):
-        name, phase = convert_id(id)
-
-        if name not in bus:
-            continue
-        if name.find('OPEN') != -1:
-            continue
-
-        [type, _] = eq.split('.')
+        name, phase = id.split(".", 1)
         phase = int(phase) - 1
-        if type == "PVSystem":
-            bus[name]["eqid"] = eq
-            bus[name]["pv"][phase][0] = power*1000
-            logger.debug(f"{eq}, {power}")
+
+        if name not in bus_info.buses:
+            continue
+
+        if "PVSystem" in eq:
+            bus_info.buses[name].base_pv[phase][0] -= power*1000
         else:
-            bus[name]["eqid"] = eq
-            bus[name]["pq"][phase][0] = -power*1000
+            bus_info.buses[name].base_pq[phase][0] += power*1000
 
     for id, eq, power in zip(imag.ids, imag.equipment_ids, imag.values):
-        name, phase = convert_id(id)
-
-        if name not in bus:
-            continue
-        if name.find('OPEN') != -1:
-            continue
-
-        [type, _] = eq.split('.')
+        name, phase = id.split(".", 1)
         phase = int(phase) - 1
-        if type == "PVSystem":
-            bus[name]["eqid"] = eq
-            bus[name]["pv"][phase][1] = power*1000
+
+        if name not in bus_info.buses:
+            continue
+
+        if "PVSystem" in eq:
+            bus_info.buses[name].base_pv[phase][1] -= power*1000
         else:
-            bus[name]["eqid"] = eq
-            bus[name]["pq"][phase][1] = -power*1000
-    return bus
+            bus_info.buses[name].base_pq[phase][1] += power*1000
+    return bus_info
 
 
-class SwitchInfo:
-    def __init__(self, name: str, from_bus: str, to_bus: str) -> None:
-        self.name = name
-        self.from_bus = from_bus
-        self.to_bus = to_bus
+def extract_admittance(
+        branch_info: BranchInfo, y: AdmittanceSparse) -> BranchInfo:
+    for src, dst, v in zip(
+            y.from_equipment, y.to_equipment, y.admittance_list):
+        src, row = src.split(".", 1)
+        row = int(row) - 1
+        dst, col = dst.split(".", 1)
+        col = int(col) - 1
+
+        if src == dst:
+            continue
+
+        key = f"{src}_{dst}"
+        rev_key = f"{dst}_{src}"
+        if key in branch_info.branches:
+            branch_info.branches[key].y[row][col] = complex(v[0], v[1])
+            branch_info.branches[key].phases[row] = row+1
+            branch_info.branches[key].phases[col] = col+1
+        elif rev_key in branch_info.branches:
+            branch_info.branches[rev_key].y[col][row] = complex(v[0], v[1])
+            branch_info.branches[rev_key].phases[row] = row+1
+            branch_info.branches[rev_key].phases[col] = col+1
+    return branch_info
 
 
-def extract_switches(incidences: Incidence) -> list[SwitchInfo]:
-    switches = []
-    from_eq = incidences.from_equipment
-    to_eq = incidences.to_equipment
-    ids = incidences.ids
-    for fr_eq, to_eq, eq_id in zip(from_eq, to_eq, ids):
-        if ("sw" in eq_id or "fuse" in eq_id) and "padswitch" not in eq_id:
-            if "." in fr_eq:
-                [fr_eq, _] = fr_eq.split('.', 1)
-            if "." in to_eq:
-                [to_eq, _] = to_eq.split('.', 1)
-            switches.append(
-                SwitchInfo(
-                    name=eq_id,
-                    from_bus=fr_eq,
-                    to_bus=to_eq))
-
-    return switches
-
-
-def extract_transformers(incidences: Incidence) -> (list[str], list[str]):
-    xfmrs = []
-    to_eq = incidences.to_equipment
-    fr_eq = incidences.from_equipment
-    ids = incidences.ids
-    for fr_eq, to_eq, eq_id in zip(fr_eq, to_eq, ids):
-        if "tr" in eq_id or "reg" in eq_id or "xfm" in eq_id:
-            print("XFMR: ", eq_id, fr_eq, to_eq)
-            if "." in to_eq:
-                [to_eq, _] = to_eq.split('.', 1)
-            if "." in fr_eq:
-                [fr_eq, _] = fr_eq.split('.', 1)
-            xfmrs.append(f"{fr_eq}_{to_eq}")
-    return xfmrs
-
-
-def generate_graph(topology: Topology) -> nx.Graph:
-    to_eq = topology.admittance.to_equipment
-    fr_eq = topology.admittance.from_equipment
+def generate_graph(inc: Incidence, slack_bus: str) -> nx.Graph:
     graph = nx.Graph()
-    for src, dst in zip(fr_eq, to_eq):
+    for src, dst, id in zip(inc.from_equipment, inc.to_equipment, inc.ids):
         if "OPEN" in src or "OPEN" in dst:
             continue
         if src == dst:
             continue
-        graph.add_edge(src, dst)
-    disconnected = list(nx.connected_components(graph))
-    for d in disconnected:
-        if any([b in d for b in topology.slack_bus]):
-            return d
+        if "." in src:
+            src, _ = src.split('.', 1)
+        if "." in dst:
+            dst, _ = dst.split('.', 1)
+        eq = "LINE"
+        if "sw" in id or "fuse" in id and "padswitch" not in id:
+            eq = "SWITCH"
+        if "tr" in id or "reg" in id or "xfm" in id:
+            eq = "XFMR"
+        graph.add_edge(src, dst, name=f"{src}_{dst}", tag=eq)
+
+    for c in nx.connected_components(graph):
+        if slack_bus in c:
+            return graph.subgraph(c).copy()
 
 
-def extract_info(topology: Topology) -> (dict, dict):
-    branch_info = {}
-    bus_info = {}
-    switches = extract_switches(topology.incidences)
-    xfmrs = extract_transformers(topology.incidences)
-    fr_buses = [switch.from_bus for switch in switches]
-    to_buses = [switch.to_bus for switch in switches]
-    from_equip = topology.admittance.from_equipment
-    to_equip = topology.admittance.to_equipment
-    admittance = topology.admittance.admittance_list
+def extract_info(topology: Topology) -> (BranchInfo, BusInfo):
+    branch_info = BranchInfo()
+    bus_info = BusInfo()
+    slack_bus, _ = topology.slack_bus[0].split(".", 1)
+    graph = generate_graph(topology.incidences, slack_bus)
 
-    for fr_eq, to_eq, y in zip(from_equip, to_equip, admittance):
-        type = "LINE"
-        [from_name, from_phase] = fr_eq.split('.')
-        [to_name, to_phase] = to_eq.split('.')
+    for u, v, a in graph.edges(data=True):
+        branch_info.branches[a["name"]] = Branch(
+            fr_bus=u, to_bus=v, tag=a["tag"])
+        bus_info.buses[u] = Bus()
+        bus_info.buses[v] = Bus()
 
-        forward_link = from_name in fr_buses and to_name in to_buses
-        reverse_link = to_name in fr_buses and from_name in to_buses
-        if forward_link or reverse_link:
-            type = "SWITCH"
-
-        if from_name == to_name:
-            continue
-
-        key = f"{from_name}_{to_name}"
-        key_back = f"{to_name}_{from_name}"
-
-        if key in xfmrs or key_back in xfmrs:
-            type = "XFMR"
-
-        if key not in branch_info and key_back not in branch_info:
-            branch_info[key] = init_branch()
-        elif key_back in branch_info:
-            continue
-
-        if from_name not in bus_info:
-            bus_info[from_name] = init_bus()
-
-        if to_name not in bus_info:
-            bus_info[to_name] = init_bus()
-
-        if from_phase not in branch_info[key]['phases']:
-            branch_info[key]['phases'].append(from_phase)
-
-        row = int(from_phase) - 1
-        col = int(to_phase) - 1
-        branch_info[key]["y"][row][col] = complex(y[0], y[1])
-
-        if from_phase not in branch_info[key]['phases']:
-            branch_info[key]['phases'].append(from_phase)
-
-        if from_phase not in bus_info[from_name]['phases']:
-            bus_info[from_name]['phases'].append(from_phase)
-
-        if to_phase not in bus_info[to_name]['phases']:
-            bus_info[to_name]['phases'].append(to_phase)
-
-        branch_info[key]['type'] = type
-        branch_info[key]['fr_bus'] = from_name.upper()
-        branch_info[key]['to_bus'] = to_name.upper()
-
-    base_v = topology.base_voltage_magnitudes
-    bus_info = extract_base_voltages(bus_info, base_v)
+    branch_info = extract_admittance(branch_info, topology.admittance)
+    branch_info = generate_zprim(branch_info)
+    bus_info = extract_base_kv(bus_info, topology.base_voltage_magnitudes)
+    bus_info = extract_injection(bus_info, topology.injections)
 
     return index_info(branch_info, bus_info)
