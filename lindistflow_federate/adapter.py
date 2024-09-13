@@ -3,6 +3,7 @@ import logging
 import networkx as nx
 from enum import IntEnum
 from typing import Tuple
+from dataclasses import dataclass, field
 from oedisi.types.data_types import (
     AdmittanceMatrix,
     AdmittanceSparse,
@@ -36,30 +37,48 @@ class Phase(IntEnum):
         return self.value
 
 
+@dataclass
+class Branch:
+    fr_bus: str
+    to_bus: str
+    tag: str
+    idx: int = 0
+    fr_idx: int = 0
+    to_idx: int = 0
+    phases: list[int] = field(default_factory=list)
+    zprim: list[list[list[float]]] = field(
+        default_factory=lambda: np.zeros((3, 3, 2)).tolist())
+    y: list[list[complex]] = field(
+        default_factory=lambda: np.zeros((3, 3), dtype=complex).tolist())
+
+
+@dataclass
+class BranchInfo:
+    branches: dict[Branch] = field(default_factory=dict)
+
+
+@dataclass
+class Bus:
+    idx: int = 0
+    phases: list[int] = field(default_factory=list)
+    base_kv: float = 0.0
+    base_pq: float = field(default_factory=lambda: np.zeros((3, 2)).tolist())
+    base_pv: float = field(default_factory=lambda: np.zeros((3, 2)).tolist())
+    kv: float = 0.0
+    pq: list[list[float]] = field(
+        default_factory=lambda: np.zeros((3, 2)).tolist())
+    pv: list[list[float]] = field(
+        default_factory=lambda: np.zeros((3, 2)).tolist())
+
+
+@dataclass
+class BusInfo:
+    buses: dict[Bus] = field(default_factory=dict)
+
+
 def convert_id(eqid: str) -> (str, str):
     [bus, phase] = eqid.split('.', 1)
     return (bus, phase)
-
-
-def init_branch() -> dict:
-    branch = {}
-    branch["fr_bus"] = ""
-    branch["to_bus"] = ""
-    branch["phases"] = []
-    branch["zprim"] = np.zeros((3, 3, 2)).tolist()
-    branch["y"] = np.zeros((3, 3), dtype=complex)
-    return branch
-
-
-def init_bus() -> dict:
-    bus = {}
-    bus["phases"] = []
-    bus["kv"] = 0.0
-    bus["base_kv"] = 0.0
-    bus["tap_ratio"] = 1.0
-    bus["pq"] = np.zeros((3, 2)).tolist()
-    bus["pv"] = np.zeros((3, 2)).tolist()
-    return bus
 
 
 def index_info(branch: dict, bus: dict) -> Tuple[dict, dict]:
