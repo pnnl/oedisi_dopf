@@ -11,14 +11,11 @@
         {"type": "VoltagesMagnitude", "port_id": "voltages_magnitude"},
         {"type": "Topology", "port_id": "topology"},
         {"type": "Injections", "port_id": "injections"},
-        {"type": "", "port_id": "pv_available"},
+        {"type": "MeasurementArray", "port_id": "available_power"},
         {"type": "", "port_id":"pv_forecast", "optional": true}
     ],
     "dynamic_outputs": [
         {"type": "ControlList", "port_id": "pv_set"},
-        {"type": "VoltagesMagnitude", "port_id": "opf_voltages_magnitude"},
-        {"type": "", "port_id": "delta_setpoint"},
-        {"type": "", "port_id": "forecast_curtail"},
-        {"type": "", "port_id": "real_curtail"}
+        {"type": "VoltagesMagnitude", "port_id": "opf_voltages_magnitude"}
     ]
 }

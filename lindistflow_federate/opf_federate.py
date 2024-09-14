@@ -15,6 +15,7 @@ from oedisi.types.data_types import (
 )
 import adapter
 import lindistflow
+from dataclasses import asdict
 from area import area_info, check_network_radiality
 import xarray as xr
 
@@ -94,10 +95,6 @@ class OPFFederate(object):
             self.inputs["voltages_magnitude"], "")
         self.sub.injections = self.fed.register_subscription(
             self.inputs["injections"], "")
-        self.sub.power_real = self.fed.register_subscription(
-            self.inputs["power_real"], "")
-        self.sub.power_imag = self.fed.register_subscription(
-            self.inputs["power_imag"], "")
         self.sub.available_power = self.fed.register_subscription(
             self.inputs["available_power"], "")
 
@@ -140,47 +137,30 @@ class OPFFederate(object):
             topology: Topology = Topology.parse_obj(self.sub.topology.json)
             branch_info, bus_info, slack_bus = adapter.extract_info(topology)
 
-            injections: Injection = Injection.parse_obj(topology.injections)
-            bus_info = adapter.extract_injection(bus_info, injections)
-
-            p = PowersReal.parse_obj(self.sub.power_real.json)
-            bus_info = adapter.extract_powers_real(bus_info, p)
-            for id, eid, v in zip(p.ids, p.equipment_ids, p.values):
-                logger.debug(id, eid, v)
-
-            q = PowersImaginary.parse_obj(self.sub.power_imag.json)
-            bus_info = adapter.extract_powers_imag(bus_info, q)
-            for id, eid, v in zip(q.ids, q.equipment_ids, q.values):
-                logger.debug(id, eid, v)
-
             injections = Injection.parse_obj(self.sub.injections.json)
-            p_inj = injections.power_real
-            for id, eid, v in zip(
-                    p_inj.ids, p_inj.equipment_ids, p_inj.values):
-                logger.debug(id, eid, v)
+            bus_info = adapter.extract_injection(bus_info, injections)
 
             voltages_mag = VoltagesMagnitude.parse_obj(
                 self.sub.voltages_mag.json)
             bus_info = adapter.extract_voltages(bus_info, voltages_mag)
 
             time = voltages_mag.time
-            logger.debug("Timestep: ", time)
+            logger.debug(f"Timestep: {time}")
 
             with open("bus_info.json", "w") as outfile:
-                outfile.write(json.dumps(bus_info))
+                outfile.write(json.dumps(asdict(bus_info)))
 
             with open("branch_info.json", "w") as outfile:
-                outfile.write(json.dumps(branch_info))
+                outfile.write(json.dumps(asdict(branch_info)))
 
-            assert (check_network_radiality(branch_info, bus_info))
+            assert (adapter.check_radiality(branch_info, bus_info))
 
-            pv_available = MeasurementArray.parse_obj(
-                self.sub.available_pv.json)
-            for id, v in zip(
-                    pv_available.ids, p_inj.values):
-                logger.debug(id,  v)
+            p_inj = MeasurementArray.parse_obj(
+                self.sub.available_power.json)
+            for id, v in zip(p_inj.ids, p_inj.values):
+                logger.debug(f"{id},  {v}")
 
-            voltages, power_flow, control, conversion = lindistflow.optimal_power_flow(
+            voltages, power_flow, control, conversion = lindistflow.solve(
                 branch_info, bus_info, slack_bus, self.static.control_type, self.static.pf_flag)
             real_setpts = self.get_set_points(control, bus_info, conversion)
 

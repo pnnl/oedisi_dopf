@@ -53,9 +53,12 @@ class Bus:
     idx: int = 0
     tags: list[str] = field(default_factory=list)
     phases: list[int] = field(default_factory=lambda: [0]*3)
-    base_kv: float = field(default_factory=lambda: [0]*3)
-    base_pq: float = field(default_factory=lambda: np.zeros((3, 2)).tolist())
-    base_pv: float = field(default_factory=lambda: np.zeros((3, 2)).tolist())
+    base_kv: float = 0.0
+    tap_ratio: float = 0.0
+    base_pq: list[list[float]] = field(
+        default_factory=lambda: np.zeros((3, 2)).tolist())
+    base_pv: list[list[float]] = field(
+        default_factory=lambda: np.zeros((3, 2)).tolist())
     kv: float = 0.0
     pq: list[list[float]] = field(
         default_factory=lambda: np.zeros((3, 2)).tolist())
@@ -94,6 +97,7 @@ def index_info(
 def generate_zprim(branch_info: BranchInfo) -> BranchInfo:
     for branch in branch_info.branches.values():
         z = -1*np.linalg.pinv(branch.y)
+        branch.y = []
         for idx, value in np.ndenumerate(z):
             row = idx[0]
             col = idx[1]
@@ -101,7 +105,8 @@ def generate_zprim(branch_info: BranchInfo) -> BranchInfo:
     return branch_info
 
 
-def extract_base_kv(bus_info: BusInfo, voltages: VoltagesMagnitude) -> dict:
+def extract_base_voltages(
+        bus_info: BusInfo, voltages: VoltagesMagnitude) -> dict:
     for id, voltage in zip(voltages.ids, voltages.values):
         name, phase = id.split(".", 1)
         phase = int(phase) - 1
@@ -109,12 +114,12 @@ def extract_base_kv(bus_info: BusInfo, voltages: VoltagesMagnitude) -> dict:
         if name not in bus_info.buses:
             continue
 
-        bus_info.buses[name].base_kv[phase] = voltage/1000.0
+        bus_info.buses[name].base_kv = voltage/1000.0
         bus_info.buses[name].phases[phase] = phase+1
     return bus_info
 
 
-def extract_kv(bus_info: BusInfo, voltages: VoltagesMagnitude) -> dict:
+def extract_voltages(bus_info: BusInfo, voltages: VoltagesMagnitude) -> dict:
     for id, voltage in zip(voltages.ids, voltages.values):
         name, phase = id.split(".", 1)
         phase = int(phase) - 1
@@ -122,7 +127,7 @@ def extract_kv(bus_info: BusInfo, voltages: VoltagesMagnitude) -> dict:
         if name not in bus_info.buses:
             continue
 
-        bus_info.buses[name].kv[phase] = voltage/1000.0
+        bus_info.buses[name].kv = voltage/1000.0
     return bus_info
 
 
@@ -186,7 +191,7 @@ def extract_powers_imag(bus_info: BusInfo, imag: PowersImaginary) -> BusInfo:
     return bus_info
 
 
-def extract_injection(bus_info: BusInfo, powers: Injection) -> dict:
+def extract_base_injection(bus_info: BusInfo, powers: Injection) -> dict:
     real = powers.power_real
     imag = powers.power_imaginary
 
@@ -197,7 +202,7 @@ def extract_injection(bus_info: BusInfo, powers: Injection) -> dict:
         if name not in bus_info.buses:
             continue
 
-        bus_info.buses[name].tag.append(eq)
+        bus_info.buses[name].tags.append(eq)
         if "PVSystem" in eq:
             bus_info.buses[name].base_pv[phase][0] -= power*1000
         else:
@@ -214,6 +219,37 @@ def extract_injection(bus_info: BusInfo, powers: Injection) -> dict:
             bus_info.buses[name].base_pv[phase][1] -= power*1000
         else:
             bus_info.buses[name].base_pq[phase][1] += power*1000
+    return bus_info
+
+
+def extract_injection(bus_info: BusInfo, powers: Injection) -> dict:
+    real = powers.power_real
+    imag = powers.power_imaginary
+
+    for id, eq, power in zip(real.ids, real.equipment_ids, real.values):
+        name, phase = id.split(".", 1)
+        phase = int(phase) - 1
+
+        if name not in bus_info.buses:
+            continue
+
+        bus_info.buses[name].tags.append(eq)
+        if "PVSystem" in eq:
+            bus_info.buses[name].pv[phase][0] -= power*1000
+        else:
+            bus_info.buses[name].pq[phase][0] += power*1000
+
+    for id, eq, power in zip(imag.ids, imag.equipment_ids, imag.values):
+        name, phase = id.split(".", 1)
+        phase = int(phase) - 1
+
+        if name not in bus_info.buses:
+            continue
+
+        if "PVSystem" in eq:
+            bus_info.buses[name].pv[phase][1] -= power*1000
+        else:
+            bus_info.buses[name].pq[phase][1] += power*1000
     return bus_info
 
 
@@ -279,7 +315,9 @@ def extract_info(topology: Topology) -> (BranchInfo, BusInfo, str):
 
     branch_info = extract_admittance(branch_info, topology.admittance)
     branch_info = generate_zprim(branch_info)
-    bus_info = extract_base_kv(bus_info, topology.base_voltage_magnitudes)
-    bus_info = extract_injection(bus_info, topology.injections)
+    bus_info = extract_base_voltages(
+        bus_info, topology.base_voltage_magnitudes)
+    bus_info = extract_base_injection(bus_info, topology.injections)
+    branch_info, bus_info = index_info(branch_info, bus_info)
 
-    return index_info(branch_info, bus_info, slack_bus)
+    return (branch_info, bus_info, slack_bus)

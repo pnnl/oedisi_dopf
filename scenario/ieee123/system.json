@@ -92,18 +92,6 @@
         },
         {
             "source": "feeder",
-            "source_port": "power_real",
-            "target": "lindistflow",
-            "target_port": "power_real"
-        },
-        {
-            "source": "feeder",
-            "source_port": "power_imag",
-            "target": "lindistflow",
-            "target_port": "power_imag"
-        },
-        {
-            "source": "feeder",
             "source_port": "available_power",
             "target": "lindistflow",
             "target_port": "available_power"
