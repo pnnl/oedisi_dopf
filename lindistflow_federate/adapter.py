@@ -1,5 +1,8 @@
+import copy
+from pprint import pprint
 import numpy as np
 import logging
+import networkx as nx
 from enum import IntEnum
 from typing import Tuple
 from oedisi.types.data_types import (
@@ -276,6 +279,89 @@ def extract_transformers(incidences: Incidence) -> (list[str], list[str]):
                 [fr_eq, _] = fr_eq.split('.', 1)
             xfmrs.append(f"{fr_eq}_{to_eq}")
     return xfmrs
+
+
+def generate_graph(inc: Incidence, slack_bus: str) -> nx.Graph:
+    graph = nx.Graph()
+    for src, dst, id in zip(inc.from_equipment, inc.to_equipment, inc.ids):
+        if "OPEN" in src or "OPEN" in dst:
+            continue
+        if src == dst:
+            continue
+        if "." in src:
+            src, _ = src.split('.', 1)
+        if "." in dst:
+            dst, _ = dst.split('.', 1)
+        eq = "LINE"
+        if ("sw" in id or "fuse" in id) and "padswitch" not in id:
+            eq = "SWITCH"
+        if "tr" in id or "reg" in id or "xfm" in id:
+            eq = "XFMR"
+        graph.add_edge(src, dst, name=f"{src}_{dst}", tag=eq, id=f"{id}")
+
+    for c in nx.connected_components(graph):
+        if slack_bus in c:
+            return graph.subgraph(c).copy()
+
+
+def disconnect_areas(graph: nx.Graph, switches) -> list[nx.Graph]:
+    graph.remove_edges_from(switches)
+
+    areas = []
+    for c in nx.connected_components(graph):
+        areas.append(graph.subgraph(c).copy())
+    return areas
+
+
+def get_switches(graph: nx.Graph):
+    switches = []
+    for u, v, a in graph.edges(data=True):
+        if "SWITCH" == a["tag"]:
+            switches.append((u, v, a))
+    return switches
+
+
+def area_dissconnects(graph: nx.Graph):
+    switches = get_switches(graph)
+    areas = disconnect_areas(graph, switches)
+    area_cnt = [area.number_of_nodes() for area in areas]
+    n_min = [area.number_of_nodes() for area in areas]
+    n_min.sort(reverse=True)
+    n_min = min(n_min[0:5])
+    z_area = zip(area_cnt, areas)
+    z_area = sorted(z_area, key=lambda v: v[0])
+
+    pprint(switches)
+    closed = []
+    cnt = 0
+    for n, area in z_area:
+        print(cnt, n, area)
+        if n < 3 or n < n_min or cnt > 5:
+            for u, v, a in switches:
+                if area.has_node(u) or area.has_node(v):
+                    closed.append((u, v, a))
+            continue
+        cnt += 1
+
+    open = [(u, v, a) for u, v, a in switches if (u, v, a) not in closed]
+    pprint(open)
+    return open
+
+
+def reconnect_area_switches(areas: list[nx.Graph], switches):
+    for area in areas:
+        for u, v, a in switches:
+            if area.has_node(u) or area.has_node(v):
+                area.add_edge(u, v, **a)
+    return areas
+
+
+def get_area_source(graph: nx.Graph, slack_bus: str, switches):
+    paths = {}
+    for u, v, a in switches:
+        paths[len(nx.shortest_path(graph, slack_bus, u))] = (u, v, a)
+    source = min(paths, key=paths.get)
+    return paths[source]
 
 
 def extract_info(topology: Topology) -> (dict, dict):
