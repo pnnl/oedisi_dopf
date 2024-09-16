@@ -59,9 +59,8 @@ def power_balance(A, b, k_frm, k_to, counteq, col, val):
 
 def convert_pu(
         branch_info: BranchInfo,
-        bus_info: BusInfo,
-        base_s: int) -> (BranchInfo, BusInfo):
-    pq_pu = 1 / base_s
+        bus_info: BusInfo) -> (BranchInfo, BusInfo, float):
+    pq_pu = 1 / (100*1e6)
     bus_pu = copy.deepcopy(bus_info)
     branch_pu = copy.deepcopy(branch_info)
 
@@ -75,11 +74,11 @@ def convert_pu(
         else:
             base_kv = bus_pu.buses[v.fr_bus].kv
 
-        z_pu = 1 / (base_kv**2 / base_s)
+        z_pu = 1 / (base_kv**2 / 100)
         branch_pu.branches[k].zprim = [[[e * z_pu for e in l1]
                                         for l1 in l2] for l2 in v.zprim]
 
-    return (branch_pu, bus_pu)
+    return (branch_pu, bus_pu, pq_pu)
 
 
 def voltage_cons_pri(A, b, p, frm, to, counteq, pii, qii, pij, qij, pik, qik, nbus_ABC, nbus_s1s2, nbranch_ABC, baseZ):
@@ -142,10 +141,10 @@ def solve(branch_info: dict, bus_info: dict, slack_bus: str, control: ControlTyp
 
 def optimal_power_flow(branch_info: dict, bus_info: dict, source_bus: str, control: ControlType, pf_flag: bool):
     # System's base definition
-    BASE_S = 100  # MVA
+    BASE_S = 1  # MVA
     S_CAPACITY = 1.2
     PRIMARY_V = 0.12
-    branch_pu, bus_pu = convert_pu(branch_info, bus_info, BASE_S)
+    branch_pu, bus_pu, kw_converter = convert_pu(branch_info, bus_info)
     bus_pu = update_ratios(branch_pu, bus_pu)
 
     with open("bus_info_pu.json", "w") as outfile:
@@ -159,7 +158,7 @@ def optimal_power_flow(branch_info: dict, bus_info: dict, source_bus: str, contr
 
     slack_v = max([b.base_kv for b in buses.values()])
     basekV = buses[source_bus].base_kv
-    baseZ = basekV ** 2 / 100
+    baseZ = 1.0
     SOURCE_V = [slack_v/basekV]*3
 
     # Find the ABC phase and s1s2 phase triplex line and bus numbers
@@ -801,7 +800,5 @@ def optimal_power_flow(branch_info: dict, bus_info: dict, source_bus: str, contr
                                                  val_bus.idx + control_variable_idx_start]
         opf_control_variable[key]['C'] = x.value[nbus_ABC *
                                                  2 + val_bus.idx + control_variable_idx_start]
-
-    kw_converter = 1 / BASE_S / 1000
 
     return bus_voltage, line_flow, opf_control_variable, kw_converter
