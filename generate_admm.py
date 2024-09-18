@@ -1,13 +1,3 @@
-import json
-import os
-import sys
-import copy
-import networkx as nx
-from oedisi.componentframework.system_configuration import (
-    WiringDiagram, Component, Link
-)
-from oedisi.types.data_types import Topology
-from pprint import pprint
 from lindistflow_federate.adapter import (
     generate_graph,
     area_dissconnects,
@@ -15,6 +5,17 @@ from lindistflow_federate.adapter import (
     reconnect_area_switches,
     get_area_source
 )
+from pprint import pprint
+from oedisi.types.data_types import Topology
+from oedisi.componentframework.system_configuration import (
+    WiringDiagram, Component, Link
+)
+import networkx as nx
+import copy
+import os
+import json
+import sys
+
 
 ROOT = os.getcwd()
 OUTPUTS = f"{ROOT}/outputs"

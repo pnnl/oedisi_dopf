@@ -272,7 +272,6 @@ def extract_transformers(incidences: Incidence) -> (list[str], list[str]):
     ids = incidences.ids
     for fr_eq, to_eq, eq_id in zip(fr_eq, to_eq, ids):
         if "tr" in eq_id or "reg" in eq_id or "xfm" in eq_id:
-            print("XFMR: ", eq_id, fr_eq, to_eq)
             if "." in to_eq:
                 [to_eq, _] = to_eq.split('.', 1)
             if "." in fr_eq:
@@ -322,21 +321,20 @@ def get_switches(graph: nx.Graph):
 
 
 def area_dissconnects(graph: nx.Graph):
+    n_max = 5
     switches = get_switches(graph)
     areas = disconnect_areas(graph, switches)
     area_cnt = [area.number_of_nodes() for area in areas]
-    n_min = [area.number_of_nodes() for area in areas]
-    n_min.sort(reverse=True)
-    n_min = min(n_min[0:5])
+    min_n = [area.number_of_nodes() for area in areas]
+    min_n.sort(reverse=True)
+    min_n = min(min_n[0:n_max])
     z_area = zip(area_cnt, areas)
     z_area = sorted(z_area, key=lambda v: v[0])
 
-    pprint(switches)
     closed = []
     cnt = 0
     for n, area in z_area:
-        print(cnt, n, area)
-        if n < 3 or n < n_min or cnt > 5:
+        if n < 2 or n < min_n or cnt > n_max:
             for u, v, a in switches:
                 if area.has_node(u) or area.has_node(v):
                     closed.append((u, v, a))
@@ -344,7 +342,6 @@ def area_dissconnects(graph: nx.Graph):
         cnt += 1
 
     open = [(u, v, a) for u, v, a in switches if (u, v, a) not in closed]
-    pprint(open)
     return open
 
 
