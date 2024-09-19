@@ -130,16 +130,16 @@ def update_ratios(branch_info: BranchInfo, bus_info: BusInfo) -> BusInfo:
     return bus_info
 
 
-def solve(branch_info: dict, bus_info: dict, slack_bus: str, control: ControlType, pf_flag: bool):
+def solve(branch_info: dict, bus_info: dict, slack_bus: str, mode: str, relaxed: bool):
     try:
-        voltages, power_flow, control, conversion = optimal_power_flow(
-            branch_info, bus_info, slack_bus, control, pf_flag)
+        return optimal_power_flow(
+            branch_info, bus_info, slack_bus, mode, relaxed)
     except:
-        voltages, power_flow, control, conversion = optimal_power_flow(
-            branch_info, bus_info, slack_bus, control, True)
+        return optimal_power_flow(
+            branch_info, bus_info, slack_bus, mode, True)
 
 
-def optimal_power_flow(branch_info: dict, bus_info: dict, source_bus: str, control: ControlType, pf_flag: bool):
+def optimal_power_flow(branch_info: dict, bus_info: dict, slack_bus: str, mode: str, relaxed: bool):
     # System's base definition
     BASE_S = 1  # MVA
     S_CAPACITY = 1.2
@@ -157,7 +157,7 @@ def optimal_power_flow(branch_info: dict, bus_info: dict, source_bus: str, contr
     buses = bus_pu.buses
 
     slack_v = max([b.base_kv for b in buses.values()])
-    basekV = buses[source_bus].base_kv
+    basekV = buses[slack_bus].base_kv
     baseZ = 1.0
     SOURCE_V = [slack_v/basekV]*3
 
@@ -223,10 +223,10 @@ def optimal_power_flow(branch_info: dict, bus_info: dict, source_bus: str, contr
     # Linear Programming Cost Vector:
     # for k in range(nbus_ABC  + nbus_s1s2):
 
-    if control is ControlType.WATT:
+    if mode == "real":
         for k in range(n_bus):
             q_obj_vector[state_variable_number + k] = -1  # DER max objective
-    elif control is ControlType.VAR:
+    elif mode == "imag":
         for k in range(n_bus):
             q_obj_vector[n_Qdg + k] = 0  # Just Voltage regulation
             # q_obj_vector[n_Qdg + k] = -1  # Just Voltage regulation
@@ -238,7 +238,7 @@ def optimal_power_flow(branch_info: dict, bus_info: dict, source_bus: str, contr
 
     counteq = 0
     for keyb, val_bus in buses.items():
-        if keyb == source_bus:
+        if keyb == slack_bus:
             continue
 
         k_frm_3p = []
@@ -478,7 +478,7 @@ def optimal_power_flow(branch_info: dict, bus_info: dict, source_bus: str, contr
 
     # Constraint 3: Substation voltage definition
     # V_substation = V_source
-    source_bus_idx = buses[source_bus].idx
+    source_bus_idx = buses[slack_bus].idx
     A_eq[counteq, source_bus_idx] = 1
     b_eq[counteq] = (SOURCE_V[0]) ** 2
     counteq += 1
@@ -496,10 +496,10 @@ def optimal_power_flow(branch_info: dict, bus_info: dict, source_bus: str, contr
     # print("Start: Injection Constraints")
 
     # P_dg control:
-    if control is ControlType.WATT:
+    if mode == "real":
         DG_up_lim = np.zeros((n_bus, 1))
         for keyb, val_bus in buses.items():
-            if keyb == source_bus:
+            if keyb == slack_bus:
                 continue
 
             # Real power injection at a bus
@@ -568,10 +568,10 @@ def optimal_power_flow(branch_info: dict, bus_info: dict, source_bus: str, contr
                 DG_up_lim[nbus_ABC * 3 + val_bus.idx
                           ] = val_bus.pv[0] * BASE_S
 
-    elif control is ControlType.VAR:
+    elif mode == "imag":
         DG_up_lim = np.zeros((n_bus, 1))
         for keyb, val_bus in buses.items():
-            if keyb == source_bus:
+            if keyb == slack_bus:
                 continue
 
             # Real power injection at a bus
@@ -652,7 +652,7 @@ def optimal_power_flow(branch_info: dict, bus_info: dict, source_bus: str, contr
 
     # Constraints for all bound within Maximum Capacity values
     # Only P_dg control Variable:
-    if control is ControlType.WATT:
+    if mode == "real":
         for k in range(n_bus):
             A_ineq[countineq, state_variable_number + k] = 1
             b_ineq[countineq] = DG_up_lim[k, 0]
@@ -664,7 +664,7 @@ def optimal_power_flow(branch_info: dict, bus_info: dict, source_bus: str, contr
             countineq += 1
 
     # Only Q_dg control Variable:
-    elif control is ControlType.VAR:
+    elif mode == "imag":
         for k in range(n_bus):
             A_ineq[countineq, n_Qdg + k] = 1
             b_ineq[countineq] = DG_up_lim[k, 0]
@@ -679,7 +679,7 @@ def optimal_power_flow(branch_info: dict, bus_info: dict, source_bus: str, contr
     # print("Formulating voltage limit constraints")
     v_idxs = list(set(v_lim))
     # # Does the vmin make sense here?
-    if pf_flag is True:
+    if relaxed is True:
         vmax = 1.5
         vmin = 0.1
     else:
@@ -734,13 +734,13 @@ def optimal_power_flow(branch_info: dict, bus_info: dict, source_bus: str, contr
     line_flow = {}
     n_flow_ABC = (nbus_ABC * 3 + nbus_s1s2) + (nbus_ABC * 6 + nbus_s1s2 * 2)
     for k in range(n_flow_ABC, n_flow_ABC + nbranch_ABC):
-        line_flow[name[i]] = {}
-        line_flow[name[i]]['A'] = [x.value[k] * mul * 1000,
-                                   x.value[k + nbranch_ABC * 3] * mul * 1000]
-        line_flow[name[i]]['B'] = [x.value[k + nbranch_ABC] *
-                                   mul * 1000, x.value[k + nbranch_ABC * 4] * mul * 1000]
-        line_flow[name[i]]['C'] = [x.value[k + nbranch_ABC * 2] * mul * 1000,
-                                   x.value[k + nbranch_ABC * 5] * mul * 1000]
+        line_flow[name[i]] = []
+        line_flow[name[i]].append([x.value[k] * mul * 1000,
+                                   x.value[k + nbranch_ABC * 3] * mul * 1000])
+        line_flow[name[i]].append([x.value[k + nbranch_ABC] *
+                                   mul * 1000, x.value[k + nbranch_ABC * 4] * mul * 1000])
+        line_flow[name[i]].append([x.value[k + nbranch_ABC * 2] * mul * 1000,
+                                   x.value[k + nbranch_ABC * 5] * mul * 1000])
         i += 1
 
     n_flow_s1s2 = (nbus_ABC*3 + nbus_s1s2) + \
@@ -771,9 +771,9 @@ def optimal_power_flow(branch_info: dict, bus_info: dict, source_bus: str, contr
             abs(x.value[nbus_ABC * 2 + val_bus.idx]))
         i += 1
 
-    if control is ControlType.WATT:
+    if mode == "real":
         control_variable_idx_start = state_variable_number
-    elif control is ControlType.VAR:
+    elif mode == "imag":
         control_variable_idx_start = n_Qdg
 
     generation_output = np.zeros((nbus_ABC, 3))
@@ -793,12 +793,12 @@ def optimal_power_flow(branch_info: dict, bus_info: dict, source_bus: str, contr
 
     opf_control_variable = {}
     for key, val_bus in buses.items():
-        opf_control_variable[key] = {}
-        opf_control_variable[key]['A'] = x.value[val_bus.idx +
-                                                 control_variable_idx_start]
-        opf_control_variable[key]['B'] = x.value[nbus_ABC +
-                                                 val_bus.idx + control_variable_idx_start]
-        opf_control_variable[key]['C'] = x.value[nbus_ABC *
-                                                 2 + val_bus.idx + control_variable_idx_start]
+        opf_control_variable[key] = []
+        opf_control_variable[key].append(x.value[val_bus.idx +
+                                                 control_variable_idx_start])
+        opf_control_variable[key].append(x.value[nbus_ABC +
+                                                 val_bus.idx + control_variable_idx_start])
+        opf_control_variable[key].append(x.value[nbus_ABC *
+                                                 2 + val_bus.idx + control_variable_idx_start])
 
     return bus_voltage, line_flow, opf_control_variable, kw_converter

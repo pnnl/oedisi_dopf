@@ -61,13 +61,14 @@ class FeederConfig(BaseModel):
     user_uploads_model: bool = False
     profile_location: str
     opendss_location: str
-    existing_feeder_file: Optional[str] = None
+    feeder_file: Optional[str] = None
     sensor_location: Optional[str] = None
     start_date: str
     number_of_timesteps: int
     run_freq_sec: float = 15 * 60
     start_time_index: int = 0
     topology_output: str = "topology.json"
+    buscoords_output: str = "BusCoords.dat"
     use_sparse_admittance: bool = False
     tap_setting: Optional[int] = None
 
@@ -113,6 +114,8 @@ class FeederSimulator(object):
         self._sensor_location = config.sensor_location
         self._use_smartds = config.use_smartds
         self._user_uploads_model = config.user_uploads_model
+        self._user_uploads_model = config.user_uploads_model
+        self._buscoords_output = config.buscoords_output
         self._inverter_to_pvsystems = {}
         self._pvsystem_to_inverter = {}
         self._inverters = set()
@@ -130,7 +133,7 @@ class FeederSimulator(object):
         self.tap_setting = config.tap_setting
 
         self._simulation_time_step = "15m"
-        if config.existing_feeder_file is None:
+        if not os.path.exists(f"./{config.feeder_file}"):
             if self._use_smartds:
                 self._feeder_file = os.path.join("opendss", "Master.dss")
                 self.download_data(
@@ -142,7 +145,7 @@ class FeederSimulator(object):
                 # User should have uploaded model using endpoint
                 raise Exception("Set existing_feeder_file when uploading data")
         else:
-            self._feeder_file = config.existing_feeder_file
+            self._feeder_file = config.feeder_file
 
         self.load_feeder()
 
@@ -310,6 +313,8 @@ class FeederSimulator(object):
         dss.Basic.LegacyModels(True)
         dss.Text.Command("clear")
         dss.Text.Command("redirect " + self._feeder_file)
+        os.system(f"cp Buscoords.dat {self._buscoords_output}")
+
         result = dss.Text.Result()
         if not result == "":
             raise ValueError("Feeder not loaded: " + result)
@@ -748,16 +753,20 @@ class FeederSimulator(object):
             dss.Text.Command(
                 f"{inverter}.vvc_curve1={vvc_curve.split('.')[1]}")
             dss.Text.Command(
-                f"{inverter}.deltaQ_factor={inv_control.vvcontrol.deltaq_factor}"
+                f"{inverter}.deltaQ_factor={
+                    inv_control.vvcontrol.deltaq_factor}"
             )
             dss.Text.Command(
-                f"{inverter}.VarChangeTolerance={inv_control.vvcontrol.varchangetolerance}"
+                f"{inverter}.VarChangeTolerance={
+                    inv_control.vvcontrol.varchangetolerance}"
             )
             dss.Text.Command(
-                f"{inverter}.VoltageChangeTolerance={inv_control.vvcontrol.voltagechangetolerance}"
+                f"{inverter}.VoltageChangeTolerance={
+                    inv_control.vvcontrol.voltagechangetolerance}"
             )
             dss.Text.Command(
-                f"{inverter}.VV_RefReactivePower={inv_control.vvcontrol.vv_refreactivepower}"
+                f"{inverter}.VV_RefReactivePower={
+                    inv_control.vvcontrol.vv_refreactivepower}"
             )
         if inv_control.vwcontrol is not None:
             vw_curve = self.create_xy_curve(
@@ -767,7 +776,8 @@ class FeederSimulator(object):
             dss.Text.Command(
                 f"{inverter}.voltwatt_curve={vw_curve.split('.')[1]}")
             dss.Text.Command(
-                f"{inverter}.deltaP_factor={inv_control.vwcontrol.deltap_factor}"
+                f"{inverter}.deltaP_factor={
+                    inv_control.vwcontrol.deltap_factor}"
             )
         if inv_control.mode == InverterControlMode.voltvar_voltwatt:
             dss.Text.Command(f"{inverter}.CombiMode = VV_VW")
@@ -882,7 +892,8 @@ class FeederSimulator(object):
                 names = list(dict.fromkeys(bus_names))
                 if len(names) != 2:
                     logging.info(
-                        f"Line {line} has {len(names)} terminals, skipping in incidence matrix"
+                        f"Line {line} has {
+                            len(names)} terminals, skipping in incidence matrix"
                     )
                     continue
             from_bus, to_bus = names
@@ -898,7 +909,8 @@ class FeederSimulator(object):
                 names = list(dict.fromkeys(bus_names))
                 if len(names) != 2:
                     logging.info(
-                        f"Transformer {transformer} has {len(names)} terminals, skipping in incidence matrix"
+                        f"Transformer {transformer} has {
+                            len(names)} terminals, skipping in incidence matrix"
                     )
                     continue
             from_bus, to_bus = names

@@ -8,20 +8,43 @@ from oedisi.types.data_types import (
     Command,
     PowersImaginary,
     PowersReal,
+    PowersMagnitude,
+    PowersAngle,
     Injection,
     Topology,
+    VoltagesReal,
+    VoltagesImaginary,
     VoltagesMagnitude,
+    VoltagesAngle,
     MeasurementArray,
+    EquipmentNodeArray
 )
 import adapter
 import lindistflow
 from dataclasses import asdict
 from area import area_info, check_network_radiality
 import xarray as xr
+from pprint import pprint
+import numpy as np
 
 logger = logging.getLogger(__name__)
 logger.addHandler(logging.StreamHandler())
 logger.setLevel(logging.DEBUG)
+
+
+def eqarray_to_xarray(eq: EquipmentNodeArray):
+    return xr.DataArray(
+        eq.values,
+        dims=("eqnode",),
+        coords={
+            "equipment_ids": ("eqnode", eq.equipment_ids),
+            "ids": ("eqnode", eq.ids),
+        },
+    )
+
+
+def measurement_to_xarray(eq: MeasurementArray):
+    return xr.DataArray(eq.values, coords={"ids": eq.ids})
 
 
 def xarray_to_dict(data):
@@ -30,15 +53,49 @@ def xarray_to_dict(data):
     return {"values": list(data.data), **coords}
 
 
+def xarray_to_powers_cart(data, **kwargs):
+    """Conveniently turn xarray into PowersReal and PowersImaginary."""
+    real = PowersReal(**xarray_to_dict(data.real), **kwargs)
+    imag = PowersImaginary(**xarray_to_dict(data.imag), **kwargs)
+    return real, imag
+
+
+def xarray_to_voltages_cart(data, **kwargs):
+    """Conveniently turn xarray into PowersReal and PowersImaginary."""
+    real = VoltagesReal(**xarray_to_dict(data.real), **kwargs)
+    imag = VoltagesImaginary(**xarray_to_dict(data.imag), **kwargs)
+    return real, imag
+
+
+def xarray_to_powers_pol(data, **kwargs):
+    """Conveniently turn xarray into PowersReal and PowersImaginary."""
+    mag = PowersMagnitude(**xarray_to_dict(np.abs(data)), **kwargs)
+    ang = PowersAngle(
+        **xarray_to_dict(np.arctan2(data.imag, data.real)), **kwargs)
+    return mag, ang
+
+
+def xarray_to_voltages_pol(data, **kwargs):
+    """Conveniently turn xarray into PowersReal and PowersImaginary."""
+    mag = VoltagesMagnitude(**xarray_to_dict(np.abs(data)), **kwargs)
+    ang = VoltagesAngle(
+        **xarray_to_dict(np.arctan2(data.imag, data.real)), **kwargs)
+    return mag, ang
+
+
 class StaticConfig(object):
     name: str
     deltat: float
-    control_type: lindistflow.ControlType
-    pf_flag: bool
+    control_type: str
+    relaxed: bool
 
 
 class Subscriptions(object):
-    voltages_mag: VoltagesMagnitude
+    powers_real: PowersReal
+    powers_imag: PowersImaginary
+    voltages_real: VoltagesReal
+    voltages_imag: VoltagesImaginary
+    available_power: PowersReal
     injections: Injection
     topology: Topology
     pv_forecast: list
@@ -72,9 +129,8 @@ class OPFFederate(object):
 
         self.static.name = config["name"]
         self.static.deltat = config["deltat"]
-        self.static.control_type = lindistflow.ControlType(
-            config["control_type"])
-        self.static.pf_flag = config["pf_flag"]
+        self.static.control_type = config["control_type"]
+        self.static.relaxed = config["relaxed"]
 
     def initilize(self) -> None:
         self.info = h.helicsCreateFederateInfo()
@@ -91,33 +147,45 @@ class OPFFederate(object):
     def register_subscription(self) -> None:
         self.sub.topology = self.fed.register_subscription(
             self.inputs["topology"], "")
-        self.sub.voltages_mag = self.fed.register_subscription(
-            self.inputs["voltages_magnitude"], "")
+        self.sub.powers_imag = self.fed.register_subscription(
+            self.inputs["powers_imag"], "")
+        self.sub.powers_real = self.fed.register_subscription(
+            self.inputs["powers_real"], "")
+        self.sub.voltages_imag = self.fed.register_subscription(
+            self.inputs["voltages_imag"], "")
+        self.sub.voltages_real = self.fed.register_subscription(
+            self.inputs["voltages_real"], "")
         self.sub.injections = self.fed.register_subscription(
             self.inputs["injections"], "")
         self.sub.available_power = self.fed.register_subscription(
             self.inputs["available_power"], "")
 
     def register_publication(self) -> None:
-        self.pub_commands = self.fed.register_publication(
-            "change_commands", h.HELICS_DATA_TYPE_STRING, ""
+        self.pub_pv_set = self.fed.register_publication(
+            "pv_set", h.HELICS_DATA_TYPE_STRING, ""
+        )
+        self.pub_powers_real = self.fed.register_publication(
+            "powers_real", h.HELICS_DATA_TYPE_STRING, ""
+        )
+        self.pub_powers_imag = self.fed.register_publication(
+            "powers_imag", h.HELICS_DATA_TYPE_STRING, ""
+        )
+        self.pub_voltages_real = self.fed.register_publication(
+            "voltages_real", h.HELICS_DATA_TYPE_STRING, ""
+        )
+        self.pub_voltages_imag = self.fed.register_publication(
+            "voltages_imag", h.HELICS_DATA_TYPE_STRING, ""
         )
 
-        self.pub_voltages = self.fed.register_publication(
-            "opf_voltages_magnitude", h.HELICS_DATA_TYPE_STRING, ""
-        )
-
-    def get_set_points(self, control, bus_info, conversion):
+    def get_set_points(self, control: dict, bus_info: adapter.BusInfo, conversion: float):
         setpoint = {}
         for key, val in control.items():
-            if key in bus_info:
-                bus = bus_info[key]
-                if 'eqid' in bus:
-                    eqid = bus['eqid']
-                    [eq_type, _] = eqid.split('.')
-                    if eq_type == "PVSystem":
-                        sp = lindistflow.ignore_phase(val)*conversion
-                        setpoint[eqid] = 0.0 if sp < 0.1 else sp
+            if key in bus_info.buses:
+                bus = bus_info.buses[key]
+                for tag in set(bus.tags):
+                    if "PVSystem" in tag:
+                        sp = max(val)*conversion
+                        setpoint[tag] = 0.0 if sp < 0.1 else sp
         return setpoint
 
     def run(self) -> None:
@@ -128,7 +196,7 @@ class OPFFederate(object):
 
         while granted_time < h.HELICS_TIME_MAXTIME:
 
-            if not self.sub.voltages_mag.is_updated():
+            if not self.sub.injections.is_updated():
                 granted_time = h.helicsFederateRequestTime(
                     self.fed, h.HELICS_TIME_MAXTIME
                 )
@@ -140,11 +208,25 @@ class OPFFederate(object):
             injections = Injection.parse_obj(self.sub.injections.json)
             bus_info = adapter.extract_injection(bus_info, injections)
 
-            voltages_mag = VoltagesMagnitude.parse_obj(
-                self.sub.voltages_mag.json)
-            bus_info = adapter.extract_voltages(bus_info, voltages_mag)
+            powers_real = PowersReal.parse_obj(
+                self.sub.powers_real.json)
+            powers_imag = PowersImaginary.parse_obj(
+                self.sub.powers_imag.json)
+            powers = eqarray_to_xarray(
+                powers_real) + 1j*eqarray_to_xarray(powers_imag)
 
-            time = voltages_mag.time
+            voltages_real = VoltagesReal.parse_obj(
+                self.sub.voltages_real.json)
+            voltages_imag = VoltagesImaginary.parse_obj(
+                self.sub.voltages_imag.json)
+            voltages = measurement_to_xarray(
+                voltages_real) + 1j*measurement_to_xarray(voltages_imag)
+
+            voltages_mag, voltages_ang = xarray_to_voltages_pol(voltages)
+            bus_info = adapter.extract_voltages(
+                bus_info, voltages_mag)
+
+            time = voltages_real.time
             logger.debug(f"Timestep: {time}")
 
             with open("bus_info.json", "w") as outfile:
@@ -160,42 +242,45 @@ class OPFFederate(object):
             for id, v in zip(p_inj.ids, p_inj.values):
                 logger.debug(f"{id},  {v}")
 
-            voltages, power_flow, control, conversion = lindistflow.solve(
-                branch_info, bus_info, slack_bus, self.static.control_type, self.static.pf_flag)
+            mode = self.static.control_type
+            relaxed = self.static.relaxed
+            v_mag, p_real, control, conversion = lindistflow.solve(
+                branch_info, bus_info, slack_bus, mode, relaxed)
             real_setpts = self.get_set_points(control, bus_info, conversion)
 
             # get the control commands for the feeder federate
             commands = []
-            for key, val in control.items():
-                if key not in bus_info.buses:
-                    continue
-
-                bus = bus_info.buses[key]
-                if all([pv == 0.0 for pv in bus.pv]):
-                    continue
-
-                setpoint = max([abs(v) for v in val])*conversion
-                if setpoint < 0.1:
-                    continue
-
-                pv = [tag for tag in bus.tags if "PVSystem" in tag]
-                ctrl = self.static.control_type
-                for tag in pv:
-                    if ctrl == lindistflow.ControlType.WATT:
-                        commands.append((tag, setpoint, 0))
-                    elif ctrl == lindistflow.ControlType.VAR:
-                        commands.append((tag, 0, setpoint))
-                    elif ctrl == lindistflow.ControlType.WATT_VAR:
-                        continue
+            for eq, val in real_setpts.items():
+                if mode == "real":
+                    commands.append((eq, val, 0))
+                elif mode == "imag":
+                    commands.append((eq, 0, val))
+                elif mode == "full":
+                    pass
 
             if commands:
-                self.pub_commands.publish(
+                self.pub_pv_set.publish(
                     json.dumps(commands)
                 )
 
-            pub_mags = adapter.pack_voltages(voltages, time)
-            self.pub_voltages.publish(
-                pub_mags.json()
+            v_mag = adapter.pack_voltages(v_mag, time)
+            voltages = measurement_to_xarray(
+                v_mag)*np.exp(1j*measurement_to_xarray(voltages_ang))
+            voltages_real, voltages_imag = xarray_to_voltages_cart(voltages)
+            voltages_real.time = time
+            voltages_imag.time = time
+            self.pub_voltages_real.publish(
+                voltages_real.json()
+            )
+            self.pub_voltages_imag.publish(
+                voltages_imag.json()
+            )
+
+            self.pub_powers_real.publish(
+                powers_real.json()
+            )
+            self.pub_powers_imag.publish(
+                powers_imag.json()
             )
 
         self.stop()

@@ -146,6 +146,19 @@ def pack_voltages(voltages: dict, time: int) -> VoltagesMagnitude:
     return VoltagesMagnitude(ids=ids, values=values, time=time)
 
 
+def pack_powers(powers: dict, time: int) -> VoltagesMagnitude:
+    ids = []
+    values = []
+    for key, value in voltages.items():
+        for phase, voltage in value.items():
+            if voltage == 0.0:
+                continue
+            id = f"{key}.{phase}"
+            ids.append(id)
+            values.append(voltage)
+    return VoltagesMagnitude(ids=ids, values=values, time=time)
+
+
 def extract_forecast(bus: dict, forecast) -> dict:
     for eq, power in zip(forecast["ids"], forecast["values"]):
         print(eq)
