@@ -132,11 +132,16 @@ def update_ratios(branch_info: BranchInfo, bus_info: BusInfo) -> BusInfo:
 
 def solve(branch_info: dict, bus_info: dict, slack_bus: str, mode: str, relaxed: bool):
     try:
+        pv = [max(b.pv)/max(b.base_pv) for b in bus_info.buses.values()]
+        if any(pv) < 0.5:
+            return optimal_power_flow(
+                branch_info, bus_info, slack_bus, "real", relaxed)
+
         return optimal_power_flow(
-            branch_info, bus_info, slack_bus, mode, relaxed)
+            branch_info, bus_info, slack_bus, "imag", relaxed)
+
     except:
-        return optimal_power_flow(
-            branch_info, bus_info, slack_bus, mode, True)
+        return {}, {}, {}, 0.0
 
 
 def optimal_power_flow(branch_info: dict, bus_info: dict, slack_bus: str, mode: str, relaxed: bool):
@@ -618,11 +623,11 @@ def optimal_power_flow(branch_info: dict, bus_info: dict, slack_bus: str, mode: 
 
                 # DG upper limit set up:
                 DG_up_lim[nbus_ABC * 0 + val_bus.idx] = np.sqrt(
-                    ((S_CAPACITY * val_bus.pv[0][0] * BASE_S) ** 2) - ((val_bus.pv[0][0] * BASE_S) ** 2))
+                    ((S_CAPACITY * val_bus.base_pv[0][0] * BASE_S) ** 2) - ((val_bus.pv[0][0] * BASE_S) ** 2))
                 DG_up_lim[nbus_ABC * 1 + val_bus.idx] = np.sqrt(
-                    ((S_CAPACITY * val_bus.pv[1][0] * BASE_S) ** 2) - ((val_bus.pv[1][0] * BASE_S) ** 2))
+                    ((S_CAPACITY * val_bus.base_pv[1][0] * BASE_S) ** 2) - ((val_bus.pv[1][0] * BASE_S) ** 2))
                 DG_up_lim[nbus_ABC * 2 + val_bus.idx] = np.sqrt(
-                    ((S_CAPACITY * val_bus.pv[2][0] * BASE_S) ** 2) - ((val_bus.pv[2][0] * BASE_S) ** 2))
+                    ((S_CAPACITY * val_bus.base_pv[2][0] * BASE_S) ** 2) - ((val_bus.pv[2][0] * BASE_S) ** 2))
 
             # work on this for the secondary netowrks:
             else:
@@ -734,7 +739,7 @@ def optimal_power_flow(branch_info: dict, bus_info: dict, slack_bus: str, mode: 
     line_flow = {}
     n_flow_ABC = (nbus_ABC * 3 + nbus_s1s2) + (nbus_ABC * 6 + nbus_s1s2 * 2)
     for k in range(n_flow_ABC, n_flow_ABC + nbranch_ABC):
-        line_flow[name[i]] = []
+        line_flow[name[i]] = {}
         line_flow[name[i]].append([x.value[k] * mul * 1000,
                                    x.value[k + nbranch_ABC * 3] * mul * 1000])
         line_flow[name[i]].append([x.value[k + nbranch_ABC] *
@@ -745,29 +750,14 @@ def optimal_power_flow(branch_info: dict, bus_info: dict, slack_bus: str, mode: 
 
     n_flow_s1s2 = (nbus_ABC*3 + nbus_s1s2) + \
         (nbus_ABC*6 + nbus_s1s2*2) + nbranch_ABC*6
-    name = []
-    for key, val_br in buses.items():
-        name.append(key)
-    bus_voltage = {}
-    i = 0
-    for k in range(nbus_ABC):
-        bus_voltage[name[k]] = {}
-        bus_voltage[name[k]]['A'] = math.sqrt(abs(x.value[k]))
-        bus_voltage[name[k]]['B'] = math.sqrt(abs(x.value[nbus_ABC + k]))
-        bus_voltage[name[k]]['C'] = math.sqrt(abs(x.value[nbus_ABC * 2 + k]))
-        i += 1
 
-    # Monish Edits
+    bus_voltage = {}
+
     for key, val_bus in buses.items():
-        # volt.append(
-        #     [name[k], '{:.4f}'.format(math.sqrt(abs(x.value[k]))),
-        #      '{:.4f}'.format(math.sqrt(abs(x.value[nbus_ABC + k]))),
-        #      '{:.4f}'.format(math.sqrt(abs(x.value[nbus_ABC * 2 + k])))])
-        bus_voltage[key] = {}
-        bus_voltage[key]['A'] = math.sqrt(abs(x.value[val_bus.idx]))
-        bus_voltage[key]['B'] = math.sqrt(
+        bus_voltage[f"{key}.1"] = math.sqrt(abs(x.value[val_bus.idx]))
+        bus_voltage[f"{key}.2"] = math.sqrt(
             abs(x.value[nbus_ABC + val_bus.idx]))
-        bus_voltage[key]['C'] = math.sqrt(
+        bus_voltage[f"{key}.3"] = math.sqrt(
             abs(x.value[nbus_ABC * 2 + val_bus.idx]))
         i += 1
 

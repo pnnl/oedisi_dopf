@@ -21,6 +21,8 @@ SMART_DS = {
     "SFO/P9U": "p9uhs16_1247/p9uhs16_1247--p9udt12866"
 }
 
+LEVELS = ["low", "medium", "high", "extreme"]
+
 
 def generate_feeder() -> Component:
     if "ieee" in MODEL:
@@ -102,14 +104,37 @@ def generate_sensor(port: str, ctx: str, src: str) -> (Component, Link):
 
 
 if __name__ == "__main__":
+    if len(sys.argv) < 2:
+        print(
+            "generate_lindistflow.py <model> [pv penetration] [es penetration]\n")
+        print("\tex. generate_indistflow.py ieee123")
+        print("\tex. generate_indistflow.py SFO/P1U extreme low\n")
+        print("Available Smart-DS Models:")
+        print("\t", list(SMART_DS.keys()), "\n")
+        print("Available Penetration levels:")
+        print("\t", LEVELS, "\n")
+        exit()
+
     MODEL = sys.argv[1]
     if len(sys.argv) == 3:
+        if sys.argv[2] not in LEVELS:
+            print("PV_LEVEL must be: ", LEVELS)
+            exit()
         PV_LEVEL = sys.argv[2]
+
     if len(sys.argv) == 4:
+        lvl = sys.argv[3]
+        if lvl not in LEVELS and lvl != "none":
+            print("ES_LEVEL must be none or: ", LEVELS)
+            exit()
         ES_LEVEL = sys.argv[3]
 
     OUTPUTS = f"{ROOT}/outputs/{ALGO}/{MODEL}"
     SCENARIOS = f"{ROOT}/scenarios/{ALGO}/{MODEL}"
+
+    if "ieee" not in MODEL:
+        OUTPUTS = f"{OUTPUTS}/{PV_LEVEL}/{ES_LEVEL}"
+        SCENARIOS = f"{SCENARIOS}/{PV_LEVEL}/{ES_LEVEL}"
 
     system = WiringDiagram(name=f"{ALGO}_{MODEL}", components=[], links=[])
     feeder = generate_feeder()

@@ -133,29 +133,16 @@ def extract_voltages(bus_info: BusInfo, voltages: VoltagesMagnitude) -> dict:
     return bus_info
 
 
-def pack_voltages(voltages: dict, time: int) -> VoltagesMagnitude:
+def pack_voltages(voltages: dict, bus_info: BusInfo, time: int) -> VoltagesMagnitude:
     ids = []
     values = []
     for key, value in voltages.items():
-        for phase, voltage in value.items():
-            if voltage == 0.0:
-                continue
-            id = f"{key}.{phase}"
-            ids.append(id)
-            values.append(voltage)
-    return VoltagesMagnitude(ids=ids, values=values, time=time)
-
-
-def pack_powers(powers: dict, time: int) -> VoltagesMagnitude:
-    ids = []
-    values = []
-    for key, value in voltages.items():
-        for phase, voltage in value.items():
-            if voltage == 0.0:
-                continue
-            id = f"{key}.{phase}"
-            ids.append(id)
-            values.append(voltage)
+        busid, phase = key.split(".", 1)
+        print(key, value)
+        if busid in bus_info.buses:
+            print(key, value)
+            ids.append(key)
+            values.append(value*bus_info.buses[key].base_kv)
     return VoltagesMagnitude(ids=ids, values=values, time=time)
 
 

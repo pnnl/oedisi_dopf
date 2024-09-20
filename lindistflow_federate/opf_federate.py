@@ -251,6 +251,9 @@ class OPFFederate(object):
             # get the control commands for the feeder federate
             commands = []
             for eq, val in real_setpts.items():
+                if val == 0:
+                    continue
+
                 if mode == "real":
                     commands.append((eq, val, 0))
                 elif mode == "imag":
@@ -263,7 +266,10 @@ class OPFFederate(object):
                     json.dumps(commands)
                 )
 
-            v_mag = adapter.pack_voltages(v_mag, time)
+            pprint(v_mag)
+            v_mag = adapter.pack_voltages(v_mag, bus_info, time)
+            pprint(v_mag)
+            pprint(voltages_ang)
             voltages = measurement_to_xarray(
                 v_mag)*np.exp(1j*measurement_to_xarray(voltages_ang))
             voltages_real, voltages_imag = xarray_to_voltages_cart(voltages)
