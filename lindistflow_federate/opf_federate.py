@@ -245,7 +245,7 @@ class OPFFederate(object):
             mode = self.static.control_type
             relaxed = self.static.relaxed
             v_mag, p_real, control, conversion = lindistflow.solve(
-                branch_info, bus_info, slack_bus, mode, relaxed)
+                branch_info, bus_info, slack_bus, relaxed)
             real_setpts = self.get_set_points(control, bus_info, conversion)
 
             # get the control commands for the feeder federate

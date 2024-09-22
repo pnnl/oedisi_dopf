@@ -18,7 +18,7 @@
         {"type": "", "port_id":"pv_forecast", "optional": true}
     ],
     "dynamic_outputs": [
-        {"type": "ControlList", "port_id": "pv_set"},
+        {"type": "CommandList", "port_id": "pv_set"},
         {"type": "VoltagesReal", "port_id": "voltages_real"},
         {"type": "VoltagesImaginary", "port_id": "voltages_imag"},
         {"type": "PowersReal", "port_id": "powers_real"},

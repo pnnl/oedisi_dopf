@@ -7,7 +7,7 @@ from oedisi.componentframework.system_configuration import (
 
 
 ROOT = os.getcwd()
-ALGO = "lindistflow"
+ALGO = "omoo"
 MODEL = ""
 PV_LEVEL = "low"
 ES_LEVEL = "none"
@@ -141,12 +141,10 @@ if __name__ == "__main__":
     system.components.append(feeder)
 
     algo = Component(
-        name="lindistflow",
+        name=ALGO,
         type="OptimalPowerFlow",
         parameters={
-            "deltat": 0.1,
-            "relaxed": False,
-            "control_type": "real"
+            "algorithm_parameters": {"tol": 1e-5}
         }
     )
     system.components.append(algo)

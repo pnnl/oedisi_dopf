@@ -34,16 +34,24 @@
     ],
     "dynamic_outputs": [
         {
-            "type": "VoltagesMagnitude",
-            "port_id": "voltage_mag"
+            "type": "VoltagesReal",
+            "port_id": "voltages_real"
         },
         {
-            "type": "VoltagesAngle",
-            "port_id": "voltage_angle"
+            "type": "VoltagesImaginary",
+            "port_id": "voltages_imag"
+        },
+        {
+            "type": "PowersReal",
+            "port_id": "powers_real"
+        },
+        {
+            "type": "PowersImaginary",
+            "port_id": "powers_imag"
         },
         {
             "type": "CommandList",
-            "port_id": "P_set"
+            "port_id": "pv_set"
         }
     ]
 }
