@@ -33,7 +33,6 @@ from oedisi.types.data_types import (
     PowersReal,
     PowersImaginary,
     AdmittanceSparse,
-    VoltagesMagnitude,
     Command,
 )
 from scipy.sparse import csc_matrix, coo_matrix, diags, vstack, hstack
@@ -67,7 +66,8 @@ def matrix_to_numpy(admittance: List[List[Complex]]):
 
 def get_indices(topology, measurement):
     "Get list of indices in the topology for each index of the input measurement"
-    inv_map = {v: i for i, v in enumerate(topology.base_voltage_magnitudes.ids)}
+    inv_map = {v: i for i, v in enumerate(
+        topology.base_voltage_magnitudes.ids)}
     return [inv_map[v] for v in measurement.ids]
 
 
@@ -192,7 +192,8 @@ def cost_fun(
     # f2 = cost_Q * Qk_v_last^2. cost_Q-penalty; Qk_v_last^2-penalize any reactive generation
     q_cost = 2 * cost_Q * Qk_v_last
     # gradient of f1, f2; lk * (uni_Vmin - (G @ p + H @ q)) + mk * ((G @ p + H @ q) - uni_max)
-    dLq_pp = q_cost + q_set_dev + (H[:, pv_ii]) @ (muk_last - lambdak_last)  # + nu*Qk_v
+    dLq_pp = q_cost + q_set_dev + \
+        (H[:, pv_ii]) @ (muk_last - lambdak_last)  # + nu*Qk_v
     # dLq_pp = (H[:,pv_ii])@(muk_last - lambdak_last)
     uqk = Qk_v - alpha * dLq_pp  # gradient descent
 
@@ -208,7 +209,8 @@ def cost_fun(
     p_cost = 2 * cost_P * Pck_v
     # gradient of f1, f2; lk * (uni_Vmin - (G @ p + H @ q)) + mk * ((G @ p + H @ q) - uni_max)
 
-    dLp_pp = p_cost + p_set_dev + (G[:, pv_ii]) @ (muk_last - lambdak_last)  # + nu*Pk_v
+    dLp_pp = p_cost + p_set_dev + \
+        (G[:, pv_ii]) @ (muk_last - lambdak_last)  # + nu*Pk_v
     # print(f"p_cost, p_set_dev {p_cost}, {p_set_dev}, {(G[:, pv_ii])@(muk_last - lambdak_last)}")
     upk = Pk_v - alpha * dLp_pp
     upk = np.maximum(0, upk)
@@ -304,7 +306,7 @@ class OMOOParameters(BaseModel):
     Vmin: float = 0.95  # + 0.005 + 0.002  # Lower limit\
     # Linearized equation is overestimating. So increase the lower limit by 0.005.
     # The problem is not solved to the optimal, so increase another 0.002.
-    alpha: float = 0.5  #  learning rate for dual and primal
+    alpha: float = 0.5  # learning rate for dual and primal
     epsilon: float = 1e-8  # decay of duals
     nu: float = 0.016  # A trivial penalty factor
     ratio_t_k: int = 1000
@@ -325,7 +327,8 @@ def getLinearModel(YLL, YL0, V0):
     """
     #
     Nnode = YLL.shape[0]
-    YLLi = inv(YLL)  # quicker than spsolve(YLL_s, eye(YLL_s.shape[0])) by testing
+    # quicker than spsolve(YLL_s, eye(YLL_s.shape[0])) by testing
+    YLLi = inv(YLL)
     w = -((YLLi @ YL0) @ V0)
     w_mag = np.abs(w)
     Vk = w
@@ -383,6 +386,7 @@ class OMOO:
             Q_wopv = -np.array(Q_wopv.values) / self.base_power
         else:
             raise Exception(f"Unit system {parameters.units} not supported")
+
         P_wopv, Q_wopv = (
             np.delete(P_wopv, self.slack_bus),
             np.delete(Q_wopv, self.slack_bus),
@@ -396,9 +400,11 @@ class OMOO:
         for pp, pv_ii in enumerate(self.pv_index):
             Ppv[pv_ii] = P_0[pp]
             Qpv[pv_ii] = Q_0[pp]
-        Ppv, Qpv = np.delete(Ppv, self.slack_bus), np.delete(Qpv, self.slack_bus)
+        Ppv, Qpv = np.delete(Ppv, self.slack_bus), np.delete(
+            Qpv, self.slack_bus)
         Vk_wopv = self.w_mag + self.G @ P_wopv + self.H @ Q_wopv
         V_hat = Vk_wopv + self.G @ Ppv + self.H @ Qpv
+        print(V_hat)
         diff = np.abs(V_hat - np.delete(vmagTrue, self.slack_bus))
         logger.debug(f"maximum diff is {np.max(diff)}")
         logger.debug(f"maximum V_hat is {np.max(V_hat)}")
@@ -421,7 +427,8 @@ class OMOO:
             dual_update_v = 1
             muk_last, lambdak_last = np.zeros(N_node), np.zeros(N_node)
             Pk_last, Qk_last = P_0, Q_0 * 0.0
-            pv_set_point_real, pv_set_point_imag = np.zeros(N_pv), np.zeros(N_pv)
+            pv_set_point_real, pv_set_point_imag = np.zeros(
+                N_pv), np.zeros(N_pv)
             uni_Vmax = np.ones(N_node) * self.parameters.Vmax
             uni_Vmin = np.ones(N_node) * self.parameters.Vmin
 
@@ -472,18 +479,21 @@ class OMOO:
             Ppv, Qpv = np.zeros(self.num_node), np.zeros(self.num_node)
             for pp, pv_ii in enumerate(self.pv_index):
                 pv_avail_v = self.pv_frame.iloc[pp]["avai"] / self.base_power
-                pv_capacity_v = self.pv_frame.iloc[pp]["kVarRated"] / self.base_power
+                pv_capacity_v = self.pv_frame.iloc[pp]["kVarRated"] / \
+                    self.base_power
                 Pk_last[pp], Qk_last[pp] = Proj_inverter(
                     Pk_last[pp], Qk_last[pp], pv_avail_v, pv_capacity_v
                 )
                 Ppv[pv_ii], Qpv[pv_ii] = Pk_last[pp], Qk_last[pp]
-            Ppv, Qpv = np.delete(Ppv, self.slack_bus), np.delete(Qpv, self.slack_bus)
+            Ppv, Qpv = np.delete(Ppv, self.slack_bus), np.delete(
+                Qpv, self.slack_bus)
             V_hat_final = Vk_wopv + self.G @ Ppv + self.H @ Qpv
 
             # logger.debug(f"Before OMOO, the violated ones are {V_hat[ind]}")
             # logger.debug(f"After opf, approxiamted violations: {V_hat_final[ind]}")
             logger.debug(
-                f"Target bounds are [{self.parameters.Vmax}, {self.parameters.Vmin}]"
+                f"Target bounds are [{self.parameters.Vmax}, {
+                    self.parameters.Vmin}]"
             )
             return (
                 Pk_last * self.base_power,
@@ -538,14 +548,20 @@ class OMOOFederate:
             input_mapping["available_power"], ""
         )
 
-        self.pub_voltage_mag = self.vfed.register_publication(
-            "voltage_mag", h.HELICS_DATA_TYPE_STRING, ""
+        self.pub_powers_real = self.vfed.register_publication(
+            "powers_real", h.HELICS_DATA_TYPE_STRING, ""
         )
-        self.pub_voltage_angle = self.vfed.register_publication(
-            "voltage_angle", h.HELICS_DATA_TYPE_STRING, ""
+        self.pub_powers_imag = self.vfed.register_publication(
+            "powers_imag", h.HELICS_DATA_TYPE_STRING, ""
         )
-        self.pub_P_set = self.vfed.register_publication(
-            "P_set", h.HELICS_DATA_TYPE_STRING, ""
+        self.pub_voltages_real = self.vfed.register_publication(
+            "voltages_real", h.HELICS_DATA_TYPE_STRING, ""
+        )
+        self.pub_voltages_imag = self.vfed.register_publication(
+            "voltages_imag", h.HELICS_DATA_TYPE_STRING, ""
+        )
+        self.pub_pv_set = self.vfed.register_publication(
+            "pv_set", h.HELICS_DATA_TYPE_STRING, ""
         )
         logger.debug("algorithm_parameters")
         logger.debug(algorithm_parameters)
@@ -621,7 +637,8 @@ class OMOOFederate:
                 voltages_real
             ) + 1j * measurement_to_xarray(voltages_imag)
             logger.debug(np.max(np.abs(voltages) / v))
-            assert topology.base_voltage_magnitudes.ids == list(voltages.ids.data)
+            assert topology.base_voltage_magnitudes.ids == list(
+                voltages.ids.data)
 
             injections = Injection.parse_obj(self.injections.json)
             power_injections = eqarray_to_xarray(
@@ -656,9 +673,11 @@ class OMOOFederate:
 
             V0 = voltages[slack_bus].data
             self.V0 = (
-                V0 / np.array(topology.base_voltage_magnitudes.values)[slack_bus]
+                V0 /
+                np.array(topology.base_voltage_magnitudes.values)[slack_bus]
             ).reshape(3, -1)
-            self.G, self.H, self.w_mag = getLinearModel(self.YLL, self.YL0, self.V0)
+            self.G, self.H, self.w_mag = getLinearModel(
+                self.YLL, self.YL0, self.V0)
 
             logger.debug("PVframe")
             logger.debug(pv)
@@ -684,6 +703,7 @@ class OMOOFederate:
             P_set, Q_set, set_power, V_hat = opf.opf_run(
                 np.abs(voltages), power_P, power_Q
             )
+            print(V_hat)
             power_set = P_set + 1j * Q_set
             power_factor = power_set.real / (np.abs(power_set) + 1e-7)
             pmpp = power_set.real / pv["kVarRated"]
@@ -698,7 +718,8 @@ class OMOOFederate:
             logger.debug(f"OMOO takes {(te-ts)/60} (min)")
 
             power_set_xr = (
-                xr.DataArray(power_set, coords={"equipment_ids": pv.loc[:, "name"]})
+                xr.DataArray(power_set, coords={
+                             "equipment_ids": pv.loc[:, "name"]})
                 .groupby("equipment_ids")
                 .sum()
             )
@@ -725,29 +746,7 @@ class OMOOFederate:
             logger.debug(command_list_obj)
             # Turn P_set and Q_set into commands
             if set_power:
-                self.pub_P_set.publish(json.dumps(pv_settings))
-
-            # Publish control voltage magnitudes
-            time_ = voltages_imag.time
-            logger.info(time_)
-            V_slack = abs(self.V0)
-            node_ids = []
-            node_voltages = []
-            V_hat_index = 0
-            for k,nid in enumerate(ids):
-                node_ids.append(nid)
-                if k in slack_bus:
-                    V0_index = slack_bus.index(k)
-                    node_voltages.append(V_slack[V0_index,0])
-                else:
-                    node_voltages.append(V_hat[V_hat_index])
-                    V_hat_index += 1
-            pub_mags = VoltagesMagnitude(
-                ids=node_ids, 
-                values=node_voltages, 
-                time=time_
-                )
-            self.pub_voltage_mag.publish(pub_mags.json())
+                self.pub_pv_set.publish(json.dumps(pv_settings))
 
             logger.info("end time: " + str(datetime.now()))
 
@@ -774,7 +773,8 @@ if __name__ == "__main__":
         config = json.load(f)
         federate_name = config["name"]
         if "algorithm_parameters" in config:
-            parameters = OMOOParameters.parse_obj(config["algorithm_parameters"])
+            parameters = OMOOParameters.parse_obj(
+                config["algorithm_parameters"])
         else:
             parameters = OMOOParameters.parse_obj({})
 

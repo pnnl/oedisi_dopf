@@ -74,6 +74,7 @@ class BusInfo:
 
 
 def check_radiality(branch_info: BranchInfo, bus_info: BusInfo) -> bool:
+    print(len(bus_info.buses), len(branch_info.branches))
     if len(bus_info.buses)-len(branch_info.branches) == 1:
         return True
 
@@ -133,16 +134,16 @@ def extract_voltages(bus_info: BusInfo, voltages: VoltagesMagnitude) -> dict:
     return bus_info
 
 
-def pack_voltages(voltages: dict, time: int) -> VoltagesMagnitude:
+def pack_voltages(voltages: dict, bus_info: BusInfo, time: int) -> VoltagesMagnitude:
     ids = []
     values = []
     for key, value in voltages.items():
-        for phase, voltage in value.items():
-            if voltage == 0.0:
-                continue
-            id = f"{key}.{phase}"
-            ids.append(id)
-            values.append(voltage)
+        busid, phase = key.split(".", 1)
+        print(key, value)
+        if busid in bus_info.buses:
+            print(key, value)
+            ids.append(key)
+            values.append(value*bus_info.buses[key].base_kv)
     return VoltagesMagnitude(ids=ids, values=values, time=time)
 
 
@@ -206,9 +207,9 @@ def extract_base_injection(bus_info: BusInfo, powers: Injection) -> dict:
 
         bus_info.buses[name].tags.append(eq)
         if "PVSystem" in eq:
-            bus_info.buses[name].base_pv[phase][0] -= power*1000
+            bus_info.buses[name].base_pv[phase][0] += power*1000
         else:
-            bus_info.buses[name].base_pq[phase][0] += power*1000
+            bus_info.buses[name].base_pq[phase][0] -= power*1000
 
     for id, eq, power in zip(imag.ids, imag.equipment_ids, imag.values):
         name, phase = id.split(".", 1)
@@ -218,9 +219,9 @@ def extract_base_injection(bus_info: BusInfo, powers: Injection) -> dict:
             continue
 
         if "PVSystem" in eq:
-            bus_info.buses[name].base_pv[phase][1] -= power*1000
+            bus_info.buses[name].base_pv[phase][1] += power*1000
         else:
-            bus_info.buses[name].base_pq[phase][1] += power*1000
+            bus_info.buses[name].base_pq[phase][1] -= power*1000
     return bus_info
 
 
@@ -242,7 +243,8 @@ def extract_transformers(incidences: Incidence) -> (list[str], list[str]):
 def generate_graph(inc: Incidence, slack_bus: str) -> nx.Graph:
     graph = nx.Graph()
     for src, dst, id in zip(inc.from_equipment, inc.to_equipment, inc.ids):
-        if "OPEN" in src or "OPEN" in dst:
+        print(src, dst, id)
+        if "OPEN" in src or "OPEN" in dst or "61S" in src or "61S" in dst:
             continue
         if src == dst:
             continue
@@ -333,9 +335,9 @@ def extract_injection(bus_info: BusInfo, powers: Injection) -> dict:
 
         bus_info.buses[name].tags.append(eq)
         if "PVSystem" in eq:
-            bus_info.buses[name].pv[phase][0] -= power*1000
+            bus_info.buses[name].pv[phase][0] += power*1000
         else:
-            bus_info.buses[name].pq[phase][0] += power*1000
+            bus_info.buses[name].pq[phase][0] -= power*1000
 
     for id, eq, power in zip(imag.ids, imag.equipment_ids, imag.values):
         name, phase = id.split(".", 1)
@@ -345,9 +347,9 @@ def extract_injection(bus_info: BusInfo, powers: Injection) -> dict:
             continue
 
         if "PVSystem" in eq:
-            bus_info.buses[name].pv[phase][1] -= power*1000
+            bus_info.buses[name].pv[phase][1] += power*1000
         else:
-            bus_info.buses[name].pq[phase][1] += power*1000
+            bus_info.buses[name].pq[phase][1] -= power*1000
     return bus_info
 
 

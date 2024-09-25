@@ -7,11 +7,10 @@ then
 else
 	if [ ! -d "outputs/$scenario" ]; then
    		echo "Creating $scenario directory"
-   		mkdir "outputs/$scenario"
+   		mkdir -p "outputs/$scenario"
 	fi
 	pkill -9 helics_broker
 	pkill -9 python
-	oedisi build --component-dict scenario/$scenario/components.json --system scenario/$scenario/system.json --target-directory build_$scenario
-	oedisi run --runner build_$scenario/system_runner.json
-	python post_process/post_analysis.py $scenario
+	oedisi build --component-dict scenarios/$scenario/components.json --system scenarios/$scenario/system.json --target-directory build/$scenario
+	oedisi run --runner build/$scenario/system_runner.json
 fi

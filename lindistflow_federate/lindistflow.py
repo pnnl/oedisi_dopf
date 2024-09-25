@@ -61,21 +61,27 @@ def convert_pu(
         branch_info: BranchInfo,
         bus_info: BusInfo) -> (BranchInfo, BusInfo, float):
     pq_pu = 1 / (100*1e6)
+    kw_to_va = 1.2
     bus_pu = copy.deepcopy(bus_info)
     branch_pu = copy.deepcopy(branch_info)
 
     for k, v in bus_info.buses.items():
         bus_pu.buses[k].pq = [[pq * pq_pu for pq in phase] for phase in v.pq]
+        bus_pu.buses[k].base_pq = [
+            [pq * pq_pu for pq in phase] for phase in v.base_pq]
         bus_pu.buses[k].pv = [[pq * pq_pu for pq in phase] for phase in v.pv]
+        bus_pu.buses[k].base_pv = [[pq*kw_to_va * pq_pu for pq in phase]
+                                   for phase in v.base_pv]
 
     for k, v in branch_pu.branches.items():
-        if "XFMR" == v.tag:
-            base_kv = bus_pu.buses[v.to_bus].kv
+        if "XFMR" == v.tag or bus_pu.buses[v.fr_bus].base_kv < 1.0 or bus_pu.buses[v.to_bus].base_kv < 1.0:
+            base_kv = 1e6  # impedance will become near zero
         else:
-            base_kv = bus_pu.buses[v.fr_bus].kv
+            base_kv = bus_pu.buses[v.fr_bus].base_kv
 
-        z_pu = 1 / (base_kv**2 / 100)
-        branch_pu.branches[k].zprim = [[[e * z_pu for e in l1]
+        z_base = 1 / (base_kv**2 / 100)
+        print(k, z_base, base_kv)
+        branch_pu.branches[k].zprim = [[[e * z_base for e in l1]
                                         for l1 in l2] for l2 in v.zprim]
 
     return (branch_pu, bus_pu, pq_pu)
@@ -130,19 +136,20 @@ def update_ratios(branch_info: BranchInfo, bus_info: BusInfo) -> BusInfo:
     return bus_info
 
 
-def solve(branch_info: dict, bus_info: dict, slack_bus: str, control: ControlType, pf_flag: bool):
+def solve(branch_info: dict, bus_info: dict, slack_bus: str, relaxed: bool):
     try:
-        voltages, power_flow, control, conversion = optimal_power_flow(
-            branch_info, bus_info, slack_bus, control, pf_flag)
+        return optimal_power_flow(
+            branch_info, bus_info, slack_bus, relaxed)
+
     except:
-        voltages, power_flow, control, conversion = optimal_power_flow(
-            branch_info, bus_info, slack_bus, control, True)
+
+        return optimal_power_flow(
+            branch_info, bus_info, slack_bus, True)
 
 
-def optimal_power_flow(branch_info: dict, bus_info: dict, source_bus: str, control: ControlType, pf_flag: bool):
+def optimal_power_flow(branch_info: dict, bus_info: dict, slack_bus: str,  relaxed: bool):
     # System's base definition
     BASE_S = 1  # MVA
-    S_CAPACITY = 1.2
     PRIMARY_V = 0.12
     branch_pu, bus_pu, kw_converter = convert_pu(branch_info, bus_info)
     bus_pu = update_ratios(branch_pu, bus_pu)
@@ -157,7 +164,7 @@ def optimal_power_flow(branch_info: dict, bus_info: dict, source_bus: str, contr
     buses = bus_pu.buses
 
     slack_v = max([b.base_kv for b in buses.values()])
-    basekV = buses[source_bus].base_kv
+    basekV = buses[slack_bus].base_kv
     baseZ = 1.0
     SOURCE_V = [slack_v/basekV]*3
 
@@ -223,13 +230,10 @@ def optimal_power_flow(branch_info: dict, bus_info: dict, source_bus: str, contr
     # Linear Programming Cost Vector:
     # for k in range(nbus_ABC  + nbus_s1s2):
 
-    if control is ControlType.WATT:
-        for k in range(n_bus):
-            q_obj_vector[state_variable_number + k] = -1  # DER max objective
-    elif control is ControlType.VAR:
-        for k in range(n_bus):
-            q_obj_vector[n_Qdg + k] = 0  # Just Voltage regulation
-            # q_obj_vector[n_Qdg + k] = -1  # Just Voltage regulation
+    for k in range(n_bus):
+        q_obj_vector[state_variable_number + k] = -1  # DER max objective
+
+        # q_obj_vector[n_Qdg + k] = -1  # Just Voltage regulation
 
     # # Define BFM constraints for both real and reactive power: Power flow conservaion
     # Constraint 1: Flow equation
@@ -238,7 +242,7 @@ def optimal_power_flow(branch_info: dict, bus_info: dict, source_bus: str, contr
 
     counteq = 0
     for keyb, val_bus in buses.items():
-        if keyb == source_bus:
+        if keyb == slack_bus:
             continue
 
         k_frm_3p = []
@@ -478,7 +482,7 @@ def optimal_power_flow(branch_info: dict, bus_info: dict, source_bus: str, contr
 
     # Constraint 3: Substation voltage definition
     # V_substation = V_source
-    source_bus_idx = buses[source_bus].idx
+    source_bus_idx = buses[slack_bus].idx
     A_eq[counteq, source_bus_idx] = 1
     b_eq[counteq] = (SOURCE_V[0]) ** 2
     counteq += 1
@@ -496,190 +500,137 @@ def optimal_power_flow(branch_info: dict, bus_info: dict, source_bus: str, contr
     # print("Start: Injection Constraints")
 
     # P_dg control:
-    if control is ControlType.WATT:
-        DG_up_lim = np.zeros((n_bus, 1))
-        for keyb, val_bus in buses.items():
-            if keyb == source_bus:
-                continue
+    DG_up_lim = np.zeros((n_bus, 1))
+    DG_active_up_lim = np.zeros((n_bus, 1))
+    for keyb, val_bus in buses.items():
+        if keyb == slack_bus:
+            continue
 
-            # Real power injection at a bus
-            if val_bus.base_kv > PRIMARY_V:
-                # p_inj  + p_gen(control var) =  p_load
-                # Phase A Real Power
-                A_eq[counteq, nbus_ABC * 3 + nbus_s1s2 +
-                     nbus_ABC * 0 + val_bus.idx] = 1
-                A_eq[counteq, state_variable_number +
-                     nbus_ABC * 0 + val_bus.idx] = 1
-                b_eq[counteq] = val_bus.pq[0][0] * BASE_S * mult
-                counteq += 1
-                # Phase B Real Power
-                A_eq[counteq, nbus_ABC * 3 + nbus_s1s2 +
-                     nbus_ABC * 1 + val_bus.idx] = 1
-                A_eq[counteq, state_variable_number +
-                     nbus_ABC * 1 + val_bus.idx] = 1
-                b_eq[counteq] = val_bus.pq[1][0] * BASE_S * mult
-                counteq += 1
-                # Phase C Real Power
-                A_eq[counteq, nbus_ABC * 3 + nbus_s1s2 +
-                     nbus_ABC * 2 + val_bus.idx] = 1
-                A_eq[counteq, state_variable_number +
-                     nbus_ABC * 2 + val_bus.idx] = 1
-                b_eq[counteq] = val_bus.pq[2][0] * BASE_S * mult
-                counteq += 1
+        # Real power injection at a bus
+        if val_bus.base_kv > PRIMARY_V:
+            # p_inj  + p_gen(control var) =  p_load
+            # Phase A Real Power
+            A_eq[counteq, nbus_ABC * 3 + nbus_s1s2 +
+                 nbus_ABC * 0 + val_bus.idx] = 1
+            A_eq[counteq, state_variable_number +
+                 nbus_ABC * 0 + val_bus.idx] = 1
+            b_eq[counteq] = val_bus.pq[0][0] * BASE_S * mult
+            counteq += 1
+            # Phase B Real Power
+            A_eq[counteq, nbus_ABC * 3 + nbus_s1s2 +
+                 nbus_ABC * 1 + val_bus.idx] = 1
+            A_eq[counteq, state_variable_number +
+                 nbus_ABC * 1 + val_bus.idx] = 1
+            b_eq[counteq] = val_bus.pq[1][0] * BASE_S * mult
+            counteq += 1
+            # Phase C Real Power
+            A_eq[counteq, nbus_ABC * 3 + nbus_s1s2 +
+                 nbus_ABC * 2 + val_bus.idx] = 1
+            A_eq[counteq, state_variable_number +
+                 nbus_ABC * 2 + val_bus.idx] = 1
+            b_eq[counteq] = val_bus.pq[2][0] * BASE_S * mult
+            counteq += 1
 
-                # DG upper limit set up:
-                DG_up_lim[nbus_ABC * 0 + val_bus.idx
-                          ] = val_bus.pv[0][0] * BASE_S
-                DG_up_lim[nbus_ABC * 1 + val_bus.idx
-                          ] = val_bus.pv[1][0] * BASE_S
-                DG_up_lim[nbus_ABC * 2 + val_bus.idx
-                          ] = val_bus.pv[2][0] * BASE_S
+            # Q_inj  + Q_gen(control var) =  Q_load
+            # Phase A Reactive power
+            A_eq[counteq, nbus_ABC * 3 + nbus_s1s2 +
+                 nbus_ABC * 3 + val_bus.idx] = 1
+            A_eq[counteq, n_Qdg + nbus_ABC * 0 + val_bus.idx] = 1
+            b_eq[counteq] = val_bus.pq[0][1] * BASE_S * mult
+            counteq += 1
+            # Phase B Reactive power
+            A_eq[counteq, nbus_ABC * 3 + nbus_s1s2 +
+                 nbus_ABC * 4 + val_bus.idx] = 1
+            A_eq[counteq, n_Qdg + nbus_ABC * 1 + val_bus.idx] = 1
+            b_eq[counteq] = val_bus.pq[1][1] * BASE_S * mult
+            counteq += 1
+            # Phase C Reactive power
+            A_eq[counteq, nbus_ABC * 3 + nbus_s1s2 +
+                 nbus_ABC * 5 + val_bus.idx] = 1
+            A_eq[counteq, n_Qdg + nbus_ABC * 2 + val_bus.idx] = 1
+            b_eq[counteq] = val_bus.pq[2][1] * BASE_S * mult
+            counteq += 1
 
-                # Phase A Reactive power
-                A_eq[counteq, nbus_ABC * 3 + nbus_s1s2 +
-                     nbus_ABC * 3 + val_bus.idx] = 1
-                b_eq[counteq] = val_bus.pq[0][1] * BASE_S * mult
-                counteq += 1
-                # Phase B Reactive power
-                A_eq[counteq, nbus_ABC * 3 + nbus_s1s2 +
-                     nbus_ABC * 4 + val_bus.idx] = 1
-                b_eq[counteq] = val_bus.pq[1][1] * BASE_S * mult
-                counteq += 1
-                # Phase C Reactive power
-                A_eq[counteq, nbus_ABC * 3 + nbus_s1s2 +
-                     nbus_ABC * 5 + val_bus.idx] = 1
-                b_eq[counteq] = val_bus.pq[2][1] * BASE_S * mult
-                counteq += 1
+            # DG upper limit set up:
+            DG_up_lim[nbus_ABC * 0 + val_bus.idx
+                      ] = val_bus.base_pv[0][0] * BASE_S
+            DG_up_lim[nbus_ABC * 1 + val_bus.idx
+                      ] = val_bus.base_pv[1][0] * BASE_S
+            DG_up_lim[nbus_ABC * 2 + val_bus.idx
+                      ] = val_bus.base_pv[2][0] * BASE_S
 
-            # work on this for the secondary netowrks:
-            else:
-                A_eq[counteq, nbus_ABC * 3 + nbus_s1s2 +
-                     nbus_ABC * 5 + val_bus.idx] = 1
-                A_eq[counteq, state_variable_number + val_bus.idx] = 1
-                b_eq[counteq] = val_bus.pq[0] * BASE_S * mult
-                counteq += 1
-                # Reactive power
-                A_eq[counteq, nbus_ABC * 3 + nbus_s1s2 +
-                     nbus_ABC * 5 + nbus_s1s2 + val_bus.idx] = 1
-                A_eq[counteq, n_Qdg + nbus_ABC * 2 + val_bus.idx] = -1
-                b_eq[counteq] = val_bus.pq[1] * BASE_S
-                counteq += 1
+            # DG active limit set up:
+            DG_active_up_lim[nbus_ABC * 0 + val_bus.idx
+                             ] = val_bus.pv[0][0] * BASE_S
+            DG_active_up_lim[nbus_ABC * 1 + val_bus.idx
+                             ] = val_bus.pv[1][0] * BASE_S
+            DG_active_up_lim[nbus_ABC * 2 + val_bus.idx
+                             ] = val_bus.pv[2][0] * BASE_S
 
-                DG_up_lim[nbus_ABC * 3 + val_bus.idx
-                          ] = val_bus.pv[0] * BASE_S
+        # work on this for the secondary netowrks:
+        else:
+            A_eq[counteq, nbus_ABC * 3 + nbus_s1s2 +
+                 nbus_ABC * 5 + val_bus.idx] = 1
+            A_eq[counteq, state_variable_number + val_bus.idx] = 1
+            b_eq[counteq] = val_bus.pq[0] * BASE_S * mult
+            counteq += 1
+            # Reactive power
+            A_eq[counteq, nbus_ABC * 3 + nbus_s1s2 +
+                 nbus_ABC * 5 + nbus_s1s2 + val_bus.idx] = 1
+            A_eq[counteq, n_Qdg + nbus_ABC * 2 + val_bus.idx] = -1
+            b_eq[counteq] = val_bus.pq[1] * BASE_S
+            counteq += 1
 
-    elif control is ControlType.VAR:
-        DG_up_lim = np.zeros((n_bus, 1))
-        for keyb, val_bus in buses.items():
-            if keyb == source_bus:
-                continue
-
-            # Real power injection at a bus
-            if val_bus.base_kv > PRIMARY_V:
-                # p_inj   =  - p_d_gen + p_load
-                # Phase A Real Power
-                A_eq[counteq, nbus_ABC * 3 + nbus_s1s2 +
-                     nbus_ABC * 0 + val_bus.idx] = 1
-                b_eq[counteq] = - val_bus.pv[0][0] * \
-                    BASE_S + val_bus.pq[0][0] * BASE_S * mult
-                counteq += 1
-                # Phase B Real Power
-                A_eq[counteq, nbus_ABC * 3 + nbus_s1s2 +
-                     nbus_ABC * 1 + val_bus.idx] = 1
-                b_eq[counteq] = - val_bus.pv[1][0] * \
-                    BASE_S + val_bus.pq[1][0] * BASE_S * mult
-                counteq += 1
-                # Phase C Real Power
-                A_eq[counteq, nbus_ABC * 3 + nbus_s1s2 +
-                     nbus_ABC * 2 + val_bus.idx] = 1
-                b_eq[counteq] = - val_bus.pv[2][0] * \
-                    BASE_S + val_bus.pq[2][0] * BASE_S * mult
-                counteq += 1
-
-                # Q_inj  + Q_gen(control var) =  Q_load
-                # Phase A Reactive power
-                A_eq[counteq, nbus_ABC * 3 + nbus_s1s2 +
-                     nbus_ABC * 3 + val_bus.idx] = 1
-                A_eq[counteq, n_Qdg + nbus_ABC * 0 + val_bus.idx] = 1
-                b_eq[counteq] = val_bus.pq[0][1] * BASE_S * mult
-                counteq += 1
-                # Phase B Reactive power
-                A_eq[counteq, nbus_ABC * 3 + nbus_s1s2 +
-                     nbus_ABC * 4 + val_bus.idx] = 1
-                A_eq[counteq, n_Qdg + nbus_ABC * 1 + val_bus.idx] = 1
-                b_eq[counteq] = val_bus.pq[1][1] * BASE_S * mult
-                counteq += 1
-                # Phase C Reactive power
-                A_eq[counteq, nbus_ABC * 3 + nbus_s1s2 +
-                     nbus_ABC * 5 + val_bus.idx] = 1
-                A_eq[counteq, n_Qdg + nbus_ABC * 2 + val_bus.idx] = 1
-                b_eq[counteq] = val_bus.pq[2][1] * BASE_S * mult
-                counteq += 1
-
-                # DG upper limit set up:
-                DG_up_lim[nbus_ABC * 0 + val_bus.idx] = np.sqrt(
-                    ((S_CAPACITY * val_bus.pv[0][0] * BASE_S) ** 2) - ((val_bus.pv[0][0] * BASE_S) ** 2))
-                DG_up_lim[nbus_ABC * 1 + val_bus.idx] = np.sqrt(
-                    ((S_CAPACITY * val_bus.pv[1][0] * BASE_S) ** 2) - ((val_bus.pv[1][0] * BASE_S) ** 2))
-                DG_up_lim[nbus_ABC * 2 + val_bus.idx] = np.sqrt(
-                    ((S_CAPACITY * val_bus.pv[2][0] * BASE_S) ** 2) - ((val_bus.pv[2][0] * BASE_S) ** 2))
-
-            # work on this for the secondary netowrks:
-            else:
-                A_eq[counteq, nbus_ABC * 3 + nbus_s1s2 +
-                     nbus_ABC * 5 + val_bus.idx] = 1
-                A_eq[counteq, state_variable_number + val_bus.idx] = 1
-                b_eq[counteq] = val_bus.pq[0] * BASE_S * mult
-                counteq += 1
-                # Reactive power
-                A_eq[counteq, nbus_ABC * 3 + nbus_s1s2 +
-                     nbus_ABC * 5 + nbus_s1s2 + val_bus.idx] = 1
-                A_eq[counteq, n_Qdg + nbus_ABC * 2 + val_bus.idx] = -1
-                b_eq[counteq] = val_bus.pq[1] * BASE_S
-                counteq += 1
-
-                DG_up_lim[nbus_ABC * 3 + val_bus.idx
-                          ] = val_bus.pv[0] * BASE_S
+            DG_up_lim[nbus_ABC * 3 + val_bus.idx
+                      ] = val_bus.pv[0] * BASE_S
 
     # Reactive power as a function of real power and inverter rating
     countineq = 0
 
-    for keyb, val_bus in buses.items():
-        if val_bus.base_kv < PRIMARY_V:
-            A_eq[counteq, n_Qdg + nbus_ABC * 2 + val_bus.idx] = 1
-            b_eq[counteq] = 0. * val_bus['s_rated'] * BASE_S
-            counteq += 1
+    # P Q both control:
+    for k in range(n_bus):
+        A_ineq[countineq, state_variable_number + k] = -1 * math.sqrt(3)
+        A_ineq[countineq, n_Qdg + k] = -1
+        b_ineq[countineq] = math.sqrt(3)*DG_up_lim[k, 0]
+        countineq += 1
 
-    # Constraints for all bound within Maximum Capacity values
-    # Only P_dg control Variable:
-    if control is ControlType.WATT:
-        for k in range(n_bus):
-            A_ineq[countineq, state_variable_number + k] = 1
-            b_ineq[countineq] = DG_up_lim[k, 0]
-            countineq += 1
+        A_ineq[countineq, state_variable_number + k] = math.sqrt(3)
+        A_ineq[countineq, n_Qdg + k] = 1
+        b_ineq[countineq] = math.sqrt(3) * DG_up_lim[k, 0]
+        countineq += 1
 
-        for k in range(n_bus):
-            A_ineq[countineq, state_variable_number + k] = -1
-            b_ineq[countineq] = 0.0
-            countineq += 1
+        A_ineq[countineq, n_Qdg + k] = -1
+        b_ineq[countineq] = (math.sqrt(3)/2) * DG_up_lim[k, 0]
+        countineq += 1
 
-    # Only Q_dg control Variable:
-    elif control is ControlType.VAR:
-        for k in range(n_bus):
-            A_ineq[countineq, n_Qdg + k] = 1
-            b_ineq[countineq] = DG_up_lim[k, 0]
-            countineq += 1
+        A_ineq[countineq, n_Qdg + k] = 1
+        b_ineq[countineq] = (math.sqrt(3)/2) * DG_up_lim[k, 0]
+        countineq += 1
 
-        for k in range(n_bus):
-            A_ineq[countineq, n_Qdg + k] = -1
-            b_ineq[countineq] = DG_up_lim[k, 0]
-            countineq += 1
+        A_ineq[countineq, state_variable_number + k] = math.sqrt(3)
+        A_ineq[countineq, n_Qdg + k] = -1
+        b_ineq[countineq] = math.sqrt(3) * DG_up_lim[k, 0]
+        countineq += 1
+
+        A_ineq[countineq, state_variable_number + k] = -1*math.sqrt(3)
+        A_ineq[countineq, n_Qdg + k] = 1
+        b_ineq[countineq] = math.sqrt(3) * DG_up_lim[k, 0]
+        countineq += 1
+
+        # add active power limit to mppt:
+        A_ineq[countineq, state_variable_number + k] = 1
+        b_ineq[countineq] = DG_active_up_lim[k, 0]
+        countineq += 1
+
+        A_ineq[countineq, state_variable_number + k] = -1
+        b_ineq[countineq] = 0.0
+        countineq += 1
 
     # Constraint 3: 0.95^2 <= V <= 1.05^2 (For those nodes where voltage constraint exist)
     # print("Formulating voltage limit constraints")
     v_idxs = list(set(v_lim))
     # # Does the vmin make sense here?
-    if pf_flag is True:
+    if relaxed is True:
         vmax = 1.5
         vmin = 0.1
     else:
@@ -735,70 +686,70 @@ def optimal_power_flow(branch_info: dict, bus_info: dict, source_bus: str, contr
     n_flow_ABC = (nbus_ABC * 3 + nbus_s1s2) + (nbus_ABC * 6 + nbus_s1s2 * 2)
     for k in range(n_flow_ABC, n_flow_ABC + nbranch_ABC):
         line_flow[name[i]] = {}
-        line_flow[name[i]]['A'] = [x.value[k] * mul * 1000,
-                                   x.value[k + nbranch_ABC * 3] * mul * 1000]
-        line_flow[name[i]]['B'] = [x.value[k + nbranch_ABC] *
-                                   mul * 1000, x.value[k + nbranch_ABC * 4] * mul * 1000]
-        line_flow[name[i]]['C'] = [x.value[k + nbranch_ABC * 2] * mul * 1000,
-                                   x.value[k + nbranch_ABC * 5] * mul * 1000]
+        line_flow[name[i]].append([x.value[k] * mul * 1000,
+                                   x.value[k + nbranch_ABC * 3] * mul * 1000])
+        line_flow[name[i]].append([x.value[k + nbranch_ABC] *
+                                   mul * 1000, x.value[k + nbranch_ABC * 4] * mul * 1000])
+        line_flow[name[i]].append([x.value[k + nbranch_ABC * 2] * mul * 1000,
+                                   x.value[k + nbranch_ABC * 5] * mul * 1000])
         i += 1
 
     n_flow_s1s2 = (nbus_ABC*3 + nbus_s1s2) + \
         (nbus_ABC*6 + nbus_s1s2*2) + nbranch_ABC*6
-    name = []
-    for key, val_br in buses.items():
-        name.append(key)
-    bus_voltage = {}
-    i = 0
-    for k in range(nbus_ABC):
-        bus_voltage[name[k]] = {}
-        bus_voltage[name[k]]['A'] = math.sqrt(abs(x.value[k]))
-        bus_voltage[name[k]]['B'] = math.sqrt(abs(x.value[nbus_ABC + k]))
-        bus_voltage[name[k]]['C'] = math.sqrt(abs(x.value[nbus_ABC * 2 + k]))
-        i += 1
 
-    # Monish Edits
+    bus_voltage = {}
+
     for key, val_bus in buses.items():
-        # volt.append(
-        #     [name[k], '{:.4f}'.format(math.sqrt(abs(x.value[k]))),
-        #      '{:.4f}'.format(math.sqrt(abs(x.value[nbus_ABC + k]))),
-        #      '{:.4f}'.format(math.sqrt(abs(x.value[nbus_ABC * 2 + k])))])
-        bus_voltage[key] = {}
-        bus_voltage[key]['A'] = math.sqrt(abs(x.value[val_bus.idx]))
-        bus_voltage[key]['B'] = math.sqrt(
+        bus_voltage[f"{key}.1"] = math.sqrt(abs(x.value[val_bus.idx]))
+        bus_voltage[f"{key}.2"] = math.sqrt(
             abs(x.value[nbus_ABC + val_bus.idx]))
-        bus_voltage[key]['C'] = math.sqrt(
+        bus_voltage[f"{key}.3"] = math.sqrt(
             abs(x.value[nbus_ABC * 2 + val_bus.idx]))
         i += 1
 
-    if control is ControlType.WATT:
-        control_variable_idx_start = state_variable_number
-    elif control is ControlType.VAR:
-        control_variable_idx_start = n_Qdg
-
-    generation_output = np.zeros((nbus_ABC, 3))
+    P_generation_output = np.zeros((nbus_ABC, 3))
     for k in range(nbus_ABC * 3):
         # injection.append([name[k], '{:.4f}'.format((x.value[k + state_variable_number]))])
         if DG_up_lim[k, 0]:
             if k < nbus_ABC:
-                generation_output[k, 0] = (
-                    x.value[k + control_variable_idx_start])
+                P_generation_output[k, 0] = (
+                    x.value[k + state_variable_number])
             elif k < (nbus_ABC * 2):
-                generation_output[k - nbus_ABC,
-                                  1] = (x.value[k + control_variable_idx_start])
+                P_generation_output[k - nbus_ABC,
+                                    1] = (x.value[k + state_variable_number])
             else:
-                generation_output[k - (nbus_ABC * 2),
-                                  2] = (x.value[k + control_variable_idx_start])
+                P_generation_output[k - (nbus_ABC * 2),
+                                    2] = (x.value[k + state_variable_number])
+
+    Q_generation_output = np.zeros((nbus_ABC, 3))
+    for k in range(nbus_ABC * 3):
+        # injection.append([name[k], '{:.4f}'.format((x.value[k + state_variable_number]))])
+        if DG_up_lim[k, 0]:
+            if k < nbus_ABC:
+                Q_generation_output[k, 0] = (x.value[k + n_Qdg])
+            elif k < (nbus_ABC * 2):
+                Q_generation_output[k - nbus_ABC, 1] = (x.value[k + n_Qdg])
+            else:
+                Q_generation_output[k - (nbus_ABC * 2),
+                                    2] = (x.value[k + n_Qdg])
     # %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
     opf_control_variable = {}
     for key, val_bus in buses.items():
         opf_control_variable[key] = {}
-        opf_control_variable[key]['A'] = x.value[val_bus.idx +
-                                                 control_variable_idx_start]
-        opf_control_variable[key]['B'] = x.value[nbus_ABC +
-                                                 val_bus.idx + control_variable_idx_start]
-        opf_control_variable[key]['C'] = x.value[nbus_ABC *
-                                                 2 + val_bus.idx + control_variable_idx_start]
+        opf_control_variable[key]["Pdg_gen"] = {}
+        opf_control_variable[key]["Qdg_gen"] = {}
+        opf_control_variable[key]["Pdg_gen"]['A'] = x.value[val_bus.idx +
+                                                            state_variable_number]
+        opf_control_variable[key]["Pdg_gen"]['B'] = x.value[nbus_ABC +
+                                                            val_bus.idx + state_variable_number]
+        opf_control_variable[key]["Pdg_gen"]['C'] = x.value[nbus_ABC *
+                                                            2 + val_bus.idx + state_variable_number]
+        opf_control_variable[key]["Qdg_gen"]['A'] = x.value[val_bus.idx + n_Qdg]
+        opf_control_variable[key]["Qdg_gen"]['B'] = x.value[nbus_ABC +
+                                                            val_bus.idx + n_Qdg]
+        opf_control_variable[key]["Qdg_gen"]['C'] = x.value[nbus_ABC *
+                                                            2 + val_bus.idx + n_Qdg]
 
+    print(bus_voltage)
     return bus_voltage, line_flow, opf_control_variable, kw_converter
