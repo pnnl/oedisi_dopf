@@ -3,9 +3,10 @@ from pprint import pprint
 import numpy as np
 import logging
 import networkx as nx
+from pprint import pprint
 from enum import IntEnum
 from typing import Tuple
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, asdict
 from oedisi.types.data_types import (
     AdmittanceMatrix,
     AdmittanceSparse,
@@ -23,6 +24,8 @@ from oedisi.types.data_types import (
     VoltagesMagnitude,
     VoltagesReal
 )
+
+import bus_update as bu
 
 
 logger = logging.getLogger(__name__)
@@ -139,11 +142,11 @@ def pack_voltages(voltages: dict, bus_info: BusInfo, time: int) -> VoltagesMagni
     values = []
     for key, value in voltages.items():
         busid, phase = key.split(".", 1)
-        print(key, value)
+        base_kv = bus_info.buses[busid].base_kv
         if busid in bus_info.buses:
             print(key, value)
             ids.append(key)
-            values.append(value*bus_info.buses[key].base_kv)
+            values.append(value*base_kv)
     return VoltagesMagnitude(ids=ids, values=values, time=time)
 
 
@@ -243,15 +246,17 @@ def extract_transformers(incidences: Incidence) -> (list[str], list[str]):
 def generate_graph(inc: Incidence, slack_bus: str) -> nx.Graph:
     graph = nx.Graph()
     for src, dst, id in zip(inc.from_equipment, inc.to_equipment, inc.ids):
-        print(src, dst, id)
-        if "OPEN" in src or "OPEN" in dst or "61S" in src or "61S" in dst:
+        if "OPEN" in src or "OPEN" in dst:
             continue
         if src == dst:
             continue
+
+        ps = pd = ""
         if "." in src:
-            src, _ = src.split('.', 1)
+            src, ps = src.split('.', 1)
         if "." in dst:
-            dst, _ = dst.split('.', 1)
+            dst, pd = dst.split('.', 1)
+
         eq = "LINE"
         if ("sw" in id or "fuse" in id) and "padswitch" not in id:
             eq = "SWITCH"
@@ -262,6 +267,39 @@ def generate_graph(inc: Incidence, slack_bus: str) -> nx.Graph:
     for c in nx.connected_components(graph):
         if slack_bus in c:
             return graph.subgraph(c).copy()
+
+
+def tag_regulators(branch_info: BranchInfo, bus_info: BusInfo) -> BranchInfo:
+    for k, branch in branch_info.branches.items():
+        if "XFMR" != branch.tag:
+            continue
+
+        src = bus_info.buses[branch.fr_bus]
+        dst = bus_info.buses[branch.to_bus]
+
+        if round(src.base_kv, 3) == round(dst.base_kv, 3):
+            branch.tag == "REG"
+    return branch_info
+
+
+def direct_branch_flows(
+        graph: nx.Graph, branch_info: BranchInfo, source: str) -> BranchInfo:
+    dist = nx.single_source_shortest_path(graph, source)
+
+    for k, branch in branch_info.branches.items():
+        fr_idx = branch.fr_idx
+        to_idx = branch.to_idx
+        fr_bus = branch.fr_bus
+        to_bus = branch.to_bus
+        src = dist[fr_bus]
+        dst = dist[to_bus]
+
+        if src > dst:
+            branch_info.branches[k].fr_idx = to_idx
+            branch_info.branches[k].to_idx = fr_idx
+            branch_info.branches[k].fr_bus = to_bus
+            branch_info.branches[k].to_bus = fr_bus
+    return branch_info
 
 
 def disconnect_areas(graph: nx.Graph, switches) -> list[nx.Graph]:
@@ -281,7 +319,7 @@ def get_switches(graph: nx.Graph):
     return switches
 
 
-def area_dissconnects(graph: nx.Graph):
+def area_disconnects(graph: nx.Graph):
     n_max = 5
     switches = get_switches(graph)
     areas = disconnect_areas(graph, switches)
@@ -378,6 +416,177 @@ def extract_admittance(
     return branch_info
 
 
+def find_primary(graph: nx.DiGraph, bus_info: BusInfo, node: int) -> str:
+    while list(graph.predecessors(node)):
+        primary = next(graph.predecessors(node))
+        if bus_info.buses[primary].base_kv > 0.5:
+            return primary
+        node = primary
+    return None
+
+
+def get_upstream(branch_info: BranchInfo, node: str) -> str:
+    for k, branch in branch_info.branches.items():
+        if branch.to_bus == node:
+            return branch.fr_bus
+
+
+def find_branch(branch_info: BranchInfo, src: str, dst: str) -> str:
+    for k, branch in branch_info.branches.items():
+        if branch.fr_bus == src and branch.to_bus == dst:
+            return k
+
+
+def find_consecutive_phase(connected: list[list[bool]]) -> int:
+    connected_row = []
+    connected_col = []
+    for i in range(3):
+        consecutive = 0
+        for j in range(3):
+            if connected[i][j]:
+                consecutive += 1
+            else:
+                consecutive = 0
+
+            if consecutive >= 2:
+                connected_row.append(i)
+
+    for j in range(3):
+        consecutive = 0
+        for i in range(3):
+            if connected[i][j]:
+                consecutive += 1
+            else:
+                consecutive = 0
+
+            if consecutive >= 2:
+                connected_col.append(j)
+
+    if connected_col and connected_row:
+        raise Exception("hase phase in both row and col of xfmr")
+
+    if connected_row:
+        return connected_row[0]
+
+    if connected_col:
+        return connected_col[0]
+
+
+def find_connected_phases(
+        zprim: list[list[list[float]]]) -> list[list[bool]]:
+    connected = np.zeros((3, 3), dtype=bool).tolist()
+    for i in range(3):
+        for j in range(3):
+            real = abs(zprim[i][j][0])
+            imag = abs(zprim[i][j][1])
+            if real > 1e-6 or imag > 1e-6:
+                connected[i][j] = True
+
+    return connected
+
+
+def traverse_secondaries(
+        branch_info: BranchInfo,
+        bus_info: BusInfo,
+        node: str,
+        primary: str) -> list[int]:
+    secondaries = [node]
+    while node != primary:
+        node = get_upstream(branch_info, node)
+        secondaries.append(node)
+
+    for k, branch in branch_info.branches.items():
+        # make sure first low side of the secondaries isn't in branch
+        if branch.fr_bus == primary and branch.to_bus == secondaries[-2]:
+            zprim = branch.zprim
+            break
+
+    connected_phases = find_connected_phases(zprim)
+    connected_phase = find_consecutive_phase(connected_phases)
+
+    if "processed" in branch.tag:
+        phases = branch.phases
+    else:
+        phases = [0]*3
+        phases[connected_phase] = connected_phase+1
+
+    for i, secondary in enumerate(secondaries):
+        if i == len(secondaries)-1:
+            continue
+
+        branch = find_branch(branch_info, secondaries[i+1], secondary)
+        if "processed" in branch_info.branches[branch].tag:
+            continue
+
+        branch_info.branches[branch].phases = phases
+        est_zprim = np.zeros((3, 3, 2)).tolist()
+        est_zprim[connected_phase][connected_phase] = [1e-5, 1e-5]
+        branch_info.branches[branch].zprim = est_zprim
+        branch_info.branches[branch].tag += ".processed"
+
+        bus_info.buses[secondary].phases = phases
+        if secondaries[i+1] != primary:
+            bus_info.buses[secondaries[i+1]].phases = phases
+
+    return connected_phase
+
+
+def process_secondary(
+        branch_info: BranchInfo,
+        bus_info: BusInfo,
+        node: str,
+        primary: str) -> (BranchInfo, BusInfo):
+    bus = bus_info.buses[node]
+    has_phase = [p != 0 for p in bus.phases]
+
+    if all(has_phase):
+        return (branch_info, bus_info)
+
+    primary_phase = traverse_secondaries(branch_info, bus_info, node, primary)
+
+    new_pq = np.zeros((3, 2)).tolist()
+    new_pv = np.zeros((3, 2)).tolist()
+    for pq, pv in zip(bus.pq, bus.pq):
+        for ppq, ppv in zip(pq, pv):
+            new_pq[primary_phase] += [ppq]
+            new_pv[primary_phase] += [ppv]
+
+    bus_info.buses[node].pq = new_pq
+    bus_info.buses[node].pv = new_pv
+
+    return (branch_info, bus_info)
+
+
+def map_secondaries(
+        branch_info: BranchInfo, bus_info: BusInfo) -> (BranchInfo, BusInfo):
+    graph = nx.DiGraph()
+    branch: Branch
+    for branch in branch_info.branches.values():
+        graph.add_edge(branch.fr_bus, branch.to_bus)
+
+    secondaries = [b for b in bus_info.buses.keys() if graph.out_degree(
+        b) == 0 and bus_info.buses[b].base_kv < 0.5]
+
+    # Process each leaf node
+    bus_data = {k: asdict(v) for k, v in bus_info.buses.items()}
+    branch_data = {k: asdict(v) for k, v in branch_info.branches.items()}
+    for secondary in secondaries:
+        primary_parent = bu.find_primary_parent(
+            secondary, bus_data, graph)
+
+        if primary_parent:
+            bu.process_secondary_side(
+                secondary, primary_parent, bus_data, branch_data)
+
+    bus_info.buses = {k: Bus(**v) for k, v in bus_data.items()}
+    for k in branch_data.keys():
+        if "processed" in branch_data[k]:
+            del branch_data[k]["processed"]
+    branch_info.branches = {k: Branch(**v) for k, v in branch_data.items()}
+
+    return (branch_info, bus_info)
+
+
 def extract_info(topology: Topology) -> (BranchInfo, BusInfo, str):
     branch_info = BranchInfo()
     bus_info = BusInfo()
@@ -390,11 +599,13 @@ def extract_info(topology: Topology) -> (BranchInfo, BusInfo, str):
         bus_info.buses[u] = Bus()
         bus_info.buses[v] = Bus()
 
+    branch_info = direct_branch_flows(graph, branch_info, slack_bus)
     branch_info = extract_admittance(branch_info, topology.admittance)
     branch_info = generate_zprim(branch_info)
     bus_info = extract_base_voltages(
         bus_info, topology.base_voltage_magnitudes)
     bus_info = extract_base_injection(bus_info, topology.injections)
+    branch_info = tag_regulators(branch_info, bus_info)
     branch_info, bus_info = index_info(branch_info, bus_info)
 
     return (branch_info, bus_info, slack_bus)

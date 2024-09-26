@@ -16,6 +16,7 @@ import json
 import numpy as np
 import time
 import pandas as pd
+from pprint import pprint
 from pydantic import BaseModel
 from enum import Enum
 from typing import List, Optional, Union
@@ -404,7 +405,6 @@ class OMOO:
             Qpv, self.slack_bus)
         Vk_wopv = self.w_mag + self.G @ P_wopv + self.H @ Q_wopv
         V_hat = Vk_wopv + self.G @ Ppv + self.H @ Qpv
-        print(V_hat)
         diff = np.abs(V_hat - np.delete(vmagTrue, self.slack_bus))
         logger.debug(f"maximum diff is {np.max(diff)}")
         logger.debug(f"maximum V_hat is {np.max(V_hat)}")
@@ -703,7 +703,6 @@ class OMOOFederate:
             P_set, Q_set, set_power, V_hat = opf.opf_run(
                 np.abs(voltages), power_P, power_Q
             )
-            print(V_hat)
             power_set = P_set + 1j * Q_set
             power_factor = power_set.real / (np.abs(power_set) + 1e-7)
             pmpp = power_set.real / pv["kVarRated"]

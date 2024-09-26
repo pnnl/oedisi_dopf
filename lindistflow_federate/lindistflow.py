@@ -74,13 +74,12 @@ def convert_pu(
                                    for phase in v.base_pv]
 
     for k, v in branch_pu.branches.items():
-        if "XFMR" == v.tag or bus_pu.buses[v.fr_bus].base_kv < 1.0 or bus_pu.buses[v.to_bus].base_kv < 1.0:
+        if "REG" == v.tag or bus_pu.buses[v.fr_bus].base_kv < 1.0 or bus_pu.buses[v.to_bus].base_kv < 1.0:
             base_kv = 1e6  # impedance will become near zero
         else:
             base_kv = bus_pu.buses[v.fr_bus].base_kv
 
         z_base = 1 / (base_kv**2 / 100)
-        print(k, z_base, base_kv)
         branch_pu.branches[k].zprim = [[[e * z_base for e in l1]
                                         for l1 in l2] for l2 in v.zprim]
 
@@ -120,7 +119,7 @@ def voltage_cons_sec(A, b, p, frm, to, counteq, p_pri, q_pri, p_sec, q_sec, nbus
 
 def update_ratios(branch_info: BranchInfo, bus_info: BusInfo) -> BusInfo:
     for node in branch_info.branches.values():
-        if "XFMR" == node.tag:
+        if "REG" == node.tag:
             src = node.fr_bus
             dst = node.to_bus
             v1 = bus_info.buses[src].kv
@@ -370,7 +369,7 @@ def optimal_power_flow(branch_info: dict, bus_info: dict, slack_bus: str,  relax
         if val_br.tag in secondary_model:
             continue
 
-        if "XFMR" != val_br.tag:
+        if "REG" != val_br.tag:
             z = np.asarray(val_br.zprim)
             v_lim.append(val_br.fr_idx)
             v_lim.append(val_br.to_idx)
@@ -407,7 +406,7 @@ def optimal_power_flow(branch_info: dict, bus_info: dict, slack_bus: str,  relax
                 A_eq, b_eq, idx, nbus_ABC*2 + val_br.fr_idx, nbus_ABC*2 + val_br.to_idx,
                 counteq, pca, qca, pcb, qcb, pcc, qcc, nbus_ABC, nbus_s1s2, nbranch_ABC, baseZ)
             counteq += 1
-        elif "XFMR" == val_br.tag:
+        elif "REG" == val_br.tag:
             tap_ratio = buses[val_br.to_bus].tap_ratio
             # Phase A
             A_eq[counteq, val_br.fr_idx] = tap_ratio**2
@@ -685,13 +684,12 @@ def optimal_power_flow(branch_info: dict, bus_info: dict, slack_bus: str,  relax
     line_flow = {}
     n_flow_ABC = (nbus_ABC * 3 + nbus_s1s2) + (nbus_ABC * 6 + nbus_s1s2 * 2)
     for k in range(n_flow_ABC, n_flow_ABC + nbranch_ABC):
-        line_flow[name[i]] = {}
-        line_flow[name[i]].append([x.value[k] * mul * 1000,
-                                   x.value[k + nbranch_ABC * 3] * mul * 1000])
-        line_flow[name[i]].append([x.value[k + nbranch_ABC] *
-                                   mul * 1000, x.value[k + nbranch_ABC * 4] * mul * 1000])
-        line_flow[name[i]].append([x.value[k + nbranch_ABC * 2] * mul * 1000,
-                                   x.value[k + nbranch_ABC * 5] * mul * 1000])
+        line_flow[f"{name[i]}.1"] = [x.value[k] * mul * 1000,
+                                     x.value[k + nbranch_ABC * 3] * mul * 1000]
+        line_flow[f"{name[i]}.2"] = [x.value[k + nbranch_ABC] *
+                                     mul * 1000, x.value[k + nbranch_ABC * 4] * mul * 1000]
+        line_flow[f"{name[i]}.3"] = [x.value[k + nbranch_ABC * 2] * mul * 1000,
+                                     x.value[k + nbranch_ABC * 5] * mul * 1000]
         i += 1
 
     n_flow_s1s2 = (nbus_ABC*3 + nbus_s1s2) + \

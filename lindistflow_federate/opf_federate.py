@@ -177,16 +177,17 @@ class OPFFederate(object):
             "voltages_imag", h.HELICS_DATA_TYPE_STRING, ""
         )
 
-    def get_set_points(self, control: dict, bus_info: adapter.BusInfo, conversion: float):
-        setpoint = {}
+    def get_set_points(self, control: dict, bus_info: adapter.BusInfo, conversion: float) -> dict[complex]:
+        setpoints = {}
         for key, val in control.items():
             if key in bus_info.buses:
                 bus = bus_info.buses[key]
                 for tag in set(bus.tags):
                     if "PVSystem" in tag:
-                        sp = max(val)*conversion
-                        setpoint[tag] = 0.0 if sp < 0.1 else sp
-        return setpoint
+                        p = max([p for p in val["Pdg_gen"].values()])
+                        q = max([q for q in val["Qdg_gen"].values()])
+                        setpoints[key] = (p + 1j*q)*conversion
+        return setpoints
 
     def run(self) -> None:
         logger.info(f"Federate connected: {datetime.now()}")
@@ -229,6 +230,9 @@ class OPFFederate(object):
             time = voltages_real.time
             logger.debug(f"Timestep: {time}")
 
+            branch_info, bus_info = adapter.map_secondaries(
+                branch_info, bus_info)
+
             with open("bus_info.json", "w") as outfile:
                 outfile.write(json.dumps(asdict(bus_info)))
 
@@ -239,8 +243,6 @@ class OPFFederate(object):
 
             p_inj = MeasurementArray.parse_obj(
                 self.sub.available_power.json)
-            for id, v in zip(p_inj.ids, p_inj.values):
-                logger.debug(f"{id},  {v}")
 
             mode = self.static.control_type
             relaxed = self.static.relaxed
@@ -251,25 +253,19 @@ class OPFFederate(object):
             # get the control commands for the feeder federate
             commands = []
             for eq, val in real_setpts.items():
-                if val == 0:
+                if abs(val) < 1e-6:
                     continue
 
-                if mode == "real":
-                    commands.append((eq, val, 0))
-                elif mode == "imag":
-                    commands.append((eq, 0, val))
-                elif mode == "full":
-                    pass
+                print(eq, val)
+
+                commands.append((eq, val.real, val.imag))
 
             if commands:
                 self.pub_pv_set.publish(
                     json.dumps(commands)
                 )
 
-            pprint(v_mag)
             v_mag = adapter.pack_voltages(v_mag, bus_info, time)
-            pprint(v_mag)
-            pprint(voltages_ang)
             voltages = measurement_to_xarray(
                 v_mag)*np.exp(1j*measurement_to_xarray(voltages_ang))
             voltages_real, voltages_imag = xarray_to_voltages_cart(voltages)

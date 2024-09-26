@@ -31,7 +31,7 @@ sudo make install
 sudo apt install -y liblapack-dev libblas-dev libssl-dev
 
 cd $pwd/build 
-git clone --depth 1 --branch OEDISI.1.1.0 https://github.com/GRIDAPPSD/gridappsd-state-estimator 
+git clone --depth 1 --branch OEDISI.1.1.2_ekf_fixes https://github.com/GRIDAPPSD/gridappsd-state-estimator 
 cd gridappsd-state-estimator 
 git clone https://github.com/GRIDAPPSD/SuiteSparse 
 git clone https://github.com/GRIDAPPSD/json 
