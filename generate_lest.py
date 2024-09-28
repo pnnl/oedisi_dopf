@@ -49,9 +49,9 @@ def generate_feeder() -> Component:
             "profile_location": profiles,
             "opendss_location": opendss,
             "feeder_file": file,
-            "start_date": "2018-05-01 08:00:00",
+            "start_date": "2018-05-01 04:00:00",
             "number_of_timesteps": 4,
-            "run_freq_sec": 2*3600,
+            "run_freq_sec": 4*3600,
             "topology_output": f"{OUTPUTS}/topology.json",
             "buscoords_output": f"{OUTPUTS}/Buscoords.dat"
         }

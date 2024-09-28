@@ -453,13 +453,13 @@ def go_cosim(
         )
         pub_voltages_real.publish(
             VoltagesReal(
-                **xarray_to_dict(current_data.feeder_voltages.real),
+                **xarray_to_dict(voltages.real),
                 time=current_timestamp,
             ).json()
         )
         pub_voltages_imag.publish(
             VoltagesImaginary(
-                **xarray_to_dict(current_data.feeder_voltages.imag),
+                **xarray_to_dict(voltages.imag),
                 time=current_timestamp,
             ).json()
         )
