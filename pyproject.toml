@@ -7,8 +7,8 @@ readme = "README.md"
 
 [tool.poetry.dependencies]
 python = "^3.12"
-helics-apps = "^3.2.1"
-helics = "^3.2.1"
+helics-apps = "^3.4.0"
+helics = "^3.4.0"
 pydantic = "^1.7"
 cvxpy = "^1.5"
 numpy = "^2.0.0"
