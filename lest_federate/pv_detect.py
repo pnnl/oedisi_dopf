@@ -66,7 +66,7 @@ def voltage_cons_pri(
 
 
 def base_voltage_dict2(bus_info: dict) -> (list[float], list[str]):
-    values = [bus['kv'] for bus in bus_info.values()]
+    values = [bus['base_kv'] for bus in bus_info.values()]
     ids = []
     for key, bus in bus_info.items():
         for phase in range(3):
@@ -96,14 +96,14 @@ def get_hmat(
     secondary_model = ['TPX_LINE', 'SPLIT_PHASE']
     name = []
     for b_eq in branch_info:
-        if branch_info[b_eq]['type'] in secondary_model:
+        if branch_info[b_eq]['tag'] in secondary_model:
             nbranch_s1s2 += 1
         else:
             nbranch_ABC += 1
 
     for b_eq in bus_info:
         name.append(b_eq)
-        if bus_info[b_eq]['kv'] > PRIMARY_V:
+        if bus_info[b_eq]['base_kv'] > PRIMARY_V:
             nbus_ABC += 1
         else:
             nbus_s1s2 += 1
@@ -133,22 +133,22 @@ def get_hmat(
             # Find bus idx in "from" of branch_sw_data
             ind_frm = 0
             ind_to = 0
-            if val_bus['kv'] < PRIMARY_V:
+            if val_bus['base_kv'] < PRIMARY_V:
                 # if the bus is a part of a split phase transformer
                 for key, val_br in branch_info.items():
-                    if val_bus['idx'] == val_br['from']:
+                    if val_bus['idx'] == val_br['fr_idx']:
                         k_frm_1p.append(ind_frm - nbranch_ABC)
 
-                    if val_bus['idx'] == val_br['to']:
+                    if val_bus['idx'] == val_br['to_idx']:
                         k_to_1p.append(ind_to - nbranch_ABC)
                     ind_to += 1
                     ind_frm += 1
 
             else:
-                # iterate through all the branches and find all whose 'from' or 'to' bus match the current bus
+                # iterate through all the branches and find all whose 'fr_idx' or 'to_idx' bus match the current bus
                 for key, val_br in branch_info.items():
-                    if val_bus['idx'] == val_br['from']:
-                        if bus_info[val_br['to_bus']]['kv'] > PRIMARY_V:
+                    if val_bus['idx'] == val_br['fr_idx']:
+                        if bus_info[val_br['to_bus']]['base_kv'] > PRIMARY_V:
                             k_frm_3p.append(ind_frm)
                         else:
                             if key[-1] == 'a':
@@ -167,8 +167,8 @@ def get_hmat(
                                 k_frm_1qc.append(
                                     nbranch_ABC * 1 + ind_frm - nbranch_ABC + nbranch_s1s2)
 
-                    if val_bus['idx'] == val_br['to']:
-                        if bus_info[val_br['fr_bus']]['kv'] > PRIMARY_V:
+                    if val_bus['idx'] == val_br['to_idx']:
+                        if bus_info[val_br['fr_bus']]['base_kv'] > PRIMARY_V:
                             k_to_3p.append(ind_to)
                         else:
                             k_to_1p.append(ind_to - nbranch_ABC)
@@ -237,14 +237,14 @@ def get_hmat(
     v_lim = []
     for k, val_br in branch_info.items():
         # compute base impedance
-        basekV = bus_info[val_br['to_bus']]['kv']
+        basekV = bus_info[val_br['to_bus']]['base_kv']
         baseZ = (basekV ** 2) / (_SBASE)
 
         # Not writing voltage constraints for transformers
-        if val_br['type'] not in secondary_model:
+        if val_br['tag'] not in secondary_model:
             z = np.asarray(val_br['zprim'])
-            v_lim.append(val_br['from'])
-            v_lim.append(val_br['to'])
+            v_lim.append(val_br['fr_idx'])
+            v_lim.append(val_br['to_idx'])
             # Writing three phase voltage constraints
             # Phase A
             paa, qaa = -2 * z[0, 0][0], -2 * z[0, 0][1]
@@ -254,7 +254,7 @@ def get_hmat(
                 - z[0, 2][1] + math.sqrt(3) * z[0, 2][0])
             A2, Av = voltage_cons_pri(
                 A2, Av,
-                idx, val_br['from'], val_br['to'],
+                idx, val_br['fr_idx'], val_br['to_idx'],
                 paa, qaa, pab, qab, pac, qac, baseZ,
                 nbranch_ABC, nbranch_ABC * 0, nbus_ABC * 0)
 
@@ -266,7 +266,7 @@ def get_hmat(
                 - z[1, 2][1] - math.sqrt(3) * z[1, 2][0])
             A2, Av = voltage_cons_pri(
                 A2, Av,
-                idx, val_br['from'], val_br['to'],
+                idx, val_br['fr_idx'], val_br['to_idx'],
                 pba, qba, pbb, qbb, pbc, qbc, baseZ,
                 nbranch_ABC, nbranch_ABC * 1, nbus_ABC * 1)
 
@@ -278,7 +278,7 @@ def get_hmat(
                 - z[0, 2][1] + math.sqrt(3) * z[1, 2][0])
             A2, Av = voltage_cons_pri(
                 A2, Av,
-                idx, val_br['from'], val_br['to'],
+                idx, val_br['fr_idx'], val_br['to_idx'],
                 pca, qca, pcb, qcb, pcc, qcc, baseZ,
                 nbranch_ABC, nbranch_ABC * 2, nbus_ABC * 2)
 
@@ -378,24 +378,25 @@ def get_pq2(
             pq[count + n_bus * 5] = val_bus['pq'][2][1]
 
             count += 1
+
     pq_load = np.zeros(shape=(6 * n_bus,))
     count = 0
     for keyb, val_bus in bus_info.items():
         if keyb != source_bus:
             # Real power injection at a bus
             # Phase A Real Power
-            pq_load[count + n_bus * 0] = val_bus['pq_forecast'][0][0]
+            pq_load[count + n_bus * 0] = val_bus['base_pq'][0][0]
             # Phase B Real Power
-            pq_load[count + n_bus * 1] = val_bus['pq_forecast'][1][0]
+            pq_load[count + n_bus * 1] = val_bus['base_pq'][1][0]
             # Phase C Real Power
-            pq_load[count + n_bus * 2] = val_bus['pq_forecast'][2][0]
+            pq_load[count + n_bus * 2] = val_bus['base_pq'][2][0]
 
             # Phase A Reactive Power
-            pq_load[count + n_bus * 3] = val_bus['pq_forecast'][0][1]
+            pq_load[count + n_bus * 3] = val_bus['base_pq'][0][1]
             # Phase B Reactive Power
-            pq_load[count + n_bus * 4] = val_bus['pq_forecast'][1][1]
+            pq_load[count + n_bus * 4] = val_bus['base_pq'][1][1]
             # Phase C Reactive Power
-            pq_load[count + n_bus * 5] = val_bus['pq_forecast'][2][1]
+            pq_load[count + n_bus * 5] = val_bus['base_pq'][2][1]
 
             count += 1
     return pq/(SBASE), -1*pq_load/(SBASE)
@@ -507,9 +508,19 @@ def get_v(
     for keyb, val_bus in bus_info.items():
         if keyb == source_bus:
             slack_index = [count, count + n_bus, count + 2 * n_bus]
-        v[count + n_bus * 0] = val_bus['vmag'][0]
-        v[count + n_bus * 1] = val_bus['vmag'][1]
-        v[count + n_bus * 2] = val_bus['vmag'][2]
+
+        vmag = [0.0]*3
+        kv = val_bus['kv']
+        if kv == 0:
+            kv = val_bus['base_kv']
+
+        for p in val_bus['phases']:
+            if p != 0:
+                vmag[p-1] = val_bus['kv']
+
+        v[count + n_bus * 0] = vmag[0]
+        v[count + n_bus * 1] = vmag[1]
+        v[count + n_bus * 2] = vmag[2]
         count += 1
     return v, slack_index
 
@@ -521,9 +532,9 @@ def get_vbase(
     v = np.zeros(shape=(3 * n_bus,))
     for keyb, val_bus in bus_info.items():
         idx = val_bus["idx"]
-        v[idx + n_bus * 0] = val_bus['kv']*1000.0
-        v[idx + n_bus * 1] = val_bus['kv']*1000.0
-        v[idx + n_bus * 2] = val_bus['kv']*1000.0
+        v[idx + n_bus * 0] = val_bus['base_kv']*1000.0
+        v[idx + n_bus * 1] = val_bus['base_kv']*1000.0
+        v[idx + n_bus * 2] = val_bus['base_kv']*1000.0
     return v
 
 
@@ -623,8 +634,7 @@ def run_dsse(
     # measurement_all = H @ x_check_all
 
     v_lin_all = measurement_all[:H_check.shape[0]]
-    pl_lin_all = measurement_all[H_check.shape[0]
-        : H_check.shape[0] + A_inc.shape[1]]
+    pl_lin_all = measurement_all[H_check.shape[0]: H_check.shape[0] + A_inc.shape[1]]
     ql_lin_all = measurement_all[H_check.shape[0] +
                                  A_inc.shape[1]: H_check.shape[0] + (2 * A_inc.shape[1])]
     p_inj_all = measurement_all[H_check.shape[0] +
@@ -658,10 +668,8 @@ def run_dsse(
     x_est = G_inv @ H.transpose() @ W @ Z_meas
     v_sub_est = np.sqrt(x_est[:len(vslack)])
     p_inj_est = x_est[len(vslack): len(vslack) + (1 * A_inc.shape[1])]
-    q_inj_est = x_est[len(vslack) + (1 * A_inc.shape[1])
-                          : len(vslack) + (2 * A_inc.shape[1])]
-    Ppv_inj_est = x_est[len(vslack) + (2 * A_inc.shape[1])
-                            : len(vslack) + (3 * A_inc.shape[1])]
+    q_inj_est = x_est[len(vslack) + (1 * A_inc.shape[1]): len(vslack) + (2 * A_inc.shape[1])]
+    Ppv_inj_est = x_est[len(vslack) + (2 * A_inc.shape[1]): len(vslack) + (3 * A_inc.shape[1])]
     Qpv_inj_est = x_est[len(vslack) + (3 * A_inc.shape[1]):]
 
     p = Ppv_inj_est * base_s / 1e3
@@ -671,9 +679,5 @@ def run_dsse(
     nodes = [node for i, node in enumerate(nodes) if i not in vslack]
     powers_real = map_values(nodes, p)
     powers_imag = map_values(nodes, q)
-
-    for k, v in powers_real.items():
-        if v > 0:
-            print(k, v)
 
     return (powers_real, powers_imag)

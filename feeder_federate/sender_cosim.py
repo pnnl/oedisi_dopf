@@ -1,5 +1,5 @@
 """HELICS wrapper for OpenDSS feeder simulation."""
-
+from pprint import pprint
 import json
 import logging
 from dataclasses import dataclass
@@ -175,13 +175,16 @@ def get_initial_data(sim: FeederSimulator, config: FeederConfig):
     PQ_cap = sim.get_PQs_cap(static=True)
 
     sim.solve(0, 0)
-    power_real, power_imaginary = get_powers(-PQ_load, -PQ_PV, -PQ_gen, -PQ_cap)
-    injections = Injection(power_real=power_real, power_imaginary=power_imaginary)
+    power_real, power_imaginary = get_powers(
+        -PQ_load, -PQ_PV, -PQ_gen, -PQ_cap)
+    injections = Injection(power_real=power_real,
+                           power_imaginary=power_imaginary)
 
     feeder_voltages = sim.get_voltages_actual()
     feeder_angles: npt.NDArray[np.float64] = np.angle(feeder_voltages.data)
     phases = list(map(get_true_phases, feeder_angles))
-    base_voltageangle = VoltagesAngle(values=phases, ids=list(feeder_voltages.ids.data))
+    base_voltageangle = VoltagesAngle(
+        values=phases, ids=list(feeder_voltages.ids.data))
 
     topology = Topology(
         admittance=admittancematrix,
@@ -200,7 +203,8 @@ def agg_to_ids(x: xr.core.dataarray.DataArray, ids):
     if x.shape == (0,):
         return target
 
-    _, x_grouped = xr.align(ids, x.groupby("ids").sum(), join="left", fill_value=0.0)
+    _, x_grouped = xr.align(ids, x.groupby("ids").sum(),
+                            join="left", fill_value=0.0)
     return x_grouped
 
 
@@ -224,8 +228,10 @@ def get_current_data(sim: FeederSimulator, Y):
     PQ_cap = sim.get_PQs_cap(static=False)
 
     # Assumes everything is controllable!
-    power_real, power_imaginary = get_powers(-PQ_load, -PQ_PV, -PQ_gen, -PQ_cap)
-    injections = Injection(power_real=power_real, power_imaginary=power_imaginary)
+    power_real, power_imaginary = get_powers(
+        -PQ_load, -PQ_PV, -PQ_gen, -PQ_cap)
+    injections = Injection(power_real=power_real,
+                           power_imaginary=power_imaginary)
 
     ids = xr.DataArray(
         sim._AllNodeNames,
@@ -241,13 +247,15 @@ def get_current_data(sim: FeederSimulator, Y):
     )
 
     PQ_injections_all = PQ_injections_all.assign_coords(
-        equipment_ids=("ids", list(map(lambda x: x.split(".")[0], sim._AllNodeNames)))
+        equipment_ids=("ids", list(
+            map(lambda x: x.split(".")[0], sim._AllNodeNames)))
     )
     calculated_power = (
         feeder_voltages * (Y.conjugate() @ feeder_voltages.conjugate()) / 1000
     )
 
-    PQ_injections_all[sim._source_indexes] = -calculated_power[sim._source_indexes]
+    PQ_injections_all[sim._source_indexes] = - \
+        calculated_power[sim._source_indexes]
 
     Y_load = sim.get_load_y_matrix()
     return CurrentData(
@@ -289,23 +297,27 @@ def go_cosim(
     h.helicsFederateInfoSetCoreName(fedinfo, config.name)
     h.helicsFederateInfoSetCoreTypeFromString(fedinfo, "zmq")
     h.helicsFederateInfoSetCoreInitString(fedinfo, fedinitstring)
-    h.helicsFederateInfoSetTimeProperty(fedinfo, h.helics_property_time_delta, deltat)
+    h.helicsFederateInfoSetTimeProperty(
+        fedinfo, h.helics_property_time_delta, deltat)
     vfed = h.helicsCreateValueFederate(config.name, fedinfo)
 
     pub_voltages_real = h.helicsFederateRegisterPublication(
-        vfed, "voltages_real", h.HELICS_DATA_TYPE_STRING, ""
+        vfed, "voltage_real", h.HELICS_DATA_TYPE_STRING, ""
     )
     pub_voltages_imag = h.helicsFederateRegisterPublication(
-        vfed, "voltages_imag", h.HELICS_DATA_TYPE_STRING, ""
+        vfed, "voltage_imag", h.HELICS_DATA_TYPE_STRING, ""
     )
     pub_voltages_magnitude = h.helicsFederateRegisterPublication(
-        vfed, "voltages_magnitude", h.HELICS_DATA_TYPE_STRING, ""
+        vfed, "voltage_mag", h.HELICS_DATA_TYPE_STRING, ""
+    )
+    pub_voltages_angle = h.helicsFederateRegisterPublication(
+        vfed, "voltage_angle", h.HELICS_DATA_TYPE_STRING, ""
     )
     pub_powers_real = h.helicsFederateRegisterPublication(
-        vfed, "powers_real", h.HELICS_DATA_TYPE_STRING, ""
+        vfed, "power_real", h.HELICS_DATA_TYPE_STRING, ""
     )
     pub_powers_imag = h.helicsFederateRegisterPublication(
-        vfed, "powers_imag", h.HELICS_DATA_TYPE_STRING, ""
+        vfed, "power_imag", h.HELICS_DATA_TYPE_STRING, ""
     )
     pub_topology = h.helicsFederateRegisterPublication(
         vfed, "topology", h.HELICS_DATA_TYPE_STRING, ""
@@ -359,8 +371,8 @@ def go_cosim(
 
     logger.info("Evaluating the forecasted PV")
     forecast_data = sim.forcast_pv(int(config.number_of_timesteps))
-    PVforecast = [MeasurementArray(**xarray_to_dict(forecast), 
-                    units="kW").json() for forecast in forecast_data]
+    PVforecast = [MeasurementArray(**xarray_to_dict(forecast),
+                                   units="kW").json() for forecast in forecast_data]
     pub_pv_forecast.publish(json.dumps(PVforecast))
 
     granted_time = -1
@@ -426,10 +438,16 @@ def go_cosim(
             f"Publish load {current_data.feeder_voltages.ids.data[0]} "
             f"{current_data.feeder_voltages.data[0]}"
         )
-        voltage_magnitudes = np.abs(current_data.feeder_voltages)
+        voltages = current_data.feeder_voltages
         pub_voltages_magnitude.publish(
             VoltagesMagnitude(
-                **xarray_to_dict(voltage_magnitudes),
+                **xarray_to_dict(np.abs(voltages)),
+                time=current_timestamp,
+            ).json()
+        )
+        pub_voltages_angle.publish(
+            VoltagesAngle(
+                **xarray_to_dict(np.arctan2(voltages.imag, voltages.real)),
                 time=current_timestamp,
             ).json()
         )

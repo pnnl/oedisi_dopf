@@ -43,23 +43,27 @@
     "dynamic_outputs": [
         {
             "type": "VoltagesMagnitude",
-            "port_id": "voltages_magnitude"
+            "port_id": "voltage_mag"
+        },
+        {
+            "type": "VoltagesAngle",
+            "port_id": "voltage_angle"
         },
         {
             "type": "VoltagesReal",
-            "port_id": "voltages_real"
+            "port_id": "voltage_real"
         },
         {
             "type": "VoltagesImaginary",
-            "port_id": "voltages_imag"
+            "port_id": "voltage_imag"
         },
         {
             "type": "PowersReal",
-            "port_id": "powers_real"
+            "port_id": "power_real"
         },
         {
             "type": "PowersImaginary",
-            "port_id": "powers_imag"
+            "port_id": "power_imag"
         },
         {
             "type": "Topology",
