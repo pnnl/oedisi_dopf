@@ -123,6 +123,7 @@ class FeederSimulator(object):
         self._profile_location = config.profile_location
         self._sensor_location = config.sensor_location
         self._buscoords_output = config.buscoords_output
+        self._topology_output = config.topology_output
         self._use_smartds = config.use_smartds
         self._user_uploads_model = config.user_uploads_model
         self._inverter_to_pvsystems = {}

@@ -1,5 +1,0 @@
-{
-	"Feeder":"feeder_federate/component_definition.json",
-	"Recorder":"recorder_federate/component_definition.json",
-	"OptimalPowerFlow":"lindistflow_federate/component_definition.json"
-}

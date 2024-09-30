@@ -8,9 +8,6 @@ from oedisi.componentframework.system_configuration import (
 
 ROOT = os.getcwd()
 ALGO = "lindistflow"
-MODEL = ""
-PV_LEVEL = "low"
-ES_LEVEL = "none"
 NAME = ""
 OUTPUTS = ""
 SCENARIOS = ""
@@ -20,11 +17,11 @@ SMART_DS = {
     "SFO/P6U": "p6uhs10_1247/p6uhs10_1247--p6udt5293",
     "SFO/P9U": "p9uhs16_1247/p9uhs16_1247--p9udt12866"
 }
-
+MODELS = ["ieee123", "SFO/P1U", "SFO/P6U", "SFO/P9U"]
 LEVELS = ["low", "medium", "high", "extreme"]
 
 
-def generate_feeder() -> Component:
+def generate_feeder(MODEL: str, LEVEL: str, OUTPUTS: str) -> Component:
     if "ieee" in MODEL:
         smart_ds = False
         base = "gadal_ieee123"
@@ -35,7 +32,7 @@ def generate_feeder() -> Component:
         smart_ds = True
         base = f"SMART-DS/v1.0/2018/{MODEL}"
         scenario = f"scenarios/solar_{
-            PV_LEVEL}_batteries_{ES_LEVEL}_timeseries"
+            LEVEL}_batteries_none_timeseries"
         profiles = f"{base}/profiles"
         opendss = f"{base}/{scenario}/opendss/{SMART_DS[MODEL]}"
         file = "opendss/Master.dss"
@@ -58,17 +55,15 @@ def generate_feeder() -> Component:
     )
 
 
-def generate_recorder(port: str, ctx: str, src: str) -> (Component, Link):
+def generate_recorder(port: str, src: str, OUTPUTS: str) -> (Component, Link):
     component = Component(
-        name=f"recorder_{port}_{ctx}",
+        name=f"recorder_{port}",
         type="Recorder",
         parameters={
-            "feather_filename": f"{OUTPUTS}/{port}_{ctx}.feather",
-            "csv_filename": f"{OUTPUTS}/{port}_{ctx}.csv",
+            "feather_filename": f"{OUTPUTS}/{port}.feather",
+            "csv_filename": f"{OUTPUTS}/{port}.csv",
         }
     )
-    if "sensor" in src:
-        port = "publication"
     link = Link(
         source=src,
         source_port=port,
@@ -78,15 +73,15 @@ def generate_recorder(port: str, ctx: str, src: str) -> (Component, Link):
     return (component, link)
 
 
-def generate_sensor(port: str, ctx: str, src: str) -> (Component, Link):
-    if "powers_real" in port:
-        file = "real_ids.json"
-    if "powers_imag" in port:
-        file = "reactive_ids.json"
+def generate_sensor(port: str, src: str) -> (Component, Link):
+    if "power_real" in port:
+        file = "sensors/real_ids.json"
+    if "power_imag" in port:
+        file = "sensors/reactive_ids.json"
     if "voltage" in port:
-        file = "voltage_ids.json"
+        file = "sensors/voltage_ids.json"
     component = Component(
-        name=f"sensor_{port}_{ctx}",
+        name=f"sensor_{port}",
         type="Sensor",
         parameters={
             "additive_noise_stddev": 0.01,
@@ -103,41 +98,16 @@ def generate_sensor(port: str, ctx: str, src: str) -> (Component, Link):
     return (component, link)
 
 
-if __name__ == "__main__":
-    if len(sys.argv) < 2:
-        print(
-            "generate_lindistflow.py <model> [pv penetration] [es penetration]\n")
-        print("\tex. generate_indistflow.py ieee123")
-        print("\tex. generate_indistflow.py SFO/P1U extreme low\n")
-        print("Available Smart-DS Models:")
-        print("\t", list(SMART_DS.keys()), "\n")
-        print("Available Penetration levels:")
-        print("\t", LEVELS, "\n")
-        exit()
-
-    MODEL = sys.argv[1]
-    if len(sys.argv) == 3:
-        if sys.argv[2] not in LEVELS:
-            print("PV_LEVEL must be: ", LEVELS)
-            exit()
-        PV_LEVEL = sys.argv[2]
-
-    if len(sys.argv) == 4:
-        lvl = sys.argv[3]
-        if lvl not in LEVELS and lvl != "none":
-            print("ES_LEVEL must be none or: ", LEVELS)
-            exit()
-        ES_LEVEL = sys.argv[3]
-
+def generate(MODEL: str, LEVEL: str) -> None:
     OUTPUTS = f"{ROOT}/outputs/{ALGO}/{MODEL}"
     SCENARIOS = f"{ROOT}/scenarios/{ALGO}/{MODEL}"
 
     if "ieee" not in MODEL:
-        OUTPUTS = f"{OUTPUTS}/{PV_LEVEL}/{ES_LEVEL}"
-        SCENARIOS = f"{SCENARIOS}/{PV_LEVEL}/{ES_LEVEL}"
+        OUTPUTS = f"{OUTPUTS}/{LEVEL}"
+        SCENARIOS = f"{SCENARIOS}/{LEVEL}"
 
     system = WiringDiagram(name=f"{ALGO}_{MODEL}", components=[], links=[])
-    feeder = generate_feeder()
+    feeder = generate_feeder(MODEL, LEVEL, OUTPUTS)
     system.components.append(feeder)
 
     algo = Component(
@@ -151,38 +121,73 @@ if __name__ == "__main__":
     )
     system.components.append(algo)
 
-    for subject in ["voltages", "powers"]:
-        port = f"{subject}_real"
-        component, link = generate_recorder(port, "ref", feeder.name)
-        system.components.append(component)
-        system.links.append(link)
+    port = "voltage_real"
+    component, link = generate_recorder(port, feeder.name, OUTPUTS)
+    system.components.append(component)
+    system.links.append(link)
 
-        system.links.append(Link(
-            source=feeder.name,
-            source_port=port,
-            target=algo.name,
-            target_port=port
-        ))
+    system.links.append(Link(
+        source=feeder.name,
+        source_port=port,
+        target=algo.name,
+        target_port=port
+    ))
 
-        component, link = generate_recorder(port, "algo", algo.name)
-        system.components.append(component)
-        system.links.append(link)
+    port = "voltage_imag"
+    component, link = generate_recorder(port, feeder.name, OUTPUTS)
+    system.components.append(component)
+    system.links.append(link)
 
-        port = f"{subject}_imag"
-        component, link = generate_recorder(port, "ref", feeder.name)
-        system.components.append(component)
-        system.links.append(link)
+    system.links.append(Link(
+        source=feeder.name,
+        source_port=port,
+        target=algo.name,
+        target_port=port
+    ))
 
-        system.links.append(Link(
-            source=feeder.name,
-            source_port=port,
-            target=algo.name,
-            target_port=port
-        ))
+    port = "power_real"
+    component, link = generate_recorder(port, feeder.name, OUTPUTS)
+    system.components.append(component)
+    system.links.append(link)
 
-        component, link = generate_recorder(port, "algo", algo.name)
-        system.components.append(component)
-        system.links.append(link)
+    system.links.append(Link(
+        source=feeder.name,
+        source_port=port,
+        target=algo.name,
+        target_port=port
+    ))
+
+    port = "power_imag"
+    component, link = generate_recorder(port, feeder.name, OUTPUTS)
+    system.components.append(component)
+    system.links.append(link)
+
+    system.links.append(Link(
+        source=feeder.name,
+        source_port=port,
+        target=algo.name,
+        target_port=port
+    ))
+
+    port = "voltage_mag"
+    component, link = generate_recorder(port, algo.name, OUTPUTS)
+    system.components.append(component)
+    system.links.append(link)
+
+    port = "voltage_angle"
+    component, link = generate_recorder(port, algo.name, OUTPUTS)
+    system.components.append(component)
+    system.links.append(link)
+
+    port = "power_mag"
+    component, link = generate_recorder(port, algo.name, OUTPUTS)
+    system.components.append(component)
+    system.links.append(link)
+
+    port = "power_angle"
+    component, link = generate_recorder(port, algo.name, OUTPUTS)
+    system.components.append(component)
+    system.links.append(link)
 
     ctx = "pv_set"
     system.links.append(Link(
@@ -233,3 +238,9 @@ if __name__ == "__main__":
 
     with open(f"{SCENARIOS}/components.json", 'w') as f:
         f.write(json.dumps(components))
+
+
+if __name__ == "__main__":
+    for model in MODELS:
+        for level in LEVELS:
+            generate(model, level)

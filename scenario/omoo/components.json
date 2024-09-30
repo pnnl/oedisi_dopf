@@ -1,5 +1,0 @@
-{
-	"LocalFeeder":"feeder_federate/component_definition.json",
-	"Recorder":"recorder_federate/component_definition.json",
-	"OMOOComponent":"omoo_federate/component_definition.json"
-}

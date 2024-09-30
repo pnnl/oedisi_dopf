@@ -8,20 +8,20 @@
         {"type": "", "port_id": "relaxed"}
     ],
     "dynamic_inputs": [
-        {"type": "VoltagesReal", "port_id": "voltages_real"},
-        {"type": "VoltagesImaginary", "port_id": "voltages_imag"},
+        {"type": "VoltagesReal", "port_id": "voltage_real"},
+        {"type": "VoltagesImaginary", "port_id": "voltage_imag"},
         {"type": "Topology", "port_id": "topology"},
         {"type": "Injections", "port_id": "injections"},
         {"type": "PowersReal", "port_id": "available_power"},
-        {"type": "PowersReal", "port_id": "powers_real"},
-        {"type": "PowersImaginary", "port_id": "powers_imag"},
+        {"type": "PowersReal", "port_id": "power_real"},
+        {"type": "PowersImaginary", "port_id": "power_imag"},
         {"type": "", "port_id":"pv_forecast", "optional": true}
     ],
     "dynamic_outputs": [
         {"type": "CommandList", "port_id": "pv_set"},
-        {"type": "VoltagesReal", "port_id": "voltages_real"},
-        {"type": "VoltagesImaginary", "port_id": "voltages_imag"},
-        {"type": "PowersReal", "port_id": "powers_real"},
-        {"type": "PowersImaginary", "port_id": "powers_imag"}
+        {"type": "PowersMagnitude", "port_id": "power_mag"},
+        {"type": "PowersAngle", "port_id": "power_angle"},
+        {"type": "VoltagesMagnitude", "port_id": "voltage_mag"},
+        {"type": "VoltagesAngle", "port_id": "voltage_angle"}
     ]
 }

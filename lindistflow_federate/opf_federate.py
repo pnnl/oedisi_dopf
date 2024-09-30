@@ -35,10 +35,10 @@ logger.setLevel(logging.DEBUG)
 def eqarray_to_xarray(eq: EquipmentNodeArray):
     return xr.DataArray(
         eq.values,
-        dims=("eqnode",),
+        dims=('ids',),
         coords={
-            "equipment_ids": ("eqnode", eq.equipment_ids),
-            "ids": ("eqnode", eq.ids),
+            "ids": eq.ids,
+            "equipment_ids": ("ids", eq.equipment_ids),
         },
     )
 
@@ -148,13 +148,13 @@ class OPFFederate(object):
         self.sub.topology = self.fed.register_subscription(
             self.inputs["topology"], "")
         self.sub.powers_imag = self.fed.register_subscription(
-            self.inputs["powers_imag"], "")
+            self.inputs["power_imag"], "")
         self.sub.powers_real = self.fed.register_subscription(
-            self.inputs["powers_real"], "")
+            self.inputs["power_real"], "")
         self.sub.voltages_imag = self.fed.register_subscription(
-            self.inputs["voltages_imag"], "")
+            self.inputs["voltage_imag"], "")
         self.sub.voltages_real = self.fed.register_subscription(
-            self.inputs["voltages_real"], "")
+            self.inputs["voltage_real"], "")
         self.sub.injections = self.fed.register_subscription(
             self.inputs["injections"], "")
         self.sub.available_power = self.fed.register_subscription(
@@ -164,17 +164,17 @@ class OPFFederate(object):
         self.pub_pv_set = self.fed.register_publication(
             "pv_set", h.HELICS_DATA_TYPE_STRING, ""
         )
-        self.pub_powers_real = self.fed.register_publication(
-            "powers_real", h.HELICS_DATA_TYPE_STRING, ""
+        self.pub_powers_mag = self.fed.register_publication(
+            "power_mag", h.HELICS_DATA_TYPE_STRING, ""
         )
-        self.pub_powers_imag = self.fed.register_publication(
-            "powers_imag", h.HELICS_DATA_TYPE_STRING, ""
+        self.pub_powers_angle = self.fed.register_publication(
+            "power_angle", h.HELICS_DATA_TYPE_STRING, ""
         )
-        self.pub_voltages_real = self.fed.register_publication(
-            "voltages_real", h.HELICS_DATA_TYPE_STRING, ""
+        self.pub_voltages_mag = self.fed.register_publication(
+            "voltage_mag", h.HELICS_DATA_TYPE_STRING, ""
         )
-        self.pub_voltages_imag = self.fed.register_publication(
-            "voltages_imag", h.HELICS_DATA_TYPE_STRING, ""
+        self.pub_voltages_angle = self.fed.register_publication(
+            "voltage_angle", h.HELICS_DATA_TYPE_STRING, ""
         )
 
     def get_set_points(self, control: dict, bus_info: adapter.BusInfo, conversion: float) -> dict[complex]:
@@ -223,12 +223,15 @@ class OPFFederate(object):
             voltages = measurement_to_xarray(
                 voltages_real) + 1j*measurement_to_xarray(voltages_imag)
 
-            voltages_mag, voltages_ang = xarray_to_voltages_pol(voltages)
-            bus_info = adapter.extract_voltages(
-                bus_info, voltages_mag)
-
             time = voltages_real.time
             logger.debug(f"Timestep: {time}")
+
+            voltages_mag, voltages_ang = xarray_to_voltages_pol(voltages)
+            voltages_mag.time = time
+            voltages_ang.time = time
+
+            bus_info = adapter.extract_voltages(
+                bus_info, voltages_mag)
 
             branch_info, bus_info = adapter.map_secondaries(
                 branch_info, bus_info)
@@ -250,13 +253,15 @@ class OPFFederate(object):
                 branch_info, bus_info, slack_bus, relaxed)
             real_setpts = self.get_set_points(control, bus_info, conversion)
 
+            pprint(p_real)
+
             # get the control commands for the feeder federate
             commands = []
             for eq, val in real_setpts.items():
                 if abs(val) < 1e-6:
                     continue
 
-                print(eq, val)
+                print("setting: ", eq, val)
 
                 commands.append((eq, val.real, val.imag))
 
@@ -266,23 +271,27 @@ class OPFFederate(object):
                 )
 
             v_mag = adapter.pack_voltages(v_mag, bus_info, time)
-            voltages = measurement_to_xarray(
-                v_mag)*np.exp(1j*measurement_to_xarray(voltages_ang))
-            voltages_real, voltages_imag = xarray_to_voltages_cart(voltages)
-            voltages_real.time = time
-            voltages_imag.time = time
-            self.pub_voltages_real.publish(
-                voltages_real.json()
+            power_real = adapter.pack_powers_real(powers_real, p_real, time)
+
+            power = eqarray_to_xarray(
+                power_real) + 1j*eqarray_to_xarray(powers_imag)
+
+            power_mag, power_ang = xarray_to_powers_pol(power)
+            power_mag.time = time
+            power_ang.time = time
+
+            self.pub_voltages_mag.publish(
+                v_mag.json()
             )
-            self.pub_voltages_imag.publish(
-                voltages_imag.json()
+            self.pub_voltages_angle.publish(
+                voltages_ang.json()
             )
 
-            self.pub_powers_real.publish(
-                powers_real.json()
+            self.pub_powers_mag.publish(
+                power_mag.json()
             )
-            self.pub_powers_imag.publish(
-                powers_imag.json()
+            self.pub_powers_angle.publish(
+                power_mag.json()
             )
 
         self.stop()

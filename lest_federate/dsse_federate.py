@@ -203,7 +203,6 @@ class EstimatorFederate(object):
             voltages_mag = VoltagesMagnitude.parse_obj(
                 self.sub.voltages_mag.json)
 
-            print(self.sub.voltages_angle.json)
             voltages_angle = VoltagesAngle.parse_obj(
                 self.sub.voltages_angle.json)
             bus_info = adapter.extract_voltages(

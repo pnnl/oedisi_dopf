@@ -749,5 +749,4 @@ def optimal_power_flow(branch_info: dict, bus_info: dict, slack_bus: str,  relax
         opf_control_variable[key]["Qdg_gen"]['C'] = x.value[nbus_ABC *
                                                             2 + val_bus.idx + n_Qdg]
 
-    print(bus_voltage)
     return bus_voltage, line_flow, opf_control_variable, kw_converter

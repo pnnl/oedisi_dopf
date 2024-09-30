@@ -144,10 +144,33 @@ def pack_voltages(voltages: dict, bus_info: BusInfo, time: int) -> VoltagesMagni
         busid, phase = key.split(".", 1)
         base_kv = bus_info.buses[busid].base_kv
         if busid in bus_info.buses:
-            print(key, value)
             ids.append(key)
             values.append(value*base_kv)
     return VoltagesMagnitude(ids=ids, values=values, time=time)
+
+
+def pack_powers_real(base: PowersReal, powers: dict, time: int) -> PowersReal:
+    ids = []
+    eq_ids = []
+    values = []
+    for id, eq in zip(base.ids, base.equipment_ids):
+        if id in powers:
+            ids.append(id)
+            eq_ids.append(eq)
+            values.append(round(powers[id], 6))
+    return PowersReal(ids=ids, equipment_ids=eq_ids, values=values, time=time)
+
+
+def pack_powers_imag(base: PowersImaginary, powers: dict, time: int) -> PowersImaginary:
+    ids = []
+    eq_ids = []
+    values = []
+    for id, eq in zip(base.ids, base.equipment_ids):
+        if id in powers:
+            ids.append(id)
+            eq_ids.append(eq)
+            values.append(round(powers[id], 6))
+    return PowersReal(ids=ids, equipment_ids=eq_ids, values=values, time=time)
 
 
 def extract_forecast(bus: dict, forecast) -> dict:
