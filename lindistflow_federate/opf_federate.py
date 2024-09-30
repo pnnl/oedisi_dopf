@@ -249,11 +249,12 @@ class OPFFederate(object):
 
             mode = self.static.control_type
             relaxed = self.static.relaxed
-            v_mag, p_real, control, conversion = lindistflow.solve(
+            v_mag, pq, control, conversion = lindistflow.solve(
                 branch_info, bus_info, slack_bus, relaxed)
             real_setpts = self.get_set_points(control, bus_info, conversion)
 
-            pprint(p_real)
+            p = {k: p[0] for k, p in pq.items()}
+            q = {k: p[1] for k, p in pq.items()}
 
             # get the control commands for the feeder federate
             commands = []
@@ -271,7 +272,8 @@ class OPFFederate(object):
                 )
 
             v_mag = adapter.pack_voltages(v_mag, bus_info, time)
-            power_real = adapter.pack_powers_real(powers_real, p_real, time)
+            power_real = adapter.pack_powers_real(powers_real, p, time)
+            power_imag = adapter.pack_powers_imag(powers_real, q, time)
 
             power = eqarray_to_xarray(
                 power_real) + 1j*eqarray_to_xarray(powers_imag)
