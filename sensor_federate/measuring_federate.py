@@ -107,8 +107,7 @@ class MeasurementRelay:
     def transform(self, measurement_array: MeasurementArray, unique_ids):
         new_array = reindex(measurement_array, unique_ids)
         return apply(
-            lambda x: (
-                1 + self.rng.normal(scale=self.multiplicative_noise_stddev)) * x
+            lambda x: (1 + self.rng.normal(scale=self.multiplicative_noise_stddev)) * x
             + self.rng.normal(scale=self.additive_noise_stddev),
             new_array,
         )
@@ -118,8 +117,7 @@ class MeasurementRelay:
         self.vfed.enter_executing_mode()
         logger.info("Entering execution mode")
 
-        granted_time = h.helicsFederateRequestTime(
-            self.vfed, h.HELICS_TIME_MAXTIME)
+        granted_time = h.helicsFederateRequestTime(self.vfed, h.HELICS_TIME_MAXTIME)
         while granted_time < h.HELICS_TIME_MAXTIME:
             logger.info("start time: " + str(datetime.now()))
             json_data = self.sub_measurement.json
@@ -130,15 +128,13 @@ class MeasurementRelay:
 
             with open(self.measurement_file, "r") as fp:
                 self.measurement = json.load(fp)
-            measurement_transformed = self.transform(
-                measurement, self.measurement)
+            measurement_transformed = self.transform(measurement, self.measurement)
             logger.debug("measured transformed")
             logger.debug(measurement_transformed)
 
             self.pub_measurement.publish(measurement_transformed.json())
 
-            granted_time = h.helicsFederateRequestTime(
-                self.vfed, h.HELICS_TIME_MAXTIME)
+            granted_time = h.helicsFederateRequestTime(self.vfed, h.HELICS_TIME_MAXTIME)
             logger.info("end time: " + str(datetime.now()))
 
         self.destroy()

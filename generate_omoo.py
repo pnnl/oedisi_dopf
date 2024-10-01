@@ -2,7 +2,9 @@ import os
 import sys
 import json
 from oedisi.componentframework.system_configuration import (
-    WiringDiagram, Component, Link
+    WiringDiagram,
+    Component,
+    Link,
 )
 
 
@@ -18,7 +20,7 @@ SCENARIOS = ""
 SMART_DS = {
     "SFO/P1U": "p1uhs0_1247/p1uhs0_1247--p1udt942",
     "SFO/P6U": "p6uhs10_1247/p6uhs10_1247--p6udt5293",
-    "SFO/P9U": "p9uhs16_1247/p9uhs16_1247--p9udt12866"
+    "SFO/P9U": "p9uhs16_1247/p9uhs16_1247--p9udt12866",
 }
 
 LEVELS = ["low", "medium", "high", "extreme"]
@@ -53,8 +55,8 @@ def generate_feeder() -> Component:
             "number_of_timesteps": 1,
             "run_freq_sec": 900,
             "topology_output": f"{OUTPUTS}/topology.json",
-            "buscoords_output": f"{OUTPUTS}/Buscoords.dat"
-        }
+            "buscoords_output": f"{OUTPUTS}/Buscoords.dat",
+        },
     )
 
 
@@ -65,15 +67,12 @@ def generate_recorder(port: str, ctx: str, src: str) -> (Component, Link):
         parameters={
             "feather_filename": f"{OUTPUTS}/{port}_{ctx}.feather",
             "csv_filename": f"{OUTPUTS}/{port}_{ctx}.csv",
-        }
+        },
     )
     if "sensor" in src:
         port = "publication"
     link = Link(
-        source=src,
-        source_port=port,
-        target=component.name,
-        target_port="subscription"
+        source=src, source_port=port, target=component.name, target_port="subscription"
     )
     return (component, link)
 
@@ -91,22 +90,18 @@ def generate_sensor(port: str, ctx: str, src: str) -> (Component, Link):
         parameters={
             "additive_noise_stddev": 0.01,
             "multiplicative_noise_stddev": 0.001,
-            "measurement_file": f"../{src}/{file}"
-        }
+            "measurement_file": f"../{src}/{file}",
+        },
     )
     link = Link(
-        source=src,
-        source_port=port,
-        target=component.name,
-        target_port="subscription"
+        source=src, source_port=port, target=component.name, target_port="subscription"
     )
     return (component, link)
 
 
 if __name__ == "__main__":
     if len(sys.argv) < 2:
-        print(
-            "generate_lindistflow.py <model> [pv penetration] [es penetration]\n")
+        print("generate_lindistflow.py <model> [pv penetration] [es penetration]\n")
         print("\tex. generate_indistflow.py ieee123")
         print("\tex. generate_indistflow.py SFO/P1U extreme low\n")
         print("Available Smart-DS Models:")
@@ -143,9 +138,7 @@ if __name__ == "__main__":
     algo = Component(
         name=ALGO,
         type="OptimalPowerFlow",
-        parameters={
-            "algorithm_parameters": {"tol": 1e-5}
-        }
+        parameters={"algorithm_parameters": {"tol": 1e-5}},
     )
     system.components.append(algo)
 
@@ -155,12 +148,11 @@ if __name__ == "__main__":
         system.components.append(component)
         system.links.append(link)
 
-        system.links.append(Link(
-            source=feeder.name,
-            source_port=port,
-            target=algo.name,
-            target_port=port
-        ))
+        system.links.append(
+            Link(
+                source=feeder.name, source_port=port, target=algo.name, target_port=port
+            )
+        )
 
         component, link = generate_recorder(port, "algo", algo.name)
         system.components.append(component)
@@ -171,53 +163,40 @@ if __name__ == "__main__":
         system.components.append(component)
         system.links.append(link)
 
-        system.links.append(Link(
-            source=feeder.name,
-            source_port=port,
-            target=algo.name,
-            target_port=port
-        ))
+        system.links.append(
+            Link(
+                source=feeder.name, source_port=port, target=algo.name, target_port=port
+            )
+        )
 
         component, link = generate_recorder(port, "algo", algo.name)
         system.components.append(component)
         system.links.append(link)
 
     ctx = "pv_set"
-    system.links.append(Link(
-        source=algo.name,
-        source_port=ctx,
-        target=feeder.name,
-        target_port=ctx
-    ))
+    system.links.append(
+        Link(source=algo.name, source_port=ctx, target=feeder.name, target_port=ctx)
+    )
 
     ctx = "available_power"
-    system.links.append(Link(
-        source=feeder.name,
-        source_port=ctx,
-        target=algo.name,
-        target_port=ctx
-    ))
+    system.links.append(
+        Link(source=feeder.name, source_port=ctx, target=algo.name, target_port=ctx)
+    )
 
     ctx = "injections"
-    system.links.append(Link(
-        source=feeder.name,
-        source_port=ctx,
-        target=algo.name,
-        target_port=ctx
-    ))
+    system.links.append(
+        Link(source=feeder.name, source_port=ctx, target=algo.name, target_port=ctx)
+    )
 
     ctx = "topology"
-    system.links.append(Link(
-        source=feeder.name,
-        source_port=ctx,
-        target=algo.name,
-        target_port=ctx
-    ))
+    system.links.append(
+        Link(source=feeder.name, source_port=ctx, target=algo.name, target_port=ctx)
+    )
 
     if not os.path.exists(SCENARIOS):
         os.makedirs(SCENARIOS)
 
-    with open(f"{SCENARIOS}/system.json", 'w') as f:
+    with open(f"{SCENARIOS}/system.json", "w") as f:
         f.write(system.json())
 
     check = WiringDiagram.parse_file(f"{SCENARIOS}/system.json")
@@ -229,5 +208,5 @@ if __name__ == "__main__":
             name, _ = c.name.split("_", 1)
         components[c.type] = f"{name}_federate/component_definition.json"
 
-    with open(f"{SCENARIOS}/components.json", 'w') as f:
+    with open(f"{SCENARIOS}/components.json", "w") as f:
         f.write(json.dumps(components))

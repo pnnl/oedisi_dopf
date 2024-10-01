@@ -4,7 +4,6 @@ import numpy as np
 
 
 def find_consecutive_true(matrix):
-
     connected_phase_row = []
     connected_phase_col = []
 
@@ -33,7 +32,7 @@ def find_consecutive_true(matrix):
                 # print(f"Consecutive True found in column {j} starting at row {i - 1}")
 
     if connected_phase_row and connected_phase_col:
-        raise Exception('has both row and col value in xfmr.')
+        raise Exception("has both row and col value in xfmr.")
 
     con_ph = None
     if connected_phase_row:
@@ -45,7 +44,6 @@ def find_consecutive_true(matrix):
 
 
 def find_connected_phase(zprim, threshold):
-
     # Create a 3x3 boolean matrix
     bool_matrix = []
 
@@ -66,17 +64,16 @@ def find_connected_phase(zprim, threshold):
 
 
 def find_immediate_parent_node(branch_data, current_bus: str):
-
     for branch_id, branch in branch_data.items():
-        if branch['to_bus'] == str(current_bus):
-            immediate_parent_bus = branch['fr_bus']
+        if branch["to_bus"] == str(current_bus):
+            immediate_parent_bus = branch["fr_bus"]
 
     return immediate_parent_bus
 
 
 def find_branch_key(branch_data, fr_bus, to_bus):
     for branch_id, branch in branch_data.items():
-        if branch['fr_bus'] == str(fr_bus) and branch['to_bus'] == str(to_bus):
+        if branch["fr_bus"] == str(fr_bus) and branch["to_bus"] == str(to_bus):
             branch_key = branch_id
             break
         else:
@@ -85,7 +82,6 @@ def find_branch_key(branch_data, fr_bus, to_bus):
 
 
 def correct_secondary_network(branch_data, bus_data, target_bus, leaf_bus):
-
     # Find parent node of secondary bus:
     leaf_parent_walk = [leaf_bus]
     current_bus = leaf_bus
@@ -97,24 +93,28 @@ def correct_secondary_network(branch_data, bus_data, target_bus, leaf_bus):
 
     # Iterate through the branches
     for branch_id, branch in branch_data.items():
-        if branch['fr_bus'] == str(target_bus) and branch['to_bus'] == leaf_parent_walk[-2]:
-            zprim = branch.get('zprim', None)
+        if (
+            branch["fr_bus"] == str(target_bus)
+            and branch["to_bus"] == leaf_parent_walk[-2]
+        ):
+            zprim = branch.get("zprim", None)
             break
 
     connected_phase_temp = find_connected_phase(zprim, threshold=1e-6)
 
     if "processed" in branch:
-        connected_phase = [i-1 for i in branch["phases"] if i != 0][0]
+        connected_phase = [i - 1 for i in branch["phases"] if i != 0][0]
     else:
         connected_phase = connected_phase_temp
 
     # Correct branch and bus phase till the secondary side of the xfmr
     correct_xfmr_phases = [0, 0, 0]
-    correct_xfmr_phases[connected_phase] = int(connected_phase)+1
+    correct_xfmr_phases[connected_phase] = int(connected_phase) + 1
 
-    for walk in range(len(leaf_parent_walk)-1):
+    for walk in range(len(leaf_parent_walk) - 1):
         current_br = find_branch_key(
-            branch_data, leaf_parent_walk[1 + walk], leaf_parent_walk[0 + walk])
+            branch_data, leaf_parent_walk[1 + walk], leaf_parent_walk[0 + walk]
+        )
         if "processed" in branch_data[current_br]:
             pass
         else:
@@ -122,17 +122,20 @@ def correct_secondary_network(branch_data, bus_data, target_bus, leaf_bus):
 
             corrected_zprim = list([[[0, 0], [0, 0], [0, 0]] for a in zprim])
             corrected_zprim[connected_phase][connected_phase] = [
-                1e-5, 1e-5]  # estimating secondary Zimpedances as a low value
+                1e-5,
+                1e-5,
+            ]  # estimating secondary Zimpedances as a low value
             branch_data[current_br]["zprim"] = corrected_zprim
             branch_data[current_br]["processed"] = True
 
-        bus_data[leaf_parent_walk[0+walk]]["phases"] = correct_xfmr_phases
-        if leaf_parent_walk[1+walk] != target_bus:
-            bus_data[leaf_parent_walk[1+walk]]["phases"] = correct_xfmr_phases
+        bus_data[leaf_parent_walk[0 + walk]]["phases"] = correct_xfmr_phases
+        if leaf_parent_walk[1 + walk] != target_bus:
+            bus_data[leaf_parent_walk[1 + walk]]["phases"] = correct_xfmr_phases
 
     ####
 
     return connected_phase
+
 
 # Function to find the first high voltage parent node
 
@@ -141,27 +144,29 @@ def find_primary_parent(leaf_bus, bus_data, G):
     current_bus = leaf_bus
     while list(G.predecessors(current_bus)):
         parent = next(G.predecessors(current_bus))
-        if bus_data[parent]['base_kv'] > 0.5:
+        if bus_data[parent]["base_kv"] > 0.5:
             return parent
         current_bus = parent
     return None
+
 
 # Function to update PQ values to the same phase
 
 
 def process_secondary_side(leaf_bus, parent_bus, bus_data, branch_data):
-    leaf_pq = bus_data[leaf_bus]['pq']
-    leaf_pv = bus_data[leaf_bus]['pv']
+    leaf_pq = bus_data[leaf_bus]["pq"]
+    leaf_pv = bus_data[leaf_bus]["pv"]
     # parent_NZ_phase_idx = [idx for idx, val in enumerate(parent_phases) if val != 0]
 
-    leaf_phases = bus_data[leaf_bus]['phases']
+    leaf_phases = bus_data[leaf_bus]["phases"]
     leaf_phase_bool = [p != 0 for p in leaf_phases]
 
     if sum(leaf_phase_bool) == 3:
         pass
     else:
         parent_phases = correct_secondary_network(
-            branch_data, bus_data, parent_bus, leaf_bus)
+            branch_data, bus_data, parent_bus, leaf_bus
+        )
 
         # Assign all PQ of the leaf node to the corresponding phases of the parent node
         # Create an empty PQ for three phases
@@ -178,28 +183,30 @@ def process_secondary_side(leaf_bus, parent_bus, bus_data, branch_data):
         new_pv[parent_phases] = leaf_pv_sum
 
         # Update the leaf node's PQ
-        bus_data[leaf_bus]['pq'] = new_pq
-        bus_data[leaf_bus]['pv'] = new_pv
+        bus_data[leaf_bus]["pq"] = new_pq
+        bus_data[leaf_bus]["pv"] = new_pv
 
     # Function to update the direction of the branch based on distance from root
 
 
-def update_branch_direction_based_on_root(branch_data, root_node='P1UDT942-P1UHS0_1247X'):
+def update_branch_direction_based_on_root(
+    branch_data, root_node="P1UDT942-P1UHS0_1247X"
+):
     G = nx.Graph()
 
     for branch_id, branch in branch_data.items():
-        from_bus = branch['fr_bus']
-        to_bus = branch['to_bus']
+        from_bus = branch["fr_bus"]
+        to_bus = branch["to_bus"]
         G.add_edge(from_bus, to_bus)
 
     # Use BFS to calculate the shortest path from the root to all nodes
     distances_from_root = nx.single_source_shortest_path_length(G, root_node)
 
     for branch_id, branch in branch_data.items():
-        from_bus = branch['fr_bus']
-        to_bus = branch['to_bus']
-        from_idx = branch['fr_idx']
-        to_idx = branch['to_idx']
+        from_bus = branch["fr_bus"]
+        to_bus = branch["to_bus"]
+        from_idx = branch["fr_idx"]
+        to_idx = branch["to_idx"]
 
         # Get distances of from_bus and to_bus from the root node
         from_distance = distances_from_root[from_bus]
@@ -208,10 +215,10 @@ def update_branch_direction_based_on_root(branch_data, root_node='P1UDT942-P1UHS
         # If the from_bus is farther from the root than to_bus, swap them
         if from_distance > to_distance:
             # Swap the buses
-            branch_data[branch_id]['fr_bus'] = to_bus
-            branch_data[branch_id]['to_bus'] = from_bus
-            branch_data[branch_id]['fr_idx'] = to_idx
-            branch_data[branch_id]['to_idx'] = from_idx
+            branch_data[branch_id]["fr_bus"] = to_bus
+            branch_data[branch_id]["to_bus"] = from_bus
+            branch_data[branch_id]["fr_idx"] = to_idx
+            branch_data[branch_id]["to_idx"] = from_idx
             print(f"Swapped {branch_id}: from {from_bus} to {
                   to_bus} (now {to_bus} to {from_bus})")
         else:

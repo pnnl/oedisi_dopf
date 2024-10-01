@@ -4,14 +4,16 @@ import plotter
 
 
 def plot_result_case(
-
-        casename, alg,
-        time=["07:30", "12:30", "15:30"],
-        coordsys="2D",
-        root="150", seperator="    ", annotate=True,
-        ymin=0.98, ymax=1.06,
+    casename,
+    alg,
+    time=["07:30", "12:30", "15:30"],
+    coordsys="2D",
+    root="150",
+    seperator="    ",
+    annotate=True,
+    ymin=0.98,
+    ymax=1.06,
 ):
-
     # Directory location
     directory = f"./outputs/{casename}"
     topology_filepath = os.path.join(directory, "topology.json")
@@ -62,7 +64,8 @@ def plot_result_case(
         imag_voltage_filepath,
         opf_voltage_filepath,
         time=time,
-        show=False, to_file=fig_filename,
+        show=False,
+        to_file=fig_filename,
         figsize=(60, 15),
         suptitle_sfx=f"({alg} Algorithm)",
     )
@@ -71,22 +74,18 @@ def plot_result_case(
     fig_filename = os.path.join(directory, f"forecast_curtail_{casename}.png")
     plotter.plot_curtail(
         forecast_curtail_file,
-        show=False, 
+        show=False,
         to_file=fig_filename,
-        suptitle_pfx = "Forecasted "
+        suptitle_pfx="Forecasted ",
     )
     fig_filename = os.path.join(directory, f"real_curtail_{casename}.png")
     plotter.plot_curtail(
-        real_curtail_file,
-        show=False, 
-        to_file=fig_filename,
-        suptitle_pfx = "Real-time "
+        real_curtail_file, show=False, to_file=fig_filename, suptitle_pfx="Real-time "
     )
     return
 
 
 if __name__ == "__main__":
-
     case = sys.argv[1]
     time = ["07:30", "12:30", "15:30"]
 
@@ -167,8 +166,13 @@ if __name__ == "__main__":
         sys.exit(0)
 
     plot_result_case(
-        case, alg,
-        time=time, coordsys=cordsys,
-        root=root, seperator=seperator, annotate=annotate,
-        ymin=ymin, ymax=ymax,
+        case,
+        alg,
+        time=time,
+        coordsys=cordsys,
+        root=root,
+        seperator=seperator,
+        annotate=annotate,
+        ymin=ymin,
+        ymax=ymax,
     )

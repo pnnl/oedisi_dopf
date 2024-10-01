@@ -11,11 +11,11 @@ def extract_complex(real_path: str, imag_path) -> (list[datetime], np.ndarray):
     c = np.empty([len(real), 2], dtype=np.complex64)
     c.real = real.drop("time", axis=1)
     c.imag = imag.drop("time", axis=1)
-    return (real['time'], c)
+    return (real["time"], c)
 
 
 if __name__ == "__main__":
-    assert (sys.argv.count() > 2)
+    assert sys.argv.count() > 2
     scenario = sys.argv[1]
 
     root = os.getcwd()

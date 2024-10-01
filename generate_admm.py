@@ -3,12 +3,14 @@ from lindistflow_federate.adapter import (
     area_dissconnects,
     disconnect_areas,
     reconnect_area_switches,
-    get_area_source
+    get_area_source,
 )
 from pprint import pprint
 from oedisi.types.data_types import Topology
 from oedisi.componentframework.system_configuration import (
-    WiringDiagram, Component, Link
+    WiringDiagram,
+    Component,
+    Link,
 )
 import networkx as nx
 import copy
@@ -57,10 +59,10 @@ if __name__ == "__main__":
         src = []
         for u, v, a in boundaries:
             if area.has_edge(u, v):
-                print('\t', a['id'])
+                print("\t", a["id"])
                 src.append((u, v, a))
         su, sv, sa = get_area_source(G, slack_bus, src)
-        print("\tsource: ", sa['id'])
+        print("\tsource: ", sa["id"])
 
     path = f"{SCENARIO_DIR}/{scenario}/system.json"
     system = get_system(path)

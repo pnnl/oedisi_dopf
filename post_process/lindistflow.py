@@ -3,11 +3,7 @@ import os
 import pandas as pd
 import numpy as np
 
-from oedisi.types.data_types import (
-    Topology,
-    VoltagesReal,
-    VoltagesImaginary
-)
+from oedisi.types.data_types import Topology, VoltagesReal, VoltagesImaginary
 
 ROOT = os.getcwd()
 ALGO = "lindistflow"

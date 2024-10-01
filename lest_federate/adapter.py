@@ -22,7 +22,7 @@ from oedisi.types.data_types import (
     VoltagesAngle,
     VoltagesImaginary,
     VoltagesMagnitude,
-    VoltagesReal
+    VoltagesReal,
 )
 
 import bus_update as bu
@@ -41,11 +41,13 @@ class Branch:
     idx: int = 0
     fr_idx: int = 0
     to_idx: int = 0
-    phases: list[int] = field(default_factory=lambda: [0]*3)
+    phases: list[int] = field(default_factory=lambda: [0] * 3)
     zprim: list[list[list[float]]] = field(
-        default_factory=lambda: np.zeros((3, 3, 2)).tolist())
+        default_factory=lambda: np.zeros((3, 3, 2)).tolist()
+    )
     y: list[list[complex]] = field(
-        default_factory=lambda: np.zeros((3, 3), dtype=complex).tolist())
+        default_factory=lambda: np.zeros((3, 3), dtype=complex).tolist()
+    )
 
 
 @dataclass
@@ -57,18 +59,18 @@ class BranchInfo:
 class Bus:
     idx: int = 0
     tags: list[str] = field(default_factory=list)
-    phases: list[int] = field(default_factory=lambda: [0]*3)
+    phases: list[int] = field(default_factory=lambda: [0] * 3)
     base_kv: float = 0.0
     tap_ratio: float = 0.0
     base_pq: list[list[float]] = field(
-        default_factory=lambda: np.zeros((3, 2)).tolist())
+        default_factory=lambda: np.zeros((3, 2)).tolist()
+    )
     base_pv: list[list[float]] = field(
-        default_factory=lambda: np.zeros((3, 2)).tolist())
+        default_factory=lambda: np.zeros((3, 2)).tolist()
+    )
     kv: float = 0.0
-    pq: list[list[float]] = field(
-        default_factory=lambda: np.zeros((3, 2)).tolist())
-    pv: list[list[float]] = field(
-        default_factory=lambda: np.zeros((3, 2)).tolist())
+    pq: list[list[float]] = field(default_factory=lambda: np.zeros((3, 2)).tolist())
+    pv: list[list[float]] = field(default_factory=lambda: np.zeros((3, 2)).tolist())
 
 
 @dataclass
@@ -78,7 +80,7 @@ class BusInfo:
 
 def check_radiality(branch_info: BranchInfo, bus_info: BusInfo) -> bool:
     print(len(bus_info.buses), len(branch_info.branches))
-    if len(bus_info.buses)-len(branch_info.branches) == 1:
+    if len(bus_info.buses) - len(branch_info.branches) == 1:
         return True
 
     logger.debug("Network is not Radial")
@@ -87,8 +89,7 @@ def check_radiality(branch_info: BranchInfo, bus_info: BusInfo) -> bool:
     return False
 
 
-def index_info(
-        branch_info: BranchInfo, bus_info: BusInfo) -> (BranchInfo, BusInfo):
+def index_info(branch_info: BranchInfo, bus_info: BusInfo) -> (BranchInfo, BusInfo):
     for i, bus in enumerate(bus_info.buses.values()):
         bus.idx = i
 
@@ -102,7 +103,7 @@ def index_info(
 
 def generate_zprim(branch_info: BranchInfo) -> BranchInfo:
     for branch in branch_info.branches.values():
-        z = -1*np.linalg.pinv(branch.y)
+        z = -1 * np.linalg.pinv(branch.y)
         branch.y = []
         for idx, value in np.ndenumerate(z):
             row = idx[0]
@@ -111,8 +112,7 @@ def generate_zprim(branch_info: BranchInfo) -> BranchInfo:
     return branch_info
 
 
-def extract_base_voltages(
-        bus_info: BusInfo, voltages: VoltagesMagnitude) -> dict:
+def extract_base_voltages(bus_info: BusInfo, voltages: VoltagesMagnitude) -> dict:
     for id, voltage in zip(voltages.ids, voltages.values):
         name, phase = id.split(".", 1)
         phase = int(phase) - 1
@@ -120,8 +120,8 @@ def extract_base_voltages(
         if name not in bus_info.buses:
             continue
 
-        bus_info.buses[name].base_kv = voltage/1000.0
-        bus_info.buses[name].phases[phase] = phase+1
+        bus_info.buses[name].base_kv = voltage / 1000.0
+        bus_info.buses[name].phases[phase] = phase + 1
     return bus_info
 
 
@@ -133,7 +133,7 @@ def extract_voltages(bus_info: BusInfo, voltages: VoltagesMagnitude) -> dict:
         if name not in bus_info.buses:
             continue
 
-        bus_info.buses[name].kv = voltage/1000.0
+        bus_info.buses[name].kv = voltage / 1000.0
     return bus_info
 
 
@@ -145,7 +145,7 @@ def pack_voltages(voltages: dict, bus_info: BusInfo, time: int) -> VoltagesMagni
         base_kv = bus_info.buses[busid].base_kv
         if busid in bus_info.buses:
             ids.append(key)
-            values.append(value*base_kv)
+            values.append(value * base_kv)
     return VoltagesMagnitude(ids=ids, values=values, time=time)
 
 
@@ -189,7 +189,7 @@ def extract_forecast(bus: dict, forecast) -> dict:
             phase = int(ph) - 1
             logger.debug(f"{eq}.{ph} : {power/len(phases)}")
             bus[name]["eqid"] = eq
-            bus[name]["pv"][phase][0] = power*1000/len(phases)
+            bus[name]["pv"][phase][0] = power * 1000 / len(phases)
             bus[name]["pv"][phase][1] = 0.0
     return bus
 
@@ -204,7 +204,7 @@ def extract_powers_real(bus_info: BusInfo, real: PowersReal) -> BusInfo:
 
         if "80" in id:
             print(id, eq, power)
-        bus_info.buses[name].pq[phase][0] -= power*1000
+        bus_info.buses[name].pq[phase][0] -= power * 1000
     return bus_info
 
 
@@ -216,7 +216,7 @@ def extract_powers_imag(bus_info: BusInfo, imag: PowersImaginary) -> BusInfo:
         if name not in bus_info.buses:
             continue
 
-        bus_info.buses[name].pq[phase][1] -= power*1000
+        bus_info.buses[name].pq[phase][1] -= power * 1000
     return bus_info
 
 
@@ -235,9 +235,9 @@ def extract_base_injection(bus_info: BusInfo, powers: Injection) -> dict:
             print(id, eq, power)
         bus_info.buses[name].tags.append(eq)
         if "PVSystem" in eq:
-            bus_info.buses[name].base_pv[phase][0] += power*1000
+            bus_info.buses[name].base_pv[phase][0] += power * 1000
         else:
-            bus_info.buses[name].base_pq[phase][0] -= power*1000
+            bus_info.buses[name].base_pq[phase][0] -= power * 1000
 
     for id, eq, power in zip(imag.ids, imag.equipment_ids, imag.values):
         name, phase = id.split(".", 1)
@@ -247,9 +247,9 @@ def extract_base_injection(bus_info: BusInfo, powers: Injection) -> dict:
             continue
 
         if "PVSystem" in eq:
-            bus_info.buses[name].base_pv[phase][1] += power*1000
+            bus_info.buses[name].base_pv[phase][1] += power * 1000
         else:
-            bus_info.buses[name].base_pq[phase][1] -= power*1000
+            bus_info.buses[name].base_pq[phase][1] -= power * 1000
     return bus_info
 
 
@@ -261,9 +261,9 @@ def extract_transformers(incidences: Incidence) -> (list[str], list[str]):
     for fr_eq, to_eq, eq_id in zip(fr_eq, to_eq, ids):
         if "tr" in eq_id or "reg" in eq_id or "xfm" in eq_id:
             if "." in to_eq:
-                [to_eq, _] = to_eq.split('.', 1)
+                [to_eq, _] = to_eq.split(".", 1)
             if "." in fr_eq:
-                [fr_eq, _] = fr_eq.split('.', 1)
+                [fr_eq, _] = fr_eq.split(".", 1)
             xfmrs.append(f"{fr_eq}_{to_eq}")
     return xfmrs
 
@@ -278,9 +278,9 @@ def generate_graph(inc: Incidence, slack_bus: str) -> nx.Graph:
 
         ps = pd = ""
         if "." in src:
-            src, ps = src.split('.', 1)
+            src, ps = src.split(".", 1)
         if "." in dst:
-            dst, pd = dst.split('.', 1)
+            dst, pd = dst.split(".", 1)
 
         eq = "LINE"
         if ("sw" in id or "fuse" in id) and "padswitch" not in id:
@@ -308,7 +308,8 @@ def tag_regulators(branch_info: BranchInfo, bus_info: BusInfo) -> BranchInfo:
 
 
 def direct_branch_flows(
-        graph: nx.Graph, branch_info: BranchInfo, source: str) -> BranchInfo:
+    graph: nx.Graph, branch_info: BranchInfo, source: str
+) -> BranchInfo:
     dist = nx.single_source_shortest_path(graph, source)
 
     for k, branch in branch_info.branches.items():
@@ -402,9 +403,9 @@ def extract_injection(bus_info: BusInfo, powers: Injection) -> dict:
         bus_info.buses[name].tags.append(eq)
         if "PVSystem" in eq:
             print(id, eq, power)
-            bus_info.buses[name].pv[phase][0] += power*1000
+            bus_info.buses[name].pv[phase][0] += power * 1000
         else:
-            bus_info.buses[name].pq[phase][0] -= power*1000
+            bus_info.buses[name].pq[phase][0] -= power * 1000
 
     for id, eq, power in zip(imag.ids, imag.equipment_ids, imag.values):
         name, phase = id.split(".", 1)
@@ -414,16 +415,14 @@ def extract_injection(bus_info: BusInfo, powers: Injection) -> dict:
             continue
 
         if "PVSystem" in eq:
-            bus_info.buses[name].pv[phase][1] += power*1000
+            bus_info.buses[name].pv[phase][1] += power * 1000
         else:
-            bus_info.buses[name].pq[phase][1] -= power*1000
+            bus_info.buses[name].pq[phase][1] -= power * 1000
     return bus_info
 
 
-def extract_admittance(
-        branch_info: BranchInfo, y: AdmittanceSparse) -> BranchInfo:
-    for src, dst, v in zip(
-            y.from_equipment, y.to_equipment, y.admittance_list):
+def extract_admittance(branch_info: BranchInfo, y: AdmittanceSparse) -> BranchInfo:
+    for src, dst, v in zip(y.from_equipment, y.to_equipment, y.admittance_list):
         src, row = src.split(".", 1)
         row = int(row) - 1
         dst, col = dst.split(".", 1)
@@ -436,12 +435,12 @@ def extract_admittance(
         rev_key = f"{dst}_{src}"
         if key in branch_info.branches:
             branch_info.branches[key].y[row][col] = complex(v[0], v[1])
-            branch_info.branches[key].phases[row] = row+1
-            branch_info.branches[key].phases[col] = col+1
+            branch_info.branches[key].phases[row] = row + 1
+            branch_info.branches[key].phases[col] = col + 1
         elif rev_key in branch_info.branches:
             branch_info.branches[rev_key].y[col][row] = complex(v[0], v[1])
-            branch_info.branches[rev_key].phases[row] = row+1
-            branch_info.branches[rev_key].phases[col] = col+1
+            branch_info.branches[rev_key].phases[row] = row + 1
+            branch_info.branches[rev_key].phases[col] = col + 1
     return branch_info
 
 
@@ -501,8 +500,7 @@ def find_consecutive_phase(connected: list[list[bool]]) -> int:
         return connected_col[0]
 
 
-def find_connected_phases(
-        zprim: list[list[list[float]]]) -> list[list[bool]]:
+def find_connected_phases(zprim: list[list[list[float]]]) -> list[list[bool]]:
     connected = np.zeros((3, 3), dtype=bool).tolist()
     for i in range(3):
         for j in range(3):
@@ -515,10 +513,8 @@ def find_connected_phases(
 
 
 def traverse_secondaries(
-        branch_info: BranchInfo,
-        bus_info: BusInfo,
-        node: str,
-        primary: str) -> list[int]:
+    branch_info: BranchInfo, bus_info: BusInfo, node: str, primary: str
+) -> list[int]:
     secondaries = [node]
     while node != primary:
         node = get_upstream(branch_info, node)
@@ -536,14 +532,14 @@ def traverse_secondaries(
     if "processed" in branch.tag:
         phases = branch.phases
     else:
-        phases = [0]*3
-        phases[connected_phase] = connected_phase+1
+        phases = [0] * 3
+        phases[connected_phase] = connected_phase + 1
 
     for i, secondary in enumerate(secondaries):
-        if i == len(secondaries)-1:
+        if i == len(secondaries) - 1:
             continue
 
-        branch = find_branch(branch_info, secondaries[i+1], secondary)
+        branch = find_branch(branch_info, secondaries[i + 1], secondary)
         if "processed" in branch_info.branches[branch].tag:
             continue
 
@@ -554,17 +550,15 @@ def traverse_secondaries(
         branch_info.branches[branch].tag += ".processed"
 
         bus_info.buses[secondary].phases = phases
-        if secondaries[i+1] != primary:
-            bus_info.buses[secondaries[i+1]].phases = phases
+        if secondaries[i + 1] != primary:
+            bus_info.buses[secondaries[i + 1]].phases = phases
 
     return connected_phase
 
 
 def process_secondary(
-        branch_info: BranchInfo,
-        bus_info: BusInfo,
-        node: str,
-        primary: str) -> (BranchInfo, BusInfo):
+    branch_info: BranchInfo, bus_info: BusInfo, node: str, primary: str
+) -> (BranchInfo, BusInfo):
     bus = bus_info.buses[node]
     has_phase = [p != 0 for p in bus.phases]
 
@@ -587,25 +581,27 @@ def process_secondary(
 
 
 def map_secondaries(
-        branch_info: BranchInfo, bus_info: BusInfo) -> (BranchInfo, BusInfo):
+    branch_info: BranchInfo, bus_info: BusInfo
+) -> (BranchInfo, BusInfo):
     graph = nx.DiGraph()
     branch: Branch
     for branch in branch_info.branches.values():
         graph.add_edge(branch.fr_bus, branch.to_bus)
 
-    secondaries = [b for b in bus_info.buses.keys() if graph.out_degree(
-        b) == 0 and bus_info.buses[b].base_kv < 0.5]
+    secondaries = [
+        b
+        for b in bus_info.buses.keys()
+        if graph.out_degree(b) == 0 and bus_info.buses[b].base_kv < 0.5
+    ]
 
     # Process each leaf node
     bus_data = {k: asdict(v) for k, v in bus_info.buses.items()}
     branch_data = {k: asdict(v) for k, v in branch_info.branches.items()}
     for secondary in secondaries:
-        primary_parent = bu.find_primary_parent(
-            secondary, bus_data, graph)
+        primary_parent = bu.find_primary_parent(secondary, bus_data, graph)
 
         if primary_parent:
-            bu.process_secondary_side(
-                secondary, primary_parent, bus_data, branch_data)
+            bu.process_secondary_side(secondary, primary_parent, bus_data, branch_data)
 
     bus_info.buses = {k: Bus(**v) for k, v in bus_data.items()}
     for k in branch_data.keys():
@@ -623,16 +619,14 @@ def extract_info(topology: Topology) -> (BranchInfo, BusInfo, str):
     graph = generate_graph(topology.incidences, slack_bus)
 
     for u, v, a in graph.edges(data=True):
-        branch_info.branches[a["name"]] = Branch(
-            fr_bus=u, to_bus=v, tag=a["tag"])
+        branch_info.branches[a["name"]] = Branch(fr_bus=u, to_bus=v, tag=a["tag"])
         bus_info.buses[u] = Bus()
         bus_info.buses[v] = Bus()
 
     branch_info = direct_branch_flows(graph, branch_info, slack_bus)
     branch_info = extract_admittance(branch_info, topology.admittance)
     branch_info = generate_zprim(branch_info)
-    bus_info = extract_base_voltages(
-        bus_info, topology.base_voltage_magnitudes)
+    bus_info = extract_base_voltages(bus_info, topology.base_voltage_magnitudes)
     branch_info = tag_regulators(branch_info, bus_info)
     branch_info, bus_info = index_info(branch_info, bus_info)
 

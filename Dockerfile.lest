@@ -1,4 +1,4 @@
-FROM python:3.10.6-slim-bullseye
+FROM python:3.12.6-slim-bullseye
 USER root
 ARG MODEL
 RUN apt-get update && apt-get install -y git ssh
@@ -15,14 +15,15 @@ RUN apt update && apt install -y \
   build-essential swig cmake git
 
 WORKDIR /simulation
-COPY scenarios/lest/$MODEL scenarios/
-COPY outputs/lest/$MODEL .
-COPY feeder_federate .
-COPY lest_federate .
-COPY recorder_federate .
-COPY sensor_federate .
-COPY generate_lest.py .
 COPY requirements.txt .
 RUN pip install -r requirements.txt
+
+COPY feeder_federate feeder_federate
+COPY lest_federate lest_federate 
+COPY recorder_federate recorder_federate 
+COPY sensor_federate sensor_federate 
+COPY generate_lest.py .
+COPY workflow_lest.ipynb .
+RUN python3 generate_lest.py $MODEL
 EXPOSE 8888
-ENTRYPOINT ["poetry jupyter", "notebook", "--allow-root", "--ip=0.0.0.0", "--no-browser"] 
+ENTRYPOINT ["jupyter", "notebook", "--allow-root", "--ip=0.0.0.0", "--no-browser"] 

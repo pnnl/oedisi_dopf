@@ -27,8 +27,7 @@ async def timeout_middleware(request: Request, call_next):
     try:
         return await asyncio.wait_for(call_next(request), timeout=REQUEST_TIMEOUT_SEC)
     except asyncio.TimeoutError:
-        endpoint = str(request.url).replace(
-            str(request.base_url), "").replace("/", "")
+        endpoint = str(request.url).replace(str(request.base_url), "").replace("/", "")
         if endpoint == "sensor":
             response = ServerReply(
                 detail="Request processing time exceeded limit. Upload a model and associated profiles before simulation before starting the simulation."
@@ -67,8 +66,7 @@ async def upload_profiles(file: UploadFile):
     try:
         data = file.file.read()
         if not file.filename.endswith(".zip"):
-            HTTPException(
-                400, "Invalid file type. Only zipped profiles are accepted.")
+            HTTPException(400, "Invalid file type. Only zipped profiles are accepted.")
 
         profile_path = "./profiles"
 
@@ -120,11 +118,9 @@ async def upload_model(file: UploadFile):
             return JSONResponse(response, 200)
 
         else:
-            HTTPException(
-                400, "A valid opendss model should have a master.dss file.")
+            HTTPException(400, "A valid opendss model should have a master.dss file.")
     except Exception as e:
-        HTTPException(
-            500, "Unknown error while uploading userdefined opendss model.")
+        HTTPException(500, "Unknown error while uploading userdefined opendss model.")
 
 
 @app.post("/run/")

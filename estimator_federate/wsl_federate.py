@@ -53,8 +53,7 @@ def calculate_jacobian(X0, z, num_node, knownP, knownQ, knownV, Y):
     deltaK, VabsK = X0[:num_node], X0[num_node:]
     num_knownV = len(knownV)
     # Calculate original H1
-    H11, H12 = np.zeros((num_knownV, num_node)), np.zeros(
-        num_knownV * num_node)
+    H11, H12 = np.zeros((num_knownV, num_node)), np.zeros(num_knownV * num_node)
     H12[np.arange(num_knownV) * num_node + knownV] = 1
     H1 = np.concatenate((H11, H12.reshape(num_knownV, num_node)), axis=1)
     Vp = VabsK * np.exp(1j * deltaK)
@@ -122,8 +121,7 @@ def matrix_to_numpy(admittance: List[List[Complex]]):
 
 def get_indices(topology, measurement):
     "Get list of indices in the topology for each index of the input measurement"
-    inv_map = {v: i for i, v in enumerate(
-        topology.base_voltage_magnitudes.ids)}
+    inv_map = {v: i for i, v in enumerate(topology.base_voltage_magnitudes.ids)}
     return [inv_map[v] for v in measurement.ids]
 
 
@@ -288,8 +286,7 @@ class StateEstimatorFederate:
         self.vfed.enter_executing_mode()
         logger.info("Entering execution mode")
 
-        granted_time = h.helicsFederateRequestTime(
-            self.vfed, h.HELICS_TIME_MAXTIME)
+        granted_time = h.helicsFederateRequestTime(self.vfed, h.HELICS_TIME_MAXTIME)
 
         self.initial_ang = None
         self.initial_V = None
@@ -315,8 +312,7 @@ class StateEstimatorFederate:
 
             logger.info("start time: " + str(datetime.now()))
 
-            voltages = VoltagesMagnitude.parse_obj(
-                self.sub_voltages_magnitude.json)
+            voltages = VoltagesMagnitude.parse_obj(self.sub_voltages_magnitude.json)
             power_P = PowersReal.parse_obj(self.sub_power_P.json)
             power_Q = PowersImaginary.parse_obj(self.sub_power_Q.json)
             knownV = get_indices(topology, voltages)
@@ -334,8 +330,7 @@ class StateEstimatorFederate:
                         / np.array(topology.base_voltage_magnitudes.values)[knownV]
                     )
             if self.initial_ang is None:
-                self.initial_ang = np.array(
-                    topology.base_voltage_angles.values)
+                self.initial_ang = np.array(topology.base_voltage_angles.values)
 
             voltage_magnitudes, voltage_angles = state_estimator(
                 self.algorithm_parameters,
@@ -377,8 +372,7 @@ def run_simulator(broker_config: BrokerConfig):
         config = json.load(f)
         federate_name = config["name"]
         if "algorithm_parameters" in config:
-            parameters = AlgorithmParameters.parse_obj(
-                config["algorithm_parameters"])
+            parameters = AlgorithmParameters.parse_obj(config["algorithm_parameters"])
         else:
             parameters = AlgorithmParameters.parse_obj({})
 
