@@ -15,8 +15,8 @@ RUN apt update && apt install -y \
   build-essential swig cmake git
 
 WORKDIR /simulation
-COPY scenarios/$MODEL scenarios/
-COPY outputs/$MODEL outputs/
+COPY scenarios/lest/$MODEL scenarios/
+COPY outputs/lest/$MODEL outputs/
 COPY builds/lest/$MODEL builds/
 COPY feeder_federate .
 COPY $lest_federate .
