@@ -84,8 +84,8 @@ def generate_sensor(port: str, src: str) -> (Component, Link):
         name=f"sensor_{port}",
         type="Sensor",
         parameters={
-            "additive_noise_stddev": 0.01,
-            "multiplicative_noise_stddev": 0.001,
+            "additive_noise_stddev": 0.0,
+            "multiplicative_noise_stddev": 0.000,
             "measurement_file": f"../{src}/{file}"
         }
     )
@@ -138,13 +138,9 @@ def generate(MODEL: str, LEVEL: str) -> None:
     system.components.append(component)
     system.links.append(link)
 
-    component, link = generate_sensor(port, feeder.name)
-    system.components.append(component)
-    system.links.append(link)
-
     system.links.append(Link(
-        source=component.name,
-        source_port="publication",
+        source=feeder.name,
+        source_port=port,
         target=algo.name,
         target_port=port
     ))
@@ -154,13 +150,9 @@ def generate(MODEL: str, LEVEL: str) -> None:
     system.components.append(component)
     system.links.append(link)
 
-    component, link = generate_sensor(port, feeder.name)
-    system.components.append(component)
-    system.links.append(link)
-
     system.links.append(Link(
-        source=component.name,
-        source_port="publication",
+        source=feeder.name,
+        source_port=port,
         target=algo.name,
         target_port=port
     ))
@@ -171,8 +163,8 @@ def generate(MODEL: str, LEVEL: str) -> None:
     system.links.append(link)
 
     system.links.append(Link(
-        source=component.name,
-        source_port="publication",
+        source=feeder.name,
+        source_port=port,
         target=algo.name,
         target_port=port
     ))
@@ -200,6 +192,16 @@ def generate(MODEL: str, LEVEL: str) -> None:
 
     port = "power_angle"
     component, link = generate_recorder(port, algo.name, OUTPUTS)
+    system.components.append(component)
+    system.links.append(link)
+
+    port = "estimated_power"
+    component, link = generate_recorder(port, algo.name, OUTPUTS)
+    system.components.append(component)
+    system.links.append(link)
+
+    port = "available_power"
+    component, link = generate_recorder(port, feeder.name, OUTPUTS)
     system.components.append(component)
     system.links.append(link)
 

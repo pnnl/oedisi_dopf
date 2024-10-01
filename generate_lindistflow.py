@@ -197,6 +197,17 @@ def generate(MODEL: str, LEVEL: str) -> None:
         target_port=ctx
     ))
 
+    ctx = "estimated_power"
+    system.links.append(Link(
+        source=feeder.name,
+        source_port=ctx,
+        target=algo.name,
+        target_port=ctx
+    ))
+    component, link = generate_recorder(port, algo.name, OUTPUTS)
+    system.components.append(component)
+    system.links.append(link)
+
     ctx = "available_power"
     system.links.append(Link(
         source=feeder.name,
@@ -204,6 +215,9 @@ def generate(MODEL: str, LEVEL: str) -> None:
         target=algo.name,
         target_port=ctx
     ))
+    component, link = generate_recorder(port, feeder.name, OUTPUTS)
+    system.components.append(component)
+    system.links.append(link)
 
     ctx = "injections"
     system.links.append(Link(

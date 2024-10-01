@@ -683,19 +683,23 @@ def optimal_power_flow(branch_info: dict, bus_info: dict, slack_bus: str,  relax
     mul = 1 / (BASE_S * 1000)
     line_flow = {}
     n_flow_ABC = (nbus_ABC * 3 + nbus_s1s2) + (nbus_ABC * 6 + nbus_s1s2 * 2)
+
+    bus_names = buses.keys()
+    for i in range(0,nbus_ABC):
+        print(bus_names[i], x.value[i*6 + voltage_count + nbus_ABC * 0])
+
     for k in range(n_flow_ABC, n_flow_ABC + nbranch_ABC):
-        if f"{from_bus[i]}.1" not in line_flow:
-            line_flow[f"{from_bus[i]}.1"] = [0.0, 0.0]
-        if f"{from_bus[i]}.2" not in line_flow:
-            line_flow[f"{from_bus[i]}.2"] = [0.0, 0.0]
-        if f"{from_bus[i]}.3" not in line_flow:
-            line_flow[f"{from_bus[i]}.3"] = [0.0, 0.0]
-        line_flow[f"{from_bus[i]}.1"] = np.add(line_flow[f"{from_bus[i]}.1"], [x.value[k] * mul * 1000,
-                                                                               x.value[k + nbranch_ABC * 3] * mul * 1000]).tolist()
-        line_flow[f"{from_bus[i]}.2"] = np.add(line_flow[f"{from_bus[i]}.2"], [x.value[k + nbranch_ABC] *
-                                                                               mul * 1000, x.value[k + nbranch_ABC * 4] * mul * 1000]).tolist()
-        line_flow[f"{from_bus[i]}.3"] = np.add(line_flow[f"{from_bus[i]}.3"], [x.value[k + nbranch_ABC * 2] * mul * 1000,
-                                                                               x.value[k + nbranch_ABC * 5] * mul * 1000]).tolist()
+        line_flow[f"{to_bus[i]}.1"] = [0.0, 0.0]
+        if f"{to_bus[i]}.2" not in line_flow:
+            line_flow[f"{to_bus[i]}.2"] = [0.0, 0.0]
+        if f"{to_bus[i]}.3" not in line_flow:
+            line_flow[f"{to_bus[i]}.3"] = [0.0, 0.0]
+        line_flow[f"{to_bus[i]}.1"] = np.add(line_flow[f"{to_bus[i]}.1"], [x.value[k] * mul * 1000,
+                                                                           x.value[k + nbranch_ABC * 3] * mul * 1000]).tolist()
+        line_flow[f"{to_bus[i]}.2"] = np.add(line_flow[f"{to_bus[i]}.2"], [x.value[k + nbranch_ABC] *
+                                                                           mul * 1000, x.value[k + nbranch_ABC * 4] * mul *1000]).tolist()
+        line_flow[f"{to_bus[i]}.3"] = np.add(line_flow[f"{to_bus[i]}.3"], [x.value[k + nbranch_ABC * 2] * mul * 1000,
+                                                                           x.value[k + nbranch_ABC * 5] * mul * 1000]).tolist()
         i += 1
 
     n_flow_s1s2 = (nbus_ABC*3 + nbus_s1s2) + \
@@ -704,11 +708,11 @@ def optimal_power_flow(branch_info: dict, bus_info: dict, slack_bus: str,  relax
     bus_voltage = {}
 
     for key, val_bus in buses.items():
-        bus_voltage[f"{key}.1"] = math.sqrt(abs(x.value[val_bus.idx]*1000))
+        bus_voltage[f"{key}.1"] = math.sqrt(abs(x.value[val_bus.idx]))
         bus_voltage[f"{key}.2"] = math.sqrt(
-            abs(x.value[nbus_ABC + val_bus.idx]*1000))
+            abs(x.value[nbus_ABC + val_bus.idx]))
         bus_voltage[f"{key}.3"] = math.sqrt(
-            abs(x.value[nbus_ABC * 2 + val_bus.idx]*1000))
+            abs(x.value[nbus_ABC * 2 + val_bus.idx]))
         i += 1
 
     P_generation_output = np.zeros((nbus_ABC, 3))

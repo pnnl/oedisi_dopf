@@ -202,7 +202,9 @@ def extract_powers_real(bus_info: BusInfo, real: PowersReal) -> BusInfo:
         if name not in bus_info.buses:
             continue
 
-        bus_info.buses[name].pq[phase][0] += power*1000
+        if "80" in id:
+            print(id, eq, power)
+        bus_info.buses[name].pq[phase][0] -= power*1000
     return bus_info
 
 
@@ -214,7 +216,7 @@ def extract_powers_imag(bus_info: BusInfo, imag: PowersImaginary) -> BusInfo:
         if name not in bus_info.buses:
             continue
 
-        bus_info.buses[name].pq[phase][1] += power*1000
+        bus_info.buses[name].pq[phase][1] -= power*1000
     return bus_info
 
 
@@ -229,6 +231,8 @@ def extract_base_injection(bus_info: BusInfo, powers: Injection) -> dict:
         if name not in bus_info.buses:
             continue
 
+        if "80" in id:
+            print(id, eq, power)
         bus_info.buses[name].tags.append(eq)
         if "PVSystem" in eq:
             bus_info.buses[name].base_pv[phase][0] += power*1000
@@ -392,8 +396,12 @@ def extract_injection(bus_info: BusInfo, powers: Injection) -> dict:
         if name not in bus_info.buses:
             continue
 
+        if "80" in id:
+            print(id, eq, power)
+
         bus_info.buses[name].tags.append(eq)
         if "PVSystem" in eq:
+            print(id, eq, power)
             bus_info.buses[name].pv[phase][0] += power*1000
         else:
             bus_info.buses[name].pq[phase][0] -= power*1000
@@ -625,7 +633,6 @@ def extract_info(topology: Topology) -> (BranchInfo, BusInfo, str):
     branch_info = generate_zprim(branch_info)
     bus_info = extract_base_voltages(
         bus_info, topology.base_voltage_magnitudes)
-    bus_info = extract_base_injection(bus_info, topology.injections)
     branch_info = tag_regulators(branch_info, bus_info)
     branch_info, bus_info = index_info(branch_info, bus_info)
 

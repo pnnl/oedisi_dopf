@@ -17,6 +17,7 @@
         {"type": "Injections", "port_id": "injections"}
     ],
     "dynamic_outputs": [
+        {"type": "PowersReal", "port_id": "estimated_power"},
         {"type": "PowersMagnitude", "port_id": "power_mag"},
         {"type": "PowersAngle", "port_id": "power_angle"},
         {"type": "VoltagesMagnitude", "port_id": "voltage_mag"},

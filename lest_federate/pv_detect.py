@@ -399,7 +399,7 @@ def get_pq2(
             pq_load[count + n_bus * 5] = val_bus['base_pq'][2][1]
 
             count += 1
-    return pq/(SBASE), -1*pq_load/(SBASE)
+    return pq/(SBASE), 1*pq_load/(SBASE)
 
 
 def get_pq(
@@ -671,13 +671,16 @@ def run_dsse(
     q_inj_est = x_est[len(vslack) + (1 * A_inc.shape[1]): len(vslack) + (2 * A_inc.shape[1])]
     Ppv_inj_est = x_est[len(vslack) + (2 * A_inc.shape[1]): len(vslack) + (3 * A_inc.shape[1])]
     Qpv_inj_est = x_est[len(vslack) + (3 * A_inc.shape[1]):]
-
-    p = Ppv_inj_est * base_s / 1e3
-    q = Qpv_inj_est * base_s / 1e3
+    
+    p = p_inj_est * base_s / 1e3
+    q = q_inj_est * base_s / 1e3
+    ppv = Ppv_inj_est * base_s / 1e3
+    qpv = Qpv_inj_est * base_s / 1e3
 
     nodes = get_nodes(bus_info)
     nodes = [node for i, node in enumerate(nodes) if i not in vslack]
     powers_real = map_values(nodes, p)
     powers_imag = map_values(nodes, q)
-
-    return (powers_real, powers_imag)
+    pv_real = map_values(nodes, ppv)
+    pv_imag = map_values(nodes, qpv)
+    return (powers_real, powers_imag, pv_real, pv_imag)

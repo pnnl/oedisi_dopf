@@ -178,6 +178,9 @@ class EstimatorFederate(object):
         self.pub_powers_angle = self.fed.register_publication(
             "power_angle", h.HELICS_DATA_TYPE_STRING, ""
         )
+        self.pub_estimated_power = self.fed.register_publication(
+            "estimated_power", h.HELICS_DATA_TYPE_STRING, ""
+        )
 
     def run(self) -> None:
         logger.info(f"Federate connected: {datetime.now()}")
@@ -218,6 +221,12 @@ class EstimatorFederate(object):
             powers_imag = PowersImaginary.parse_obj(self.sub.powers_imag.json)
             bus_info = adapter.extract_powers_imag(bus_info, powers_imag)
 
+            with open("bus_info1.json", "w") as outfile:
+                outfile.write(json.dumps(asdict(bus_info)))
+
+            with open("branch_info1.json", "w") as outfile:
+                outfile.write(json.dumps(asdict(branch_info)))
+
             branch_info, bus_info = adapter.map_secondaries(
                 branch_info, bus_info)
 
@@ -232,9 +241,10 @@ class EstimatorFederate(object):
             branch_data = {k: asdict(v)
                            for k, v in branch_info.branches.items()}
             base_s = 1e6
-            p, q = pv_detect.run_dsse(
+            p, q, ppv, ppq = pv_detect.run_dsse(
                 bus_data, branch_data, self.static.__dict__, slack_bus, base_s)
 
+            est_power = adapter.pack_powers_real(powers_real, ppv, time)
             power_real = adapter.pack_powers_real(powers_real, p, time)
             power_imag = adapter.pack_powers_imag(powers_imag, p, time)
 
@@ -250,6 +260,9 @@ class EstimatorFederate(object):
             )
             self.pub_voltages_angle.publish(
                 voltages_angle.json()
+            )
+            self.pub_estimated_power.publish(
+                est_power.json()
             )
             self.pub_powers_mag.publish(
                 power_mag.json()
