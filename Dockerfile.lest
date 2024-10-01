@@ -1,5 +1,6 @@
 FROM python:3.10.6-slim-bullseye
 USER root
+ARG ALGO
 ARG MODEL
 RUN apt-get update && apt-get install -y git ssh
 RUN mkdir -p /root/.ssh
@@ -19,7 +20,7 @@ COPY scenarios/$MODEL scenarios/
 COPY outputs/$MODEL outputs/
 COPY builds/lest/$MODEL builds/
 COPY feeder_federate .
-COPY $lest_federate .
+COPY $ALGO_federate .
 COPY recorder_federate .
 COPY sensor_federate .
 COPY generate_lest.py .
