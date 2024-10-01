@@ -5,10 +5,10 @@ Open Energy Data Initiative - Solar Systems Integration Data and Analytics (OEDI
 
 Once the container is build and running, follow the link to the jupyter notebook and selet the *workflow.ipynb* notebook and follow the instructions for selecting scenarios and running the co-simulation.
 
-- <repo> should be created in dockerhub before building to make pushing easier later
-- <tag> follow tagging convention 0.0.0
-- <model> will designate which model: ieee123, SFO/P1U, SFO/P6U, ...
-- <algo> will specify witch dockerfile to build
+- \<repo\> should be created in dockerhub before building to make pushing easier later
+- \<tag\> follow tagging convention 0.0.0
+- \<model\> will designate which model: ieee123, SFO/P1U, SFO/P6U, ...
+- \<algo\> will specify witch dockerfile to build
 
 ```shell
     docker build -t openenergydatainitiative/<repo>:<tag> --build-arg MODEL=<model> -f Dockerfile.<algo> .
