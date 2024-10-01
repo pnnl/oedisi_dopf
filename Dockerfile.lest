@@ -1,6 +1,5 @@
 FROM python:3.10.6-slim-bullseye
 USER root
-ARG ALGO
 ARG MODEL
 RUN apt-get update && apt-get install -y git ssh
 RUN mkdir -p /root/.ssh
@@ -16,15 +15,14 @@ RUN apt update && apt install -y \
   build-essential swig cmake git
 
 WORKDIR /simulation
-COPY scenarios/$MODEL scenarios/
-COPY outputs/$MODEL outputs/
-COPY builds/lest/$MODEL builds/
+COPY scenarios/lest/$MODEL scenarios/
+COPY outputs/lest/$MODEL .
 COPY feeder_federate .
-COPY $ALGO_federate .
+COPY lest_federate .
 COPY recorder_federate .
 COPY sensor_federate .
 COPY generate_lest.py .
-COPY workflow_lest.ipynb .
+COPY requirements.txt .
 RUN pip install -r requirements.txt
 EXPOSE 8888
-ENTRYPOINT ["jupyter", "notebook", "--allow-root", "--ip=0.0.0.0", "--no-browser"] 
+ENTRYPOINT ["poetry jupyter", "notebook", "--allow-root", "--ip=0.0.0.0", "--no-browser"] 
