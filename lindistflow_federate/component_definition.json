@@ -18,6 +18,7 @@
         {"type": "", "port_id":"pv_forecast", "optional": true}
     ],
     "dynamic_outputs": [
+        {"type": "PowersReal", "port_id": "estimated_power"},
         {"type": "CommandList", "port_id": "pv_set"},
         {"type": "PowersMagnitude", "port_id": "power_mag"},
         {"type": "PowersAngle", "port_id": "power_angle"},

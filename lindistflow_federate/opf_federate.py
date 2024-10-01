@@ -167,6 +167,9 @@ class OPFFederate(object):
         self.pub_pv_set = self.fed.register_publication(
             "pv_set", h.HELICS_DATA_TYPE_STRING, ""
         )
+        self.pub_estimated_power = self.fed.register_publication(
+            "estimated_power", h.HELICS_DATA_TYPE_STRING, ""
+        )
         self.pub_powers_mag = self.fed.register_publication(
             "power_mag", h.HELICS_DATA_TYPE_STRING, ""
         )
@@ -181,8 +184,7 @@ class OPFFederate(object):
         )
 
     def get_set_points(
-        self, control: dict, bus_info: adapter.BusInfo, conversion: float
-    ) -> dict[complex]:
+        self, control: dict, bus_info: adapter.BusInfo) -> dict[complex]:
         setpoints = {}
         for key, val in control.items():
             if key in bus_info.buses:
@@ -191,7 +193,7 @@ class OPFFederate(object):
                     if "PVSystem" in tag:
                         p = max([p for p in val["Pdg_gen"].values()])
                         q = max([q for q in val["Qdg_gen"].values()])
-                        setpoints[key] = (p + 1j * q) * conversion
+                        setpoints[tag] = (p + 1j * q)
         return setpoints
 
     def run(self) -> None:
@@ -247,10 +249,10 @@ class OPFFederate(object):
 
             mode = self.static.control_type
             relaxed = self.static.relaxed
-            v_mag, pq, control, conversion = lindistflow.solve(
+            v_mag, pq, control = lindistflow.solve(
                 branch_info, bus_info, slack_bus, relaxed
             )
-            real_setpts = self.get_set_points(control, bus_info, conversion)
+            real_setpts = self.get_set_points(control, bus_info)
 
             p = {k: p[0] for k, p in pq.items()}
             q = {k: p[1] for k, p in pq.items()}
@@ -272,15 +274,23 @@ class OPFFederate(object):
             power_real = adapter.pack_powers_real(powers_real, p, time)
             power_imag = adapter.pack_powers_imag(powers_real, q, time)
 
-            power = eqarray_to_xarray(power_real) + 1j * eqarray_to_xarray(powers_imag)
+            power = eqarray_to_xarray(power_real) + 1j * eqarray_to_xarray(power_imag)
 
             power_mag, power_ang = xarray_to_powers_pol(power)
             power_mag.time = time
             power_ang.time = time
 
+            est_power = MeasurementArray(
+                ids=list(real_setpts.keys()),
+                values=list(real_setpts.values()),
+                time=time,
+                units="W",
+            )
+
             self.pub_voltages_mag.publish(v_mag.json())
             self.pub_voltages_angle.publish(voltages_ang.json())
 
+            self.pub_estimated_power.publish(est_power.json())
             self.pub_powers_mag.publish(power_mag.json())
             self.pub_powers_angle.publish(power_mag.json())
 

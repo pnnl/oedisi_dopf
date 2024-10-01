@@ -169,39 +169,39 @@ def generate(MODEL: str, LEVEL: str) -> None:
     system.components.append(component)
     system.links.append(link)
 
-    ctx = "pv_set"
+    port = "pv_set"
     system.links.append(
-        Link(source=algo.name, source_port=ctx, target=feeder.name, target_port=ctx)
+        Link(source=algo.name, source_port=port, target=feeder.name, target_port=port)
     )
 
-    ctx = "estimated_power"
-    system.links.append(
-        Link(source=feeder.name, source_port=ctx, target=algo.name, target_port=ctx)
-    )
+    port = "estimated_power"
     component, link = generate_recorder(port, algo.name, OUTPUTS)
     system.components.append(component)
     system.links.append(link)
 
-    ctx = "available_power"
+    port = "available_power"
     system.links.append(
-        Link(source=feeder.name, source_port=ctx, target=algo.name, target_port=ctx)
+        Link(source=feeder.name, source_port=port, target=algo.name, target_port=port)
     )
     component, link = generate_recorder(port, feeder.name, OUTPUTS)
     system.components.append(component)
     system.links.append(link)
 
-    ctx = "injections"
+    port = "injections"
     system.links.append(
-        Link(source=feeder.name, source_port=ctx, target=algo.name, target_port=ctx)
+        Link(source=feeder.name, source_port=port, target=algo.name, target_port=port)
     )
 
-    ctx = "topology"
+    port = "topology"
     system.links.append(
-        Link(source=feeder.name, source_port=ctx, target=algo.name, target_port=ctx)
+        Link(source=feeder.name, source_port=port, target=algo.name, target_port=port)
     )
 
     if not os.path.exists(SCENARIOS):
         os.makedirs(SCENARIOS)
+
+    if not os.path.exists(OUTPUTS):
+        os.makedirs(OUTPUTS)
 
     with open(f"{SCENARIOS}/system.json", "w") as f:
         f.write(system.json())
@@ -220,6 +220,14 @@ def generate(MODEL: str, LEVEL: str) -> None:
 
 
 if __name__ == "__main__":
+    if len(sys.argv) == 2:
+        model = sys.argv[1]
+        for level in LEVELS:
+            print("generating: ", model, level)
+            generate(model, level)
+        exit()
+
     for model in MODELS:
         for level in LEVELS:
+            print("generating: ", model, level)
             generate(model, level)
