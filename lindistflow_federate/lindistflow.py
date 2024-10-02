@@ -768,8 +768,8 @@ def optimal_power_flow(
     v_idxs = list(set(v_lim))
     # # Does the vmin make sense here?
     if relaxed is True:
-        vmax = 1.5
-        vmin = 0.1
+        vmax = 1.1
+        vmin = 0.9
     else:
         vmax = 1.05
         vmin = 0.95
@@ -803,7 +803,6 @@ def optimal_power_flow(
     )
 
     prob.solve(solver=cp.ECOS, verbose=True)
-    logger.info(prob.status)
     stats = {
         "solve_time": prob.solver_stats.solve_time,
         "num_iters": prob.solver_stats.num_iters,
@@ -813,6 +812,7 @@ def optimal_power_flow(
 
     if prob.status.lower() != "optimal":
         logger.debug("Check for limits. Power flow didn't converge")
+        logger.debug(prob.status)
         raise prob.status
 
     from_bus = []
@@ -843,7 +843,7 @@ def optimal_power_flow(
         bus_flows[f"{key}.3"] = [pc, qc]
 
         if "76" in key:
-            print(key, pa, pb, pc)
+            print(key, bus_flows[f"{key}.1"], bus_flows[f"{key}.2"],bus_flows[f"{key}.3"])
 
     n_flow_s1s2 = (
         (nbus_ABC * 3 + nbus_s1s2) +

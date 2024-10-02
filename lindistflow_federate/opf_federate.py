@@ -304,7 +304,7 @@ class OPFFederate(object):
             self.pub_estimated_power.publish(est_power.json())
             self.pub_solver_stats.publish(solver_stats.json())
             self.pub_powers_mag.publish(power_mag.json())
-            self.pub_powers_angle.publish(power_mag.json())
+            self.pub_powers_angle.publish(power_ang.json())
 
         self.stop()
 
