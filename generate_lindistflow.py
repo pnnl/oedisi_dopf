@@ -119,7 +119,8 @@ def generate(MODEL: str, LEVEL: str) -> None:
     system.links.append(link)
 
     system.links.append(
-        Link(source=feeder.name, source_port=port, target=algo.name, target_port=port)
+        Link(source=feeder.name, source_port=port,
+             target=algo.name, target_port=port)
     )
 
     port = "voltage_imag"
@@ -128,7 +129,8 @@ def generate(MODEL: str, LEVEL: str) -> None:
     system.links.append(link)
 
     system.links.append(
-        Link(source=feeder.name, source_port=port, target=algo.name, target_port=port)
+        Link(source=feeder.name, source_port=port,
+             target=algo.name, target_port=port)
     )
 
     port = "power_real"
@@ -137,7 +139,8 @@ def generate(MODEL: str, LEVEL: str) -> None:
     system.links.append(link)
 
     system.links.append(
-        Link(source=feeder.name, source_port=port, target=algo.name, target_port=port)
+        Link(source=feeder.name, source_port=port,
+             target=algo.name, target_port=port)
     )
 
     port = "power_imag"
@@ -146,7 +149,8 @@ def generate(MODEL: str, LEVEL: str) -> None:
     system.links.append(link)
 
     system.links.append(
-        Link(source=feeder.name, source_port=port, target=algo.name, target_port=port)
+        Link(source=feeder.name, source_port=port,
+             target=algo.name, target_port=port)
     )
 
     port = "voltage_mag"
@@ -171,8 +175,14 @@ def generate(MODEL: str, LEVEL: str) -> None:
 
     port = "pv_set"
     system.links.append(
-        Link(source=algo.name, source_port=port, target=feeder.name, target_port=port)
+        Link(source=algo.name, source_port=port,
+             target=feeder.name, target_port=port)
     )
+
+    port = "solver_stats"
+    component, link = generate_recorder(port, algo.name, OUTPUTS)
+    system.components.append(component)
+    system.links.append(link)
 
     port = "estimated_power"
     component, link = generate_recorder(port, algo.name, OUTPUTS)
@@ -181,7 +191,8 @@ def generate(MODEL: str, LEVEL: str) -> None:
 
     port = "available_power"
     system.links.append(
-        Link(source=feeder.name, source_port=port, target=algo.name, target_port=port)
+        Link(source=feeder.name, source_port=port,
+             target=algo.name, target_port=port)
     )
     component, link = generate_recorder(port, feeder.name, OUTPUTS)
     system.components.append(component)
@@ -189,12 +200,14 @@ def generate(MODEL: str, LEVEL: str) -> None:
 
     port = "injections"
     system.links.append(
-        Link(source=feeder.name, source_port=port, target=algo.name, target_port=port)
+        Link(source=feeder.name, source_port=port,
+             target=algo.name, target_port=port)
     )
 
     port = "topology"
     system.links.append(
-        Link(source=feeder.name, source_port=port, target=algo.name, target_port=port)
+        Link(source=feeder.name, source_port=port,
+             target=algo.name, target_port=port)
     )
 
     if not os.path.exists(SCENARIOS):

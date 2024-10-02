@@ -4,8 +4,6 @@ import json
 from pathlib import Path
 from datetime import datetime
 from oedisi.types.data_types import (
-    CommandList,
-    Command,
     PowersImaginary,
     PowersReal,
     PowersMagnitude,
@@ -70,14 +68,16 @@ def xarray_to_voltages_cart(data, **kwargs):
 def xarray_to_powers_pol(data, **kwargs):
     """Conveniently turn xarray into PowersReal and PowersImaginary."""
     mag = PowersMagnitude(**xarray_to_dict(np.abs(data)), **kwargs)
-    ang = PowersAngle(**xarray_to_dict(np.arctan2(data.imag, data.real)), **kwargs)
+    ang = PowersAngle(
+        **xarray_to_dict(np.arctan2(data.imag, data.real)), **kwargs)
     return mag, ang
 
 
 def xarray_to_voltages_pol(data, **kwargs):
     """Conveniently turn xarray into PowersReal and PowersImaginary."""
     mag = VoltagesMagnitude(**xarray_to_dict(np.abs(data)), **kwargs)
-    ang = VoltagesAngle(**xarray_to_dict(np.arctan2(data.imag, data.real)), **kwargs)
+    ang = VoltagesAngle(
+        **xarray_to_dict(np.arctan2(data.imag, data.real)), **kwargs)
     return mag, ang
 
 
@@ -143,7 +143,8 @@ class OPFFederate(object):
         self.fed = h.helicsCreateValueFederate(self.static.name, self.info)
 
     def register_subscription(self) -> None:
-        self.sub.topology = self.fed.register_subscription(self.inputs["topology"], "")
+        self.sub.topology = self.fed.register_subscription(
+            self.inputs["topology"], "")
         self.sub.powers_imag = self.fed.register_subscription(
             self.inputs["power_imag"], ""
         )
@@ -167,6 +168,9 @@ class OPFFederate(object):
         self.pub_pv_set = self.fed.register_publication(
             "pv_set", h.HELICS_DATA_TYPE_STRING, ""
         )
+        self.pub_solver_stats = self.fed.register_publication(
+            "solver_stats", h.HELICS_DATA_TYPE_STRING, ""
+        )
         self.pub_estimated_power = self.fed.register_publication(
             "estimated_power", h.HELICS_DATA_TYPE_STRING, ""
         )
@@ -183,8 +187,7 @@ class OPFFederate(object):
             "voltage_angle", h.HELICS_DATA_TYPE_STRING, ""
         )
 
-    def get_set_points(
-        self, control: dict, bus_info: adapter.BusInfo) -> dict[complex]:
+    def get_set_points(self, control: dict, bus_info: adapter.BusInfo) -> dict[complex]:
         setpoints = {}
         for key, val in control.items():
             if key in bus_info.buses:
@@ -193,13 +196,14 @@ class OPFFederate(object):
                     if "PVSystem" in tag:
                         p = max([p for p in val["Pdg_gen"].values()])
                         q = max([q for q in val["Qdg_gen"].values()])
-                        setpoints[tag] = (p + 1j * q)
+                        setpoints[tag] = p + 1j * q
         return setpoints
 
     def run(self) -> None:
         logger.info(f"Federate connected: {datetime.now()}")
         self.fed.enter_executing_mode()
-        granted_time = h.helicsFederateRequestTime(self.fed, h.HELICS_TIME_MAXTIME)
+        granted_time = h.helicsFederateRequestTime(
+            self.fed, h.HELICS_TIME_MAXTIME)
 
         while granted_time < h.HELICS_TIME_MAXTIME:
             if not self.sub.injections.is_updated():
@@ -221,7 +225,8 @@ class OPFFederate(object):
             )
 
             voltages_real = VoltagesReal.parse_obj(self.sub.voltages_real.json)
-            voltages_imag = VoltagesImaginary.parse_obj(self.sub.voltages_imag.json)
+            voltages_imag = VoltagesImaginary.parse_obj(
+                self.sub.voltages_imag.json)
             voltages = measurement_to_xarray(
                 voltages_real
             ) + 1j * measurement_to_xarray(voltages_imag)
@@ -235,7 +240,8 @@ class OPFFederate(object):
 
             bus_info = adapter.extract_voltages(bus_info, voltages_mag)
 
-            branch_info, bus_info = adapter.map_secondaries(branch_info, bus_info)
+            branch_info, bus_info = adapter.map_secondaries(
+                branch_info, bus_info)
 
             with open("bus_info.json", "w") as outfile:
                 outfile.write(json.dumps(asdict(bus_info)))
@@ -247,9 +253,8 @@ class OPFFederate(object):
 
             p_inj = MeasurementArray.parse_obj(self.sub.available_power.json)
 
-            mode = self.static.control_type
             relaxed = self.static.relaxed
-            v_mag, pq, control = lindistflow.solve(
+            v_mag, pq, control, stats = lindistflow.solve(
                 branch_info, bus_info, slack_bus, relaxed
             )
             real_setpts = self.get_set_points(control, bus_info)
@@ -263,8 +268,6 @@ class OPFFederate(object):
                 if abs(val) < 1e-6:
                     continue
 
-                print("setting: ", eq, val)
-
                 commands.append((eq, val.real, val.imag))
 
             if commands:
@@ -274,11 +277,19 @@ class OPFFederate(object):
             power_real = adapter.pack_powers_real(powers_real, p, time)
             power_imag = adapter.pack_powers_imag(powers_real, q, time)
 
-            power = eqarray_to_xarray(power_real) + 1j * eqarray_to_xarray(power_imag)
+            power = eqarray_to_xarray(power_real) + \
+                1j * eqarray_to_xarray(power_imag)
 
             power_mag, power_ang = xarray_to_powers_pol(power)
             power_mag.time = time
             power_ang.time = time
+
+            solver_stats = MeasurementArray(
+                ids=list(stats.keys()),
+                values=list(stats.values()),
+                time=time,
+                units="s",
+            )
 
             est_power = MeasurementArray(
                 ids=list(real_setpts.keys()),
@@ -291,6 +302,7 @@ class OPFFederate(object):
             self.pub_voltages_angle.publish(voltages_ang.json())
 
             self.pub_estimated_power.publish(est_power.json())
+            self.pub_solver_stats.publish(solver_stats.json())
             self.pub_powers_mag.publish(power_mag.json())
             self.pub_powers_angle.publish(power_mag.json())
 
