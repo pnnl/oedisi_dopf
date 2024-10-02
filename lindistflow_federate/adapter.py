@@ -142,10 +142,9 @@ def pack_voltages(voltages: dict, bus_info: BusInfo, time: int) -> VoltagesMagni
     values = []
     for key, value in voltages.items():
         busid, phase = key.split(".", 1)
-        base_kv = bus_info.buses[busid].base_kv
         if busid in bus_info.buses:
             ids.append(key)
-            values.append(value * base_kv)
+            values.append(value)
     return VoltagesMagnitude(ids=ids, values=values, time=time)
 
 
