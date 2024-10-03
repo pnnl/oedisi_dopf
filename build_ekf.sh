@@ -4,7 +4,20 @@ export DEBIAN_FRONTEND="noninteractive"
 export TZ="America/Pacific" 
 pwd=$(pwd)
 
-sudo apt-get update 
+sudo apt update & apt upgrade -y
+
+# install pyton3.12
+sudo apt install -y build-essential libssl-dev zlib1g-dev libbz2-dev \
+    libreadline-dev libsqlite3-dev wget curl llvm libncurses5-dev libncursesw5-dev \
+    xz-utils tk-dev libffi-dev liblzma-dev python-openssl git
+wget https://www.python.org/ftp/python/3.12.0/Python-3.12.0.tgz
+tar -xf Python-3.12.0.tgz
+cd Python-3.12.0
+./configure --enable-optimizations
+make -j 8
+make altinstall
+
+
 sudo apt install -y libboost-dev libzmq5-dev git cmake-curses-gui build-essential m4 wget libaprutil1-dev liblapack-dev libblas-dev libssl-dev
 
 mkdir $pwd/build 
@@ -28,7 +41,7 @@ make
 sudo make install 
 
 cd $pwd/build 
-git clone --depth 1 --branch OEDISI.1.1.2_ekf_fixes https://github.com/GRIDAPPSD/gridappsd-state-estimator 
+git clone --branch OEDISI.1.1.2_ekf_fixes https://github.com/GRIDAPPSD/gridappsd-state-estimator 
 cd gridappsd-state-estimator 
 git clone https://github.com/GRIDAPPSD/SuiteSparse 
 git clone https://github.com/GRIDAPPSD/json 
