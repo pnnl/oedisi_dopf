@@ -1,0 +1,3 @@
+New Generator.PMU_PV  Phases=3   Bus1=55   kV=4.16 conn=wye Model=1  yearly=PMU_PV_Loadshape
+New Generator.PMU_BESS  Phases=3   Bus1=80  kV=4.16 conn=wye Model=1  yearly=PMU_BESS_Loadshape
+

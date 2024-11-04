@@ -1,0 +1,3 @@
+New Loadshape.PMU_PV_Loadshape npts=192 interval=0.25 Pmult=(file=../profiles/generator_pmu_profiles/PMU_PV_P_Scaled.csv) Qmult=(file=../profiles/generator_pmu_profiles/PMU_PV_Q_Scaled.csv) useactual=true
+New Loadshape.PMU_BESS_Loadshape npts=192 interval=0.25 Pmult=(file=../profiles/generator_pmu_profiles/PMU_BESS_P_Scaled.csv) Qmult=(file=../profiles/generator_pmu_profiles/PMU_BESS_Q_Scaled.csv) useactual=true
+
