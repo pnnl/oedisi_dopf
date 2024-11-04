@@ -23,6 +23,7 @@ networkx = "*"
 matplotlib = "*"
 geopy = "*"
 plotly = "*"
+kaleido = "*"
 
 [build-system]
 requires = ["poetry-core"]

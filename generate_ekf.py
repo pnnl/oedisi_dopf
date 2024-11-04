@@ -16,10 +16,11 @@ SCENARIOS = ""
 
 SMART_DS = {
     "SFO/P1U": "p1uhs0_1247/p1uhs0_1247--p1udt942",
+    "SFO/P3U": "p3uhs0_1247/p3uhs0_1247--p3udt69",
     "SFO/P6U": "p6uhs10_1247/p6uhs10_1247--p6udt5293",
     "SFO/P9U": "p9uhs16_1247/p9uhs16_1247--p9udt12866",
 }
-MODELS = ["ieee123", "SFO/P1U", "SFO/P6U", "SFO/P9U"]
+MODELS = ["ieee123_pmu", "SFO/P1U", "SFO/P3U", "SFO/P6U", "SFO/P9U"]
 LEVELS = ["low", "medium", "high", "extreme"]
 
 
@@ -32,7 +33,7 @@ def generate_feeder(MODEL: str, LEVEL: str, OUTPUTS: str) -> Component:
         file = "opendss/master.dss"
     else:
         smart_ds = True
-        base = f"SMART-DS/v1.0/2018/{MODEL}"
+        base = f"SMART-DS/v1.0/2017/{MODEL}"
         scenario = f"scenarios/solar_{LEVEL}_batteries_none_timeseries"
         profiles = f"{base}/profiles"
         opendss = f"{base}/{scenario}/opendss/{SMART_DS[MODEL]}"
@@ -47,9 +48,10 @@ def generate_feeder(MODEL: str, LEVEL: str, OUTPUTS: str) -> Component:
             "profile_location": profiles,
             "opendss_location": opendss,
             "feeder_file": file,
-            "start_date": "2018-05-01 04:00:00",
-            "number_of_timesteps": 4,
-            "run_freq_sec": 4 * 3600,
+            "existing_feeder_file": file,
+            "start_date": "2017-05-01 04:00:00",
+            "number_of_timesteps": 8,
+            "run_freq_sec": 2 * 3600,
             "topology_output": f"{OUTPUTS}/topology.json",
             "buscoords_output": f"{OUTPUTS}/Buscoords.dat",
         },
@@ -108,7 +110,11 @@ def generate(MODEL: str, LEVEL: str) -> None:
     algo = Component(
         name=ALGO,
         type="Estimator",
-        parameters={}
+        parameters={
+            "sigma_v": 0.01,
+            "sigma_p": 0.05,
+            "sigma_q": 0.05,
+        },
     )
     system.components.append(algo)
 
@@ -127,8 +133,12 @@ def generate(MODEL: str, LEVEL: str) -> None:
     system.components.append(component)
     system.links.append(link)
 
+    component, link = generate_sensor(port, feeder.name)
+    system.components.append(component)
+    system.links.append(link)
+
     system.links.append(
-        Link(source=feeder.name, source_port=port,
+        Link(source=component.name, source_port="publication",
              target=algo.name, target_port=port)
     )
 
@@ -137,27 +147,30 @@ def generate(MODEL: str, LEVEL: str) -> None:
     system.components.append(component)
     system.links.append(link)
 
+    component, link = generate_sensor(port, feeder.name)
+    system.components.append(component)
+    system.links.append(link)
+
     system.links.append(
-        Link(source=feeder.name, source_port=port,
+        Link(source=component.name, source_port="publication",
              target=algo.name, target_port=port)
     )
 
     port = "voltage_mag"
-    system.links.append(
-        Link(source=feeder.name, source_port=port,
-             target=algo.name, target_port=port)
-    )
-
     component, link = generate_recorder(port, algo.name, OUTPUTS)
     system.components.append(component)
     system.links.append(link)
 
-    port = "voltage_angle"
+    component, link = generate_sensor(port, feeder.name)
+    system.components.append(component)
+    system.links.append(link)
+
     system.links.append(
-        Link(source=feeder.name, source_port=port,
+        Link(source=component.name, source_port="publication",
              target=algo.name, target_port=port)
     )
 
+    port = "voltage_angle"
     component, link = generate_recorder(port, algo.name, OUTPUTS)
     system.components.append(component)
     system.links.append(link)
@@ -199,6 +212,10 @@ if __name__ == "__main__":
         exit()
 
     for model in MODELS:
-        for level in LEVELS:
-            print("generating: ", model, level)
-            generate(model, level)
+        if "ieee" in model:
+            print("generating: ", model)
+            generate(model, "na")
+        else:
+            for level in LEVELS:
+                print("generating: ", model, level)
+                generate(model, level)

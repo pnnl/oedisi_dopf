@@ -7,6 +7,7 @@
         {"type": "VoltagesAngle", "port_id": "voltage_angle"},
         {"type": "PowersReal", "port_id": "power_real"},
         {"type": "PowersImaginary", "port_id": "power_imag"},
+        {"type": "Injections", "port_id": "injections"},
         {"type": "Topology", "port_id": "topology"}
     ],
     "dynamic_outputs": [
