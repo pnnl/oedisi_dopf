@@ -1,13 +1,13 @@
 FROM ubuntu:22.04
+ENV DEBIAN_FRONTEND="noninteractive"
+ENV TZ="America/Pacific"
 # ----------------------------------------------------
 # INSTALL HELICS
 # ----------------------------------------------------
 
 RUN apt update \
     && apt upgrade -y \
-    && export DEBIAN_FRONTEND="noninteractive" \
-    && export TZ="America/Pacific" \
-    && apt install -y cmake libboost-dev libzmq5-dev git build-essential autoconf automake libtool m4 wget libaprutil1-dev liblapack-dev libblas-dev libssl-dev
+    && apt install -y cmake libboost-dev libzmq5-dev git build-essential autoconf automake libtool m4 wget libaprutil1-dev liblapack-dev libblas-dev libssl-dev software-properties-common
 
 RUN mkdir /build \
     && cd /build \
@@ -51,17 +51,20 @@ RUN cd /build/gridappsd-state-estimator \
 # ----------------------------------------------------
 # INSTALL Python requirements 
 # ----------------------------------------------------
-
 RUN add-apt-repository ppa:deadsnakes/ppa \
     && apt update \
-    && apt install -y python3.12
-		
+    && apt install -y python3.12 python3.12-dev python3.12-venv python3-pip
+	
+ENV VIRTUAL_ENV=/opt/venv
+RUN python3.12 -m venv $VIRTUAL_ENV
+ENV PATH="$VIRTUAL_ENV/bin:$PATH"	
+
 COPY requirements.txt /home/requirements.txt
 RUN pip install -r /home/requirements.txt
 	
 ARG SCENARIO
 COPY feeder_federate /home/feeder_federate
-COPY private_models/${SCENARIO}/* /home/feeder_federate
+COPY private_models/${SCENARIO}/ /home/feeder_federate/
 COPY recorder_federate /home/recorder_federate
 COPY sensor_federate /home/sensor_federate
 COPY ekf_federate /home/ekf_federate
@@ -72,7 +75,7 @@ RUN rm -rf /build
 COPY generate_ekf.py /home/generate_ekf.py
 
 WORKDIR /home/
-RUN python3.12 generate_ekf.py ${SCENARIO}
+RUN python generate_ekf.py ${SCENARIO}
 
 EXPOSE 8888
 ENTRYPOINT ["jupyter", "notebook", "--allow-root", "--ip=0.0.0.0", "--no-browser"] 
