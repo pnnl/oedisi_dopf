@@ -6,7 +6,7 @@ pwd=$(pwd)
 
 sudo apt update
 sudo apt upgrade -y
-sudo apt install -y libboost-dev libzmq5-dev git build-essential autoconf automake libtool m4 wget libaprutil1-dev liblapack-dev libblas-dev libssl-dev
+sudo apt install -y cmake libboost-dev libzmq5-dev git build-essential autoconf automake libtool m4 wget libaprutil1-dev liblapack-dev libblas-dev libssl-dev
 
 mkdir $pwd/build 
 cd $pwd/build 
