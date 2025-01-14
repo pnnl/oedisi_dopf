@@ -9,7 +9,7 @@ readme = "README.md"
 python = "^3.12"
 helics-apps = "^3.4.0"
 helics = "^3.4.0"
-pydantic = "^1.7"
+pydantic = "1.9"
 cvxpy = "^1.5"
 numpy = "^2.0.0"
 pandas = "^2.2.2"
@@ -23,7 +23,6 @@ networkx = "*"
 matplotlib = "*"
 geopy = "*"
 plotly = "*"
-kaleido = "*"
 
 [build-system]
 requires = ["poetry-core"]

@@ -802,12 +802,25 @@ def optimal_power_flow(
                                           x <= b_ineq, A_eq @ x == b_eq]
     )
 
-    prob.solve(solver=cp.ECOS, verbose=True)
+    prob.solve(solver=cp.CLARABEL, verbose=True)
+    print(prob.solver_stats)
+    extra_stats = prob.solver_stats.extra_stats
+    if extra_stats is None:
+        extra_stats = {}
+
+    opt_gap = 0
+    if "info" in extra_stats.keys() and "gap" in extra_stats.keys():
+        opt_gap = prob.solver_stats.extra_stats["info"]["gap"]
+
+    fea_gap = 0
+    if "info" in extra_stats.keys() and "pres" in extra_stats.keys():
+        fea_gap = prob.solver_stats.extra_stats["info"]["pres"]
+
     stats = {
         "solve_time": prob.solver_stats.solve_time,
         "num_iters": prob.solver_stats.num_iters,
-        "optimality_gap": prob.solver_stats.extra_stats["info"]["gap"],
-        "feasibility_gap": prob.solver_stats.extra_stats["info"]["pres"],
+        "optimality_gap": opt_gap,
+        "feasibility_gap": fea_gap,
     }
 
     if prob.status.lower() != "optimal":
@@ -843,7 +856,8 @@ def optimal_power_flow(
         bus_flows[f"{key}.3"] = [pc, qc]
 
         if "76" in key:
-            print(key, bus_flows[f"{key}.1"], bus_flows[f"{key}.2"],bus_flows[f"{key}.3"])
+            print(key, bus_flows[f"{key}.1"],
+                  bus_flows[f"{key}.2"], bus_flows[f"{key}.3"])
 
     n_flow_s1s2 = (
         (nbus_ABC * 3 + nbus_s1s2) +
