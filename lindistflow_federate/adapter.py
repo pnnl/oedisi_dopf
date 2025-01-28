@@ -25,7 +25,7 @@ from oedisi.types.data_types import (
     VoltagesReal,
 )
 
-import bus_update as bu
+from . bus_update import find_primary_parent, process_secondary_side
 
 
 logger = logging.getLogger(__name__)
@@ -591,10 +591,10 @@ def map_secondaries(
     bus_data = {k: asdict(v) for k, v in bus_info.buses.items()}
     branch_data = {k: asdict(v) for k, v in branch_info.branches.items()}
     for secondary in secondaries:
-        primary_parent = bu.find_primary_parent(secondary, bus_data, graph)
+        primary_parent = find_primary_parent(secondary, bus_data, graph)
 
         if primary_parent:
-            bu.process_secondary_side(secondary, primary_parent, bus_data, branch_data)
+            process_secondary_side(secondary, primary_parent, bus_data, branch_data)
 
     bus_info.buses = {k: Bus(**v) for k, v in bus_data.items()}
     for k in branch_data.keys():
