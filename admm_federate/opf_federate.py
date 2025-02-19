@@ -26,10 +26,15 @@ class StaticConfig(object):
     deltat: float
     control_type: lindistflow.ControlType
     pf_flag: bool
+    switches: list[str]
+    source: str
 
 
 class Subscriptions(object):
     voltages_mag: VoltagesMagnitude
+    admm_voltages: VoltagesMagnitude
+    admm_powers_real: PowersReal
+    admm_powers_imag: PowersImaginary
     injections: Injection
     topology: Topology
 
@@ -62,7 +67,8 @@ class OPFFederate(object):
 
         self.static.name = config["name"]
         self.static.deltat = config["deltat"]
-        self.static.control_type = lindistflow.ControlType(config["control_type"])
+        self.static.control_type = lindistflow.ControlType(
+            config["control_type"])
         self.static.pf_flag = config["pf_flag"]
 
     def initilize(self) -> None:
@@ -78,27 +84,46 @@ class OPFFederate(object):
         self.fed = h.helicsCreateValueFederate(self.static.name, self.info)
 
     def register_subscription(self) -> None:
-        self.sub.topology = self.fed.register_subscription(self.inputs["topology"], "")
+        self.sub.topology = self.fed.register_subscription(
+            self.inputs["topology"], "")
         self.sub.voltages_mag = self.fed.register_subscription(
             self.inputs["voltages_magnitude"], ""
         )
         self.sub.injections = self.fed.register_subscription(
             self.inputs["injections"], ""
         )
+        self.sub.admm_voltages = self.fed.register_subscription(
+            self.inputs["admm_voltages"], ""
+        )
+        self.sub.admm_powers_real = self.fed.register_subscription(
+            self.inputs["admm_powers_real"], ""
+        )
+        self.sub.admm_powers_imag = self.fed.register_subscription(
+            self.inputs["admm_powers_imag"], ""
+        )
 
     def register_publication(self) -> None:
         self.pub_commands = self.fed.register_publication(
             "change_commands", h.HELICS_DATA_TYPE_STRING, ""
         )
-
         self.pub_voltages = self.fed.register_publication(
             "opf_voltages_magnitude", h.HELICS_DATA_TYPE_STRING, ""
+        )
+        self.pub_admm_voltages = self.fed.register_publication(
+            "admm_voltages", h.HELICS_DATA_TYPE_STRING, ""
+        )
+        self.pub_admm_powers_real = self.fed.register_publication(
+            "admm_powers_real", h.HELICS_DATA_TYPE_STRING, ""
+        )
+        self.pub_admm_powers_imag = self.fed.register_publication(
+            "admm_powers_imag", h.HELICS_DATA_TYPE_STRING, ""
         )
 
     def run(self) -> None:
         logger.info(f"Federate connected: {datetime.now()}")
         self.fed.enter_executing_mode()
-        granted_time = h.helicsFederateRequestTime(self.fed, h.HELICS_TIME_MAXTIME)
+        granted_time = h.helicsFederateRequestTime(
+            self.fed, h.HELICS_TIME_MAXTIME)
 
         while granted_time < h.HELICS_TIME_MAXTIME:
             if not self.sub.voltages_mag.is_updated():
@@ -113,9 +138,14 @@ class OPFFederate(object):
             slack = topology.slack_bus[0]
             [slack_bus, phase] = slack.split(".")
 
-            area_branch, area_bus = area_info(branch_info, bus_info, slack_bus)
+            area_branch, area_bus = area_info(
+                branch_info, bus_info, self.static.source)
 
-            voltages_mag = VoltagesMagnitude.parse_obj(self.sub.voltages_mag.json)
+            print(area_branch.keys())
+            print(area_bus.keys())
+
+            voltages_mag = VoltagesMagnitude.parse_obj(
+                self.sub.voltages_mag.json)
 
             area_bus = adapter.extract_voltages(area_bus, voltages_mag)
 
@@ -141,7 +171,8 @@ class OPFFederate(object):
                         eqid = bus["eqid"]
                         [type, _] = eqid.split(".")
                         if type == "PVSystem":
-                            setpoint = lindistflow.ignore_phase(val) * conversion
+                            setpoint = lindistflow.ignore_phase(
+                                val) * conversion
                             if setpoint < 0.1:
                                 continue
 

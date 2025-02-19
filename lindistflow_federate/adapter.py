@@ -69,8 +69,10 @@ class Bus:
         default_factory=lambda: np.zeros((3, 2)).tolist()
     )
     kv: float = 0.0
-    pq: list[list[float]] = field(default_factory=lambda: np.zeros((3, 2)).tolist())
-    pv: list[list[float]] = field(default_factory=lambda: np.zeros((3, 2)).tolist())
+    pq: list[list[float]] = field(
+        default_factory=lambda: np.zeros((3, 2)).tolist())
+    pv: list[list[float]] = field(
+        default_factory=lambda: np.zeros((3, 2)).tolist())
 
 
 @dataclass
@@ -594,7 +596,8 @@ def map_secondaries(
         primary_parent = find_primary_parent(secondary, bus_data, graph)
 
         if primary_parent:
-            process_secondary_side(secondary, primary_parent, bus_data, branch_data)
+            process_secondary_side(
+                secondary, primary_parent, bus_data, branch_data)
 
     bus_info.buses = {k: Bus(**v) for k, v in bus_data.items()}
     for k in branch_data.keys():
@@ -612,14 +615,16 @@ def extract_info(topology: Topology) -> (BranchInfo, BusInfo, str):
     graph = generate_graph(topology.incidences, slack_bus)
 
     for u, v, a in graph.edges(data=True):
-        branch_info.branches[a["name"]] = Branch(fr_bus=u, to_bus=v, tag=a["tag"])
+        branch_info.branches[a["name"]] = Branch(
+            fr_bus=u, to_bus=v, tag=a["tag"])
         bus_info.buses[u] = Bus()
         bus_info.buses[v] = Bus()
 
     branch_info = direct_branch_flows(graph, branch_info, slack_bus)
     branch_info = extract_admittance(branch_info, topology.admittance)
     branch_info = generate_zprim(branch_info)
-    bus_info = extract_base_voltages(bus_info, topology.base_voltage_magnitudes)
+    bus_info = extract_base_voltages(
+        bus_info, topology.base_voltage_magnitudes)
     bus_info = extract_base_injection(bus_info, topology.injections)
     branch_info = tag_regulators(branch_info, bus_info)
     branch_info, bus_info = index_info(branch_info, bus_info)
