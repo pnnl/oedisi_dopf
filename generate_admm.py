@@ -69,12 +69,18 @@ def generate_feeder(MODEL: str, LEVEL: str, OUTPUTS: str) -> Component:
 
 
 def generate_recorder(port: str, src: str, OUTPUTS: str) -> (Component, Link):
+    name = f"recorder_{port}_{src}"
+    file = f"{port}_{src}"
+    if src == "feeder":
+        name = f"recorder_{port}"
+        file = port
+
     component = Component(
-        name=f"recorder_{port}_{src}",
+        name=name,
         type="Recorder",
         parameters={
-            "feather_filename": f"{OUTPUTS}/{port}_{src}.feather",
-            "csv_filename": f"{OUTPUTS}/{port}_{src}.csv",
+            "feather_filename": f"{OUTPUTS}/{file}.feather",
+            "csv_filename": f"{OUTPUTS}/{file}.csv",
         },
     )
     link = Link(
@@ -122,6 +128,11 @@ def link_feeder(system: WiringDiagram, feeder: Component) -> None:
     system.links.append(link)
 
     port = "power_imag"
+    component, link = generate_recorder(port, feeder.name, OUTPUTS)
+    system.components.append(component)
+    system.links.append(link)
+
+    port = "available_power"
     component, link = generate_recorder(port, feeder.name, OUTPUTS)
     system.components.append(component)
     system.links.append(link)
@@ -193,9 +204,6 @@ def link_algo(system: WiringDiagram, algo: Component, feeder: Component) -> None
         Link(source=feeder.name, source_port=port,
              target=algo.name, target_port=port)
     )
-    component, link = generate_recorder(port, feeder.name, OUTPUTS)
-    system.components.append(component)
-    system.links.append(link)
 
     port = "injections"
     system.links.append(
@@ -249,9 +257,6 @@ def generate(MODEL: str, LEVEL: str) -> None:
         switch_map[i] = switches
         source_map[i] = sa["id"]
 
-    print(switch_map)
-    print(source_map)
-
     sub_areas = {}
     for area, switches in switch_map.items():
         area_set = set()
@@ -260,8 +265,6 @@ def generate(MODEL: str, LEVEL: str) -> None:
                 if a != area:
                     area_set.add(a)
         sub_areas[area] = area_set
-
-    print(sub_areas)
 
     for k, v in sub_areas.items():
         algo = Component(
@@ -276,6 +279,7 @@ def generate(MODEL: str, LEVEL: str) -> None:
             },
         )
         system.components.append(algo)
+        link_algo(system, algo, feeder)
 
     for k, v in sub_areas.items():
         for t in v:
@@ -296,7 +300,6 @@ def generate(MODEL: str, LEVEL: str) -> None:
                      source=dst,
                      source_port=port)
             )
-            link_algo(system, algo, feeder)
 
     if not os.path.exists(SCENARIOS):
         os.makedirs(SCENARIOS)
