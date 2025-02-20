@@ -283,22 +283,22 @@ def generate(MODEL: str, LEVEL: str) -> None:
 
     for k, v in sub_areas.items():
         for t in v:
-            print(k, t)
-            port = "admm_voltages"
             src = f"{ALGO}_{k}"
             dst = f"{ALGO}_{t}"
-            print(src, dst)
+
+            pub = "admm_voltage_pub"
+            sub = "admm_voltage_sub"
             system.links.append(
                 Link(source=src,
-                     source_port=port,
+                     source_port=pub,
                      target=dst,
-                     target_port=port)
+                     target_port=sub)
             )
             system.links.append(
-                Link(target=src,
-                     target_port=port,
-                     source=dst,
-                     source_port=port)
+                Link(source=dst,
+                     source_port=pub,
+                     target=src,
+                     target_port=sub)
             )
 
     if not os.path.exists(SCENARIOS):

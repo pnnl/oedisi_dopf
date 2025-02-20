@@ -25,7 +25,7 @@ from oedisi.types.data_types import (
     VoltagesReal,
 )
 
-from . bus_update import find_primary_parent, process_secondary_side
+from bus_update import find_primary_parent, process_secondary_side
 
 
 logger = logging.getLogger(__name__)
