@@ -1,4 +1,5 @@
-from lindistflow_federate.adapter import (
+import admm_federate.bus_update
+from admm_federate.adapter import (
     generate_graph,
     area_disconnects,
     disconnect_areas,
@@ -136,6 +137,17 @@ def link_feeder(system: WiringDiagram, feeder: Component) -> None:
     component, link = generate_recorder(port, feeder.name, OUTPUTS)
     system.components.append(component)
     system.links.append(link)
+
+
+def link_admm(system: WiringDiagram, src: int, dst: int, ctx: str) -> None:
+    system.links.append(
+        Link(source=f"{ALGO}_{src}", source_port=f"area_{ctx}{src}",
+             target=f"{ALGO}_{dst}", target_port=f"area_{ctx}{dst}")
+    )
+    system.links.append(
+        Link(source=f"{ALGO}_{dst}", source_port=f"area_{ctx}{dst}",
+             target=f"{ALGO}_{src}", target_port=f"area_{ctx}{src}")
+    )
 
 
 def link_algo(system: WiringDiagram, algo: Component, feeder: Component) -> None:
@@ -283,23 +295,9 @@ def generate(MODEL: str, LEVEL: str) -> None:
 
     for k, v in sub_areas.items():
         for t in v:
-            src = f"{ALGO}_{k}"
-            dst = f"{ALGO}_{t}"
-
-            pub = "admm_voltage_pub"
-            sub = "admm_voltage_sub"
-            system.links.append(
-                Link(source=src,
-                     source_port=pub,
-                     target=dst,
-                     target_port=sub)
-            )
-            system.links.append(
-                Link(source=dst,
-                     source_port=pub,
-                     target=src,
-                     target_port=sub)
-            )
+            link_admm(system, k, t, "p")
+            link_admm(system, k, t, "q")
+            link_admm(system, k, t, "v")
 
     if not os.path.exists(SCENARIOS):
         os.makedirs(SCENARIOS)
