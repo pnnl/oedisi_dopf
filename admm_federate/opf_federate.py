@@ -335,16 +335,21 @@ class OPFFederate(object):
                 powers_imag
             )
 
-            if self.sub.area_v0 is None and self.sub.area_v0.is_updated():
-                print(VoltagesMagnitude.parse_obj(self.sub.area_v0.json))
-            if self.sub.area_v1 is None and self.sub.area_v1.is_updated():
-                print(VoltagesMagnitude.parse_obj(self.sub.area_v1.json))
-            if self.sub.area_v2 is None and self.sub.area_v2.is_updated():
-                print(VoltagesMagnitude.parse_obj(self.sub.area_v2.json))
-            if self.sub.area_v3 is None and self.sub.area_v3.is_updated():
-                print(VoltagesMagnitude.parse_obj(self.sub.area_v3.json))
-            if self.sub.area_v4 is None and self.sub.area_v4.is_updated():
-                print(VoltagesMagnitude.parse_obj(self.sub.area_v4.json))
+            if self.sub.area_v0 is not None:
+                if self.sub.area_v0.is_updated():
+                    print(VoltagesMagnitude.parse_obj(self.sub.area_v0.json))
+            if self.sub.area_v1 is not None:
+                if self.sub.area_v1.is_updated():
+                    print(VoltagesMagnitude.parse_obj(self.sub.area_v1.json))
+            if self.sub.area_v2 is not None:
+                if self.sub.area_v2.is_updated():
+                    print(VoltagesMagnitude.parse_obj(self.sub.area_v2.json))
+            if self.sub.area_v3 is not None:
+                if self.sub.area_v3.is_updated():
+                    print(VoltagesMagnitude.parse_obj(self.sub.area_v3.json))
+            if self.sub.area_v4 is not None:
+                if self.sub.area_v4.is_updated():
+                    print(VoltagesMagnitude.parse_obj(self.sub.area_v4.json))
 
             voltages_real = VoltagesReal.parse_obj(self.sub.voltages_real.json)
             voltages_imag = VoltagesImaginary.parse_obj(

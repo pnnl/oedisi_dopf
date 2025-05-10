@@ -1,4 +1,3 @@
-import admm_federate.bus_update
 from admm_federate.adapter import (
     generate_graph,
     area_disconnects,
@@ -139,14 +138,43 @@ def link_feeder(system: WiringDiagram, feeder: Component) -> None:
     system.links.append(link)
 
 
-def link_admm(system: WiringDiagram, src: int, dst: int, ctx: str) -> None:
+def link_hub_voltage(system: WiringDiagram, src: int) -> None:
+    hub = "hub_voltage"
     system.links.append(
-        Link(source=f"{ALGO}_{src}", source_port=f"area_{ctx}{src}",
-             target=f"{ALGO}_{dst}", target_port=f"area_{ctx}{dst}")
+        Link(source=f"{ALGO}_{src}", source_port="area_v",
+             target=f"{hub}", target_port=f"area_v{src}")
     )
     system.links.append(
-        Link(source=f"{ALGO}_{dst}", source_port=f"area_{ctx}{dst}",
-             target=f"{ALGO}_{src}", target_port=f"area_{ctx}{src}")
+        Link(source=f"{hub}", source_port=f"area_v{src}",
+             target=f"{ALGO}_{src}", target_port="area_v")
+    )
+
+
+def link_hub_power(system: WiringDiagram, src: int) -> None:
+    hub = "hub_power"
+    system.links.append(
+        Link(source=f"{ALGO}_{src}", source_port="area_p",
+             target=f"{hub}", target_port=f"area_p{src}")
+    )
+    system.links.append(
+        Link(source=f"{hub}", source_port=f"area_p{src}",
+             target=f"{ALGO}_{src}", target_port="area_p")
+    )
+    system.links.append(
+        Link(source=f"{ALGO}_{src}", source_port="area_q",
+             target=f"{hub}", target_port=f"area_q{src}")
+    )
+    system.links.append(
+        Link(source=f"{hub}", source_port=f"area_q{src}",
+             target=f"{ALGO}_{src}", target_port="area_q")
+    )
+
+
+def link_hub_control(system: WiringDiagram, src: int) -> None:
+    hub = "hub_control"
+    system.links.append(
+        Link(source=f"{ALGO}_{src}", source_port="area_c",
+             target=f"{hub}", target_port=f"area_c{src}")
     )
 
 
@@ -194,12 +222,6 @@ def link_algo(system: WiringDiagram, algo: Component, feeder: Component) -> None
     component, link = generate_recorder(port, algo.name, OUTPUTS)
     system.components.append(component)
     system.links.append(link)
-
-    port = "pv_set"
-    system.links.append(
-        Link(source=algo.name, source_port=port,
-             target=feeder.name, target_port=port)
-    )
 
     port = "solver_stats"
     component, link = generate_recorder(port, algo.name, OUTPUTS)
@@ -293,11 +315,32 @@ def generate(MODEL: str, LEVEL: str) -> None:
         system.components.append(algo)
         link_algo(system, algo, feeder)
 
+    hub_voltage = Component(
+        name="hub_voltage",
+        type="Hub",
+        parameters={},
+    )
+    system.components.append(hub_voltage)
+
+    hub_power = Component(
+        name="hub_power",
+        type="Hub",
+        parameters={},
+    )
+    system.components.append(hub_power)
+
+    hub_control = Component(
+        name="hub_control",
+        type="Hub",
+        parameters={},
+    )
+    system.components.append(hub_control)
+
     for k, v in sub_areas.items():
-        for t in v:
-            link_admm(system, k, t, "p")
-            link_admm(system, k, t, "q")
-            link_admm(system, k, t, "v")
+        print(k, v)
+        link_hub_voltage(system, k)
+        link_hub_power(system, k)
+        link_hub_control(system, k)
 
     if not os.path.exists(SCENARIOS):
         os.makedirs(SCENARIOS)
