@@ -1,0 +1,35 @@
+[tool.poetry]
+name = "oedisi-analysis"
+version = "0.1.0"
+description = "Data pre-processing"
+authors = ["Bhaskar Mitra <bhaskar.mitra@pnnl.gov>"]
+license = "MIT"
+package-mode = false
+
+[tool.poetry.dependencies]
+python = "^3.12"
+helics-apps = "^3.4.0"
+helics = "^3.4.0"
+pydantic = "1.9"
+cvxpy = "^1.5"
+numpy = "^2.0.0"
+pandas = "^2.2.2"
+opendssdirect-py = "^0.7.0"
+oedisi = "^2.0.2"
+jupyter = "*"
+boto3 = "*"
+pyarrow = "*"
+xarray = "*"
+networkx = "*"
+matplotlib = "*"
+geopy = "*"
+plotly = "*"
+seaborn = "*"
+
+[tool.poetry.group.dev.dependencies]
+black = "^24.3.0"
+jupyter = "^1.0.0"
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
