@@ -138,43 +138,40 @@ def link_feeder(system: WiringDiagram, feeder: Component) -> None:
     system.links.append(link)
 
 
-def link_hub_voltage(system: WiringDiagram, src: int) -> None:
-    hub = "hub_voltage"
+def link_hub_voltage(system: WiringDiagram, hub: Component, src: int) -> None:
     system.links.append(
         Link(source=f"{ALGO}_{src}", source_port="area_v",
-             target=f"{hub}", target_port=f"area_v{src}")
+             target=f"{hub.name}", target_port=f"area_v{src}")
     )
     system.links.append(
-        Link(source=f"{hub}", source_port=f"area_v{src}",
+        Link(source=f"{hub.name}", source_port=f"area_v{src}",
              target=f"{ALGO}_{src}", target_port="area_v")
     )
 
 
-def link_hub_power(system: WiringDiagram, src: int) -> None:
-    hub = "hub_power"
+def link_hub_power(system: WiringDiagram, hub: Component, src: int) -> None:
     system.links.append(
         Link(source=f"{ALGO}_{src}", source_port="area_p",
-             target=f"{hub}", target_port=f"area_p{src}")
+             target=f"{hub.name}", target_port=f"area_p{src}")
     )
     system.links.append(
-        Link(source=f"{hub}", source_port=f"area_p{src}",
+        Link(source=f"{hub.name}", source_port=f"area_p{src}",
              target=f"{ALGO}_{src}", target_port="area_p")
     )
     system.links.append(
         Link(source=f"{ALGO}_{src}", source_port="area_q",
-             target=f"{hub}", target_port=f"area_q{src}")
+             target=f"{hub.name}", target_port=f"area_q{src}")
     )
     system.links.append(
-        Link(source=f"{hub}", source_port=f"area_q{src}",
+        Link(source=f"{hub.name}", source_port=f"area_q{src}",
              target=f"{ALGO}_{src}", target_port="area_q")
     )
 
 
-def link_hub_control(system: WiringDiagram, src: int) -> None:
-    hub = "hub_control"
+def link_hub_control(system: WiringDiagram, hub: Component, src: int) -> None:
     system.links.append(
         Link(source=f"{ALGO}_{src}", source_port="area_c",
-             target=f"{hub}", target_port=f"area_c{src}")
+             target=f"{hub.name}", target_port=f"area_c{src}")
     )
 
 
@@ -317,30 +314,36 @@ def generate(MODEL: str, LEVEL: str) -> None:
 
     hub_voltage = Component(
         name="hub_voltage",
-        type="Hub",
-        parameters={},
+        type="VoltageHub",
+        parameters={
+            "max_iter": 10,
+        },
     )
     system.components.append(hub_voltage)
 
     hub_power = Component(
         name="hub_power",
-        type="Hub",
-        parameters={},
+        type="PowerHub",
+        parameters={
+            "max_iter": 10,
+        },
     )
     system.components.append(hub_power)
 
     hub_control = Component(
         name="hub_control",
-        type="Hub",
-        parameters={},
+        type="ControlHub",
+        parameters={
+            "max_iter": 10,
+        },
     )
     system.components.append(hub_control)
 
     for k, v in sub_areas.items():
         print(k, v)
-        link_hub_voltage(system, k)
-        link_hub_power(system, k)
-        link_hub_control(system, k)
+        link_hub_voltage(system, hub_voltage, k)
+        link_hub_power(system, hub_power, k)
+        link_hub_control(system, hub_control, k)
 
     if not os.path.exists(SCENARIOS):
         os.makedirs(SCENARIOS)
@@ -356,8 +359,16 @@ def generate(MODEL: str, LEVEL: str) -> None:
     components = {}
     for c in system.components:
         name = c.name
+        print("Linking Component: ", name)
+        if "hub" in name:
+            components[c.type] = f"{name}/component_definition.json"
+            continue
+
         if "_" in name:
             name, _ = c.name.split("_", 1)
+            components[c.type] = f"{
+                name}_federate/component_definition.json"
+
         components[c.type] = f"{name}_federate/component_definition.json"
 
     with open(f"{SCENARIOS}/components.json", "w") as f:

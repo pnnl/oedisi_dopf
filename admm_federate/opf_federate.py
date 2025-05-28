@@ -99,21 +99,9 @@ class Subscriptions(object):
     injections: Injection
     topology: Topology
     pv_forecast: list
-    area_v0: VoltagesMagnitude
-    area_p0: PowersReal
-    area_q0: PowersImaginary
-    area_v1: VoltagesMagnitude
-    area_p1: PowersReal
-    area_q1: PowersImaginary
-    area_v2: VoltagesMagnitude
-    area_p2: PowersReal
-    area_q2: PowersImaginary
-    area_v3: VoltagesMagnitude
-    area_p3: PowersReal
-    area_q3: PowersImaginary
-    area_v4: VoltagesMagnitude
-    area_p4: PowersReal
-    area_q4: PowersImaginary
+    area_v: VoltagesMagnitude
+    area_p: PowersReal
+    area_q: PowersImaginary
 
 
 class OPFFederate(object):
@@ -165,100 +153,23 @@ class OPFFederate(object):
         self.sub.topology = self.fed.register_subscription(
             self.inputs["topology"], "")
         self.sub.powers_imag = self.fed.register_subscription(
-            self.inputs["power_imag"], ""
-        )
+            self.inputs["power_imag"], "")
         self.sub.powers_real = self.fed.register_subscription(
-            self.inputs["power_real"], ""
-        )
+            self.inputs["power_real"], "")
         self.sub.voltages_imag = self.fed.register_subscription(
-            self.inputs["voltage_imag"], ""
-        )
+            self.inputs["voltage_imag"], "")
         self.sub.voltages_real = self.fed.register_subscription(
-            self.inputs["voltage_real"], ""
-        )
+            self.inputs["voltage_real"], "")
         self.sub.injections = self.fed.register_subscription(
-            self.inputs["injections"], ""
-        )
+            self.inputs["injections"], "")
         self.sub.available_power = self.fed.register_subscription(
-            self.inputs["available_power"], ""
-        )
-
-        port = "area_v0"
-        if port in self.inputs:
-            self.sub.area_v0 = self.fed.register_subscription(
-                self.inputs[port], ""
-            )
-            self.sub.area_p0 = self.fed.register_subscription(
-                self.inputs[port], ""
-            )
-            self.sub.area_q0 = self.fed.register_subscription(
-                self.inputs[port], ""
-            )
-        else:
-            self.sub.area_v0 = None
-            self.sub.area_p0 = None
-            self.sub.area_q0 = None
-
-        port = "area_v1"
-        if port in self.inputs:
-            self.sub.area_v1 = self.fed.register_subscription(
-                self.inputs[port], ""
-            )
-            self.sub.area_p1 = self.fed.register_subscription(
-                self.inputs[port], ""
-            )
-            self.sub.area_q1 = self.fed.register_subscription(
-                self.inputs[port], ""
-            )
-        else:
-            self.sub.area_v1 = None
-            self.sub.area_p1 = None
-            self.sub.area_q1 = None
-        port = "area_v2"
-        if port in self.inputs:
-            self.sub.area_v2 = self.fed.register_subscription(
-                self.inputs[port], ""
-            )
-            self.sub.area_p2 = self.fed.register_subscription(
-                self.inputs[port], ""
-            )
-            self.sub.area_q2 = self.fed.register_subscription(
-                self.inputs[port], ""
-            )
-        else:
-            self.sub.area_v2 = None
-            self.sub.area_p2 = None
-            self.sub.area_q2 = None
-        port = "area_v3"
-        if port in self.inputs:
-            self.sub.area_v3 = self.fed.register_subscription(
-                self.inputs[port], ""
-            )
-            self.sub.area_p3 = self.fed.register_subscription(
-                self.inputs[port], ""
-            )
-            self.sub.area_q3 = self.fed.register_subscription(
-                self.inputs[port], ""
-            )
-        else:
-            self.sub.area_v3 = None
-            self.sub.area_p3 = None
-            self.sub.area_q3 = None
-        port = "area_v4"
-        if port in self.inputs:
-            self.sub.area_v4 = self.fed.register_subscription(
-                self.inputs[port], ""
-            )
-            self.sub.area_p4 = self.fed.register_subscription(
-                self.inputs[port], ""
-            )
-            self.sub.area_q4 = self.fed.register_subscription(
-                self.inputs[port], ""
-            )
-        else:
-            self.sub.area_v4 = None
-            self.sub.area_p4 = None
-            self.sub.area_q4 = None
+            self.inputs["available_power"], "")
+        self.sub.area_v = self.fed.register_subscription(
+            self.inputs["area_v"], "")
+        self.sub.area_v = self.fed.register_subscription(
+            self.inputs["area_p"], "")
+        self.sub.area_v = self.fed.register_subscription(
+            self.inputs["area_q"], "")
 
     def register_publication(self) -> None:
         self.pub_pv_set = self.fed.register_publication(
@@ -282,21 +193,15 @@ class OPFFederate(object):
         self.pub_voltages_angle = self.fed.register_publication(
             "voltage_angle", h.HELICS_DATA_TYPE_STRING, ""
         )
-        self.pub_admm_voltages = []
-        for i in range(5):
-            self.pub_admm_voltages.append(self.fed.register_publication(
-                f"area_v{i}", h.HELICS_DATA_TYPE_STRING, "")
-            )
-        self.pub_admm_powers_real = []
-        for i in range(5):
-            self.pub_admm_powers_real.append(self.fed.register_publication(
-                f"area_p{i}", h.HELICS_DATA_TYPE_STRING, "")
-            )
-        self.pub_admm_powers_imag = []
-        for i in range(6):
-            self.pub_admm_powers_imag = self.fed.register_publication(
-                f"area_q{i}", h.HELICS_DATA_TYPE_STRING, ""
-            )
+        self.pub_admm_v.append(self.fed.register_publication(
+            "area_v", h.HELICS_DATA_TYPE_STRING, "")
+        )
+        self.pub_admm_p.append(self.fed.register_publication(
+            "area_p", h.HELICS_DATA_TYPE_STRING, "")
+        )
+        self.pub_admm_q.fed.register_publication(
+            "area_q", h.HELICS_DATA_TYPE_STRING, ""
+        )
 
     def get_set_points(self, control: dict, bus_info: adapter.BusInfo) -> dict[complex]:
         setpoints = {}
