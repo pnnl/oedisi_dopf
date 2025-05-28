@@ -173,6 +173,11 @@ def area_info(branch_info: dict, bus_info: dict, source_bus: str):
     return branch_sw_data_area_i, bus_info_area_i
 
 
-def check_network_radiality(branch_info_cen, bus_info_cen, bus_info):
-    if not len(bus_info_cen) - len(branch_info_cen) == 1:
-        logger.debug("Network is not Radial. Please check the network data")
+def check_network_radiality(branch: dict, bus: dict) -> bool:
+    radial = len(bus) - len(branch) == 1
+    if not radial:
+        logger.debug(f"Network is not Radial. bus={len(bus)}, branch={len(branch)}")
+        logger.debug(f"Branch: {branch.keys()}")
+        logger.debug(f"Bus: {bus.keys()}")
+        return False
+    return True
