@@ -17,6 +17,7 @@ import uuid
 import seaborn as sns
 import random
 import hashlib
+from pathlib import Path
 
 # master_file =r'/Users/mitr284/Library/CloudStorage/OneDrive-PNNL/PNNL_Work/OEDI/electricdss-tst/Version8/Distrib/IEEETestCases/123Bus/IEEE123Master.dss'
 # dss_folder = "/Users/mitr284/Downloads/oedisi-ieee123-main/snapshot/"
@@ -52,15 +53,7 @@ def replace_with_anonymized(df, original_col, anon_col):
     return df.drop(columns=[original_col]).rename(columns={anon_col: original_col})
 
 def write_dss_from_dataframe_auto(df, filename, object_type, object_name_column):
-    """
-    Writes a DSS file from a Pandas DataFrame, auto-detecting property columns.
 
-    Args:
-        df (pd.DataFrame): The DataFrame containing the data.
-        filename (str): The name of the DSS file to write.
-        object_type (str): The OpenDSS object type (e.g., "Load", "Line").
-        object_name_column (str): The name of the column containing the object names.
-    """
   
     property_columns = [col for col in df.columns if col != object_name_column]
 
@@ -72,6 +65,20 @@ def write_dss_from_dataframe_auto(df, filename, object_type, object_name_column)
                 value = row[property_name]
                 f.write(f"{property_name}={value} ")
             f.write(";\n")
+            
+def create_master(path, **dss_files):
+    master_path = path/"master.dss"
+    
+    content = '''
+Clear
+New Circuit.ieee123
+~ basekv=4.16 Bus1=150 pu=1.00 R1=0 X1=0.0001 R0=0 X0=0.0001
+    '''
+    for label,filename in dss_files.items():
+        content += f"Redirect {filename}\n"
+    
+    with open(master_path, 'w') as f:
+        f.write(content)
 
 '''
 # Anonymize lists
@@ -293,9 +300,19 @@ df_line = replace_with_anonymized(df_line, 'Length', 'anom_Length')
 
 ''' ---Converting dataframe back to .dss ---'''
 
-write_dss_from_dataframe_auto(df_pv, "PV_new.dss", "PV", "Name")
-write_dss_from_dataframe_auto(df_load, "Load_new.dss", "Load", "Name")
-write_dss_from_dataframe_auto(df_transformer, "Transformer_new.dss", "Transformer", "Name")
-write_dss_from_dataframe_auto(df_line, "Line_new.dss", "Line", "Name")
-write_dss_from_dataframe_auto(df_capacitor, "Capacitor_new.dss", "Capacitor", "Name")
+new_dir = Path(dss_folder+'/anonymized_files')
+new_dir.mkdir(parents=True, exist_ok=True)
+
+write_dss_from_dataframe_auto(df_pv, new_dir/"PV.dss", "PV", "Name")
+write_dss_from_dataframe_auto(df_load, new_dir/"Load.dss", "Load", "Name")
+write_dss_from_dataframe_auto(df_transformer, new_dir/"Transformer.dss", "Transformer", "Name")
+write_dss_from_dataframe_auto(df_line, new_dir/"Line.dss", "Line", "Name")
+write_dss_from_dataframe_auto(df_capacitor, new_dir/"Capacitor.dss", "Capacitor", "Name")
+
+''' ---Creating a new master.dss ---'''
+
+create_master(new_dir, PV = "PV.dss", Transformer = 'Transformer.dss', Load ="Load.dss",
+              Capacitor="Capacitor.dss", Line = "Line.dss")
+
+
 
