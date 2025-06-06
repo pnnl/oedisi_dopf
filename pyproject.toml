@@ -22,7 +22,9 @@ networkx = "*"
 matplotlib = "*"
 geopy = "*"
 plotly = "*"
-numpy = "*"
+tsfel = "*"
+scikit-learn = "*"
+tensorflow = "*"
 
 [build-system]
 requires = ["poetry-core"]

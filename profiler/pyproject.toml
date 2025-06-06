@@ -6,9 +6,14 @@ authors = [
     {name = "Tylores",email = "tylor.slay@gmail.com"}
 ]
 readme = "README.md"
-requires-python = ">=3.12, <3.13"
 dependencies = [
-"pysynthetic"
+    "tsfel",
+    "tensorflow",
+    "numpy",
+    "pandas",
+    "scikit-learn",
+    "matplotlib",
+    "jupyter",
 ]
 
 
