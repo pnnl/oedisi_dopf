@@ -122,3 +122,43 @@ resistance_data = resistance_data[1,:]
 
 np.save(output_dir+"//reactance_data.npy", resistance_data)
 
+
+#PV multiplier data
+
+
+for i, mult in enumerate(mults):
+    # 
+    
+    dss.Basic.ClearAll()
+    dss.Text.Command('Redirect Master.dss')
+    dss.Text.Command("Set mode=duty")
+    dss.Text.Command("Set stepsize=0.25")
+    dss.Text.Command("Set number=4")
+    dss.Text.Command("Set controlmode=static")
+    
+    gen_names = dss.Generators.AllNames()
+    kws =[]
+    
+    for gen_name in gen_names:
+        dss.Generators.Name(gen_name)
+        kws.append(dss.Generators.kW())
+    
+    for gen_name, base_kw in zip(gen_names, kws):
+        dss.Generators.Name(gen_name)
+        dss.Generators.kW(base_kw * mult)
+    
+    bus_names = dss.Circuit.AllBusNames()
+    n_buses = len(bus_names)
+    pv_data = np.full((n_steps, n_buses, max_phases), np.nan)
+    pv_data =np.nan_to_num(pv_data)
+
+    for t in range(n_steps):
+        dss.Solution.Solve()
+        for b, bus in enumerate(bus_names):
+            dss.Circuit.SetActiveBus(bus)
+            vmag = dss.Bus.VMagAngle()[::2]
+            for p in range(min(len(vmag), max_phases)):
+                pv_data[t, b, p] = vmag[p]
+    out_file = os.path.join(output_dir, f"voltages_gen_mult_{mult:.2f}.npy")
+    np.save(out_file, pv_data)
+            
