@@ -21,7 +21,10 @@ from pathlib import Path
 
 # master_file =r'/Users/mitr284/Library/CloudStorage/OneDrive-PNNL/PNNL_Work/OEDI/electricdss-tst/Version8/Distrib/IEEETestCases/123Bus/IEEE123Master.dss'
 # dss_folder = "/Users/mitr284/Downloads/oedisi-ieee123-main/snapshot/"
-dss_folder = r'/Users/mitr284/Downloads/oedisi-ieee123-main/qsts/'
+root = os.getcwd()
+inputs = f"{root}/inputs"
+outputs = f"{root}/outputs"
+dss_folder = f"{inputs}/oedisi-ieee123-main/qsts/"
 os.chdir(dss_folder)
 
 dss.Text.Command("Clear")
@@ -300,7 +303,7 @@ df_line = replace_with_anonymized(df_line, 'Length', 'anom_Length')
 
 ''' ---Converting dataframe back to .dss ---'''
 
-new_dir = Path(dss_folder+'/anonymized_files')
+new_dir = Path(outputs+'/anonymized_files')
 new_dir.mkdir(parents=True, exist_ok=True)
 
 write_dss_from_dataframe_auto(df_pv, new_dir/"PV.dss", "PV", "Name")
