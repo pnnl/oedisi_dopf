@@ -6,14 +6,15 @@ authors = [
     {name = "Tylores",email = "tylor.slay@gmail.com"}
 ]
 readme = "README.md"
+requires-python = "^3.11"
 dependencies = [
-    "tsfel",
-    "tensorflow",
+    "tsgm",
+    "jupyter",
+    "seaborn",
+    "matplotlib",
     "numpy",
     "pandas",
-    "scikit-learn",
-    "matplotlib",
-    "jupyter",
+    'OpenDSSDirect.py >= 0.9.4',
 ]
 
 
