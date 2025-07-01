@@ -1,4 +1,4 @@
-# Profiler
+# Anonymizer
 
 This anonymizer loads an OpenDSS model and its connected loadshape/pvshape profiles to generate new anonymized OpenDSS files. 
 
