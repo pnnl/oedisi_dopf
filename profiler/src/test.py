@@ -2,6 +2,7 @@ import os
 import sys
 import numpy as np
 import pandas as pd
+import matplotlib.pyplot as plt
 
 
 def init_paths(data: str, model: str) -> str:
@@ -45,12 +46,27 @@ if __name__ == "__main__":
     i = len(profiles)-1
     df = pd.read_csv(f"{data_dir}/{profiles[i]}", index_col=0)
     real = df.to_numpy()
-    data = prepair_data(real[:95], 24)
+    day = 96
+    window = 7*day
+    real = real[:window-1]
+    n_seq = 24
+    data = prepair_data(real, n_seq)
     print("real: ", real.shape)
     print("data: ", data.shape)
 
     synth = np.load(f"{output_dir}/synth_raw.npy")
     print("synth: ", synth.shape)
-    print(real[:95, 0])
-    print(synth[:2])
-    exit()
+
+    fig, ax = plt.subplots(
+        layout="constrained",
+        figsize=(8, 3),
+    )
+    ax.grid()
+    time = range(n_seq)
+    obs = np.random.randint(len(synth))
+
+    ax.plot(time, data[obs], '--', label=df.columns)
+    ax.plot(time, synth[obs], 'o-', label=df.columns)
+    ax.legend()
+    plt.savefig(f"{output_dir}/compare_profiles.png", dpi=400)
+    plt.close()
