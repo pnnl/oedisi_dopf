@@ -20,8 +20,7 @@ import hashlib
 from pathlib import Path
 import argparse
 
-# master_file =r'/Users/mitr284/Library/CloudStorage/OneDrive-PNNL/PNNL_Work/OEDI/electricdss-tst/Version8/Distrib/IEEETestCases/123Bus/IEEE123Master.dss'
-# dss_folder = "/Users/mitr284/Downloads/oedisi-ieee123-main/snapshot/"
+
 
 root = os.getcwd()
 outputs = f"{root}/outputs"
