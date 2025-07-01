@@ -34,7 +34,6 @@ python /src/InjPred_Train.py
 To predict the imputed data, the Injection_Prediction.py is run. 
 ```
 ### Evaluate 
-If you are interested in evaluating the new profiles, you can generate the maximum mean discrepancy (MMD) for random samples and visualize the t-SNE plot for model inspection. run the evaluate.py
 
 ```shell
 poetry run python /src/Injection_Prediction.py
