@@ -24,6 +24,9 @@ import argparse
 # dss_folder = "/Users/mitr284/Downloads/oedisi-ieee123-main/snapshot/"
 
 root = os.getcwd()
+outputs = f"{root}/outputs"
+builds = f"{root}/builds"
+scenarios = f"{root}/scenarios"
 parser = argparse.ArgumentParser(description="Anonymize OpenDSS data.")
 parser.add_argument("feeder_name", help="Name of the feeder (e.g., ieee123)")
 args = parser.parse_args()
