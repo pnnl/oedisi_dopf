@@ -10,20 +10,11 @@ This profile utilizes Differential Privacy with highest level of privacy setting
 git clone https://github.com/pnnl/oedisi_dopf.git
 cd oedisi_dopf/anonymize
 poetry update
-poetry lock
 ```
 
 ## Run
-
-### Anonymize Files
+The main.py script will anonymize all opendss files found within the input director and save them into the specified output director under the new model name.
 
 ```shell
-python main.py <feeder_name>
+python main.py --model=anon123 --input=./opendss/ieee123 --output=./anon/opendss
 ```
-
-#### Example:
-```
-python main.py ieee123
-```
-### Output Files 
-The files are anonymized and saved in the outputs directory
