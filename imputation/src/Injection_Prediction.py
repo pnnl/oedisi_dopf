@@ -8,6 +8,18 @@ import numpy as np
 import matplotlib.pyplot as plt
 import seaborn as sns
 from matplotlib.patches import Rectangle
+import argparse
+import os
+
+
+def init_paths(args):
+    if not os.path.exists(args.input):
+        print("data location doesn't exist")
+        exit()
+
+    output = os.path.abspath(f"{args.output}/{args.model}")
+    os.makedirs(output, exist_ok=True)
+    return output
 
 
 def plot_array_comparison(array1, array2, array_names=['Array 1', 'Array 2'],
@@ -42,7 +54,8 @@ def plot_array_comparison(array1, array2, array_names=['Array 1', 'Array 2'],
         ax.plot(range(132), arr2[:, phase], 's--', color=phase_colors[phase],
                 alpha=0.9, linewidth=2, markersize=3, label=array_names[1])
 
-        ax.set_title(f'{phase_names[phase]} Comparison', fontsize=12, fontweight='bold')
+        ax.set_title(f'{phase_names[phase]} Comparison',
+                     fontsize=12, fontweight='bold')
         ax.set_xlabel('Bus Index')
         ax.set_ylabel('Value')
         ax.legend()
@@ -54,7 +67,8 @@ def plot_array_comparison(array1, array2, array_names=['Array 1', 'Array 2'],
         significant_diff_indices = np.where(diff > threshold)[0]
 
         for idx in significant_diff_indices:
-            ax.axvline(x=idx, color='red', alpha=0.3, linestyle=':', linewidth=1)
+            ax.axvline(x=idx, color='red', alpha=0.3,
+                       linestyle=':', linewidth=1)
 
     # # 2. Scatter plots (Middle row)
     # for phase in range(3):
@@ -139,7 +153,8 @@ def plot_array_comparison(array1, array2, array_names=['Array 1', 'Array 2'],
     # plt.xticks(rotation=45)
     # ax.grid(True, alpha=0.3)
 
-    plt.suptitle(f'{title_prefix} - Shape: {array1.shape}', fontsize=16, fontweight='bold')
+    plt.suptitle(f'{title_prefix} - Shape: {array1.shape}',
+                 fontsize=16, fontweight='bold')
     plt.tight_layout()
     plt.show()
 
@@ -167,23 +182,29 @@ def detailed_comparison_stats(array1, array2, array_names=['Array 1', 'Array 2']
         print("-" * 40)
 
         # Basic statistics
-        print(f"{array_names[0]:15} - Mean: {np.mean(arr1[:, phase]):8.4f}, Std: {np.std(arr1[:, phase]):8.4f}")
-        print(f"{array_names[1]:15} - Mean: {np.mean(arr2[:, phase]):8.4f}, Std: {np.std(arr2[:, phase]):8.4f}")
+        print(f"{array_names[0]:15} - Mean: {np.mean(arr1[:, phase])
+              :8.4f}, Std: {np.std(arr1[:, phase]):8.4f}")
+        print(f"{array_names[1]:15} - Mean: {np.mean(arr2[:, phase])
+              :8.4f}, Std: {np.std(arr2[:, phase]):8.4f}")
 
         # Differences
         diff = arr1[:, phase] - arr2[:, phase]
         abs_diff = np.abs(diff)
 
-        print(f"{'Difference':15} - Mean: {np.mean(diff):8.4f}, Std: {np.std(diff):8.4f}")
-        print(f"{'Abs Difference':15} - Mean: {np.mean(abs_diff):8.4f}, Max: {np.max(abs_diff):8.4f}")
+        print(f"{'Difference':15} - Mean: {np.mean(diff)
+              :8.4f}, Std: {np.std(diff):8.4f}")
+        print(f"{'Abs Difference':15} - Mean: {np.mean(abs_diff)
+              :8.4f}, Max: {np.max(abs_diff):8.4f}")
 
         # Correlation
         correlation = np.corrcoef(arr1[:, phase], arr2[:, phase])[0, 1]
         print(f"{'Correlation':15} - r = {correlation:.6f}")
 
         # Percentage differences
-        percent_diff = np.abs(diff) / np.maximum(np.abs(arr1[:, phase]), 1e-10) * 100
-        print(f"{'% Difference':15} - Mean: {np.mean(percent_diff):8.2f}%, Max: {np.max(percent_diff):8.2f}%")
+        percent_diff = np.abs(
+            diff) / np.maximum(np.abs(arr1[:, phase]), 1e-10) * 100
+        print(f"{'% Difference':15} - Mean: {np.mean(percent_diff)
+              :8.2f}%, Max: {np.max(percent_diff):8.2f}%")
 
     # Overall statistics
     print(f"\nOVERALL STATISTICS:")
@@ -328,7 +349,8 @@ def create_detailed_plots_plotly(pred, measurement, array_names=['Predicted', 'M
             )
 
             # Set y-axis limits for main plot
-            max_valInjection = int(np.ceil(max(np.max(pred_shown), np.max(measurement_shown))))
+            max_valInjection = int(
+                np.ceil(max(np.max(pred_shown), np.max(measurement_shown))))
             fig.update_yaxes(
                 range=[0, max_valInjection + 3],
                 title_text='DER Injection (kW)',
@@ -337,7 +359,8 @@ def create_detailed_plots_plotly(pred, measurement, array_names=['Predicted', 'M
 
             # Set y-axis limits for difference plot (top-down effect)
             fig.update_yaxes(
-                range=[max_diff + np.min(differences), max_diff + np.max(differences)],
+                range=[max_diff + np.min(differences),
+                       max_diff + np.max(differences)],
                 title_text='Difference kW (Top-down)',
                 title_font_color='gray',
                 tickfont_color='gray',
@@ -348,7 +371,8 @@ def create_detailed_plots_plotly(pred, measurement, array_names=['Predicted', 'M
             # Add text for no data - using paper coordinates
             fig.add_annotation(
                 text=f'No prediction values ≥ 0.2 in {phase_names[phase]}',
-                x=0.5, y=0.8 - (phase * 0.33),  # Adjust y position for each subplot
+                # Adjust y position for each subplot
+                x=0.5, y=0.8 - (phase * 0.33),
                 xref='paper', yref='paper',
                 showarrow=False,
                 bgcolor='lightgray',
@@ -379,8 +403,10 @@ def create_detailed_plots_plotly(pred, measurement, array_names=['Predicted', 'M
             rmse = np.sqrt(np.mean((pred_all - measurement_all) ** 2))
             mae = np.mean(np.abs(pred_all - measurement_all))
 
+            text = f"Points: {shown_points}/{total_points}"
+            text = f"{text}<br>RMSE: {rmse:.3f}<br>MAE: {mae:.3f}"
             fig.add_annotation(
-                text=f'Points: {shown_points}/{total_points}<br>RMSE: {rmse:.3f}<br>MAE: {mae:.3f}',
+                text=text,
                 x=0.02,
                 y=0.95 - (phase * 0.33),  # Position for each subplot
                 xref='paper',
@@ -424,7 +450,7 @@ def create_detailed_plots_plotly(pred, measurement, array_names=['Predicted', 'M
     return fig
 
 
-def create_detailed_plots(pred, measurement, array_names=['Predicted', 'Measured']):
+def create_detailed_plots(output, pred, measurement, array_names=['Predicted', 'Measured']):
     """
     Create additional detailed plots
     """
@@ -510,7 +536,8 @@ def create_detailed_plots(pred, measurement, array_names=['Predicted', 'Measured
             ax.set_xticks(x_shown)
             ax.set_xticklabels(x_shown)
         ax.set_xlim(-1, bus+1)
-        max_valInjection = int(np.ceil(max(np.max(pred_shown), np.max(measurement_shown))) )
+        max_valInjection = int(
+            np.ceil(max(np.max(pred_shown), np.max(measurement_shown))))
         ax.set_ylim(0, max_valInjection+3)
 
         # Add difference subplot
@@ -523,7 +550,6 @@ def create_detailed_plots(pred, measurement, array_names=['Predicted', 'Measured
             colors = ['red' if abs(d) > np.std(differences) else 'lightgray'
                       for d in differences]
 
-
             # Get the maximum difference for reference
             max_diff = np.max(np.abs(differences))
             print('max_diff', max_diff)
@@ -532,17 +558,19 @@ def create_detailed_plots(pred, measurement, array_names=['Predicted', 'Measured
                            bottom=max_diff)  # Start bars from top
 
             # Set limits to show the flipped effect
-            ax2.set_ylim(max_diff + np.max(differences), max_diff + np.min(differences))
-
+            ax2.set_ylim(max_diff + np.max(differences),
+                         max_diff + np.min(differences))
 
         ax2.set_ylabel('Difference kW (Top-down)', color='gray')
         ax2.tick_params(axis='y', labelcolor='gray')
 
     plt.tight_layout()
-    plt.savefig("../output/Imputed_data_Detection.png", dpi=300, bbox_inches="tight")
-    plt.show()
+    plt.savefig(f"{output}/Imputed_data_Detection.png",
+                dpi=300, bbox_inches="tight")
+    # plt.show()
 
     return fig
+
 
 def create_detailed_plots_allNodes(pred, measurement, array_names=['Predicted', 'Measured']):
     """
@@ -574,7 +602,8 @@ def create_detailed_plots_allNodes(pred, measurement, array_names=['Predicted', 
         ax.fill_between(x_indices, arr1[:, phase], arr2[:, phase],
                         alpha=0.3, color=phase_colors[phase])
 
-        ax.set_title(f'{phase_names[phase]} - Detailed Comparison', fontsize=14, fontweight='bold')
+        ax.set_title(
+            f'{phase_names[phase]} - Detailed Comparison', fontsize=14, fontweight='bold')
         ax.set_xlabel('Bus Index')
         ax.set_ylabel('Value')
         ax.legend()
@@ -587,30 +616,29 @@ def create_detailed_plots_allNodes(pred, measurement, array_names=['Predicted', 
         ax2.set_ylabel('Difference', color='gray')
         ax2.tick_params(axis='y', labelcolor='gray')
 
-    plt.suptitle('Phase-by-Phase Detailed Comparison', fontsize=16, fontweight='bold')
+    plt.suptitle('Phase-by-Phase Detailed Comparison',
+                 fontsize=16, fontweight='bold')
     plt.tight_layout()
     plt.show()
-
 
     return fig
 
 
-def grid_measurements(sample = 10):
+def grid_measurements(input, sample=10):
     # baseKV = 1
     # baseS = 1
     # baseZ = baseKV ** 2 / baseS
-    file_path = "../training_data/"
 
-    voltage_data = np.load(file_path+'voltage.npy')
+    voltage_data = np.load(f"{input}/voltage.npy")
     voltage_data_t = voltage_data[sample, :, :]
 
-    base_r = np.load(file_path + 'r.npy')
-    base_x = np.load(file_path + 'x.npy')
+    base_r = np.load(f'{input}/r.npy')
+    base_x = np.load(f'{input}/x.npy')
 
-    load_forecast_data = np.load(file_path+'load.npy')
+    load_forecast_data = np.load(f'{input}/load.npy')
     load_forecast_data_t = load_forecast_data[sample, :, :]
 
-    injection_data = np.load(file_path+'injection.npy')
+    injection_data = np.load(f'{input}/injection.npy')
     injection_data_t = injection_data[sample, :, :]
 
     voltage_data_t = np.tile(voltage_data_t, (1, 1, 1))
@@ -626,16 +654,31 @@ def grid_measurements(sample = 10):
 
 
 if __name__ == "__main__":
+    parser = argparse.ArgumentParser(
+        description="Anonymize OpenDSS data.")
+    parser.add_argument(
+        "--model", help="model name: ieee123, SFO-P1U, ...")
+    parser.add_argument(
+        "--input", help="model path: ./opendss/master.dss")
+    parser.add_argument(
+        "--output", help="new model path: ./anon/opendss/")
+    args = parser.parse_args()
 
-    n_buses, n_phases, voltage_data, load_forecast_data, r_data, x_data, injection_data = grid_measurements(sample = 52)
+    feeder_name = args.model
+    input = args.input
+    output = init_paths(args)
+
+    n_buses, n_phases, voltage_data, load_forecast_data, r_data, x_data, injection_data = grid_measurements(
+        sample=52)
     injection_data[0, 69, :] = [0, 0, 0]
     injection_data[0, 74, :] = [0, 0, 0]
-    agentFilePath = "power_system_injection_predictor.h5"
+    agentFilePath = f"{output}power_system_injection_predictor.h5"
 
     predictor = InjPred(n_buses, n_phases)
     predictor.load_model(agentFilePath)
-    predicted_injections = predictor.predict(voltage_data, load_forecast_data, r_data, x_data)
+    predicted_injections = predictor.predict(
+        voltage_data, load_forecast_data, r_data, x_data)
 
     # Additional detailed plots
-    fig2 = create_detailed_plots(predicted_injections, injection_data,
+    fig2 = create_detailed_plots(output, predicted_injections, injection_data,
                                  array_names=['Predicted', 'Actual'])
