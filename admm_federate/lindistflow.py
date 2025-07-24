@@ -163,6 +163,11 @@ def optimal_power_flow(
     # elif Q_control==True:
     #     variable_start_idx = n_Qdg
 
+    # ADMM
+    # Extract obj Vup Pup and Qup and check for parent values
+    # Extract obj Vdown Pdown and Qdown and check for child values
+    # admm_penalty_term = cp.sum(obj_loss + obj_Vup + obj_Pup + obj_Qup + obj_Vdn + obj_Pdn + obj_Qdn)
+
     # Linear Programming Cost Vector:
     # for k in range(nbus_ABC  + nbus_s1s2):
 
@@ -274,7 +279,8 @@ def optimal_power_flow(
                             k_to_1p.append(ind_to - nbranch_ABC)
                     ind_to += 1
                     ind_frm += 1
-                loc = (nbus_ABC * 3 + nbus_s1s2) + (nbus_ABC * 6 + nbus_s1s2 * 2)
+                loc = (nbus_ABC * 3 + nbus_s1s2) + \
+                    (nbus_ABC * 6 + nbus_s1s2 * 2)
                 # Finding the kfrms
                 k_frm_A = k_frm_3p + k_frm_1pa
                 k_frm_B = k_frm_3p + k_frm_1pb
@@ -583,30 +589,36 @@ def optimal_power_flow(
                     # Phase A Real Power
                     A_eq[
                         counteq,
-                        nbus_ABC * 3 + nbus_s1s2 + nbus_ABC * 0 + val_bus["idx"],
+                        nbus_ABC * 3 + nbus_s1s2 +
+                        nbus_ABC * 0 + val_bus["idx"],
                     ] = 1
                     A_eq[
-                        counteq, state_variable_number + nbus_ABC * 0 + val_bus["idx"]
+                        counteq, state_variable_number +
+                        nbus_ABC * 0 + val_bus["idx"]
                     ] = 1
                     b_eq[counteq] = val_bus["pq"][0][0] * BASE_S * mult
                     counteq += 1
                     # Phase B Real Power
                     A_eq[
                         counteq,
-                        nbus_ABC * 3 + nbus_s1s2 + nbus_ABC * 1 + val_bus["idx"],
+                        nbus_ABC * 3 + nbus_s1s2 +
+                        nbus_ABC * 1 + val_bus["idx"],
                     ] = 1
                     A_eq[
-                        counteq, state_variable_number + nbus_ABC * 1 + val_bus["idx"]
+                        counteq, state_variable_number +
+                        nbus_ABC * 1 + val_bus["idx"]
                     ] = 1
                     b_eq[counteq] = val_bus["pq"][1][0] * BASE_S * mult
                     counteq += 1
                     # Phase C Real Power
                     A_eq[
                         counteq,
-                        nbus_ABC * 3 + nbus_s1s2 + nbus_ABC * 2 + val_bus["idx"],
+                        nbus_ABC * 3 + nbus_s1s2 +
+                        nbus_ABC * 2 + val_bus["idx"],
                     ] = 1
                     A_eq[
-                        counteq, state_variable_number + nbus_ABC * 2 + val_bus["idx"]
+                        counteq, state_variable_number +
+                        nbus_ABC * 2 + val_bus["idx"]
                     ] = 1
                     b_eq[counteq] = val_bus["pq"][2][0] * BASE_S * mult
                     counteq += 1
@@ -625,21 +637,24 @@ def optimal_power_flow(
                     # Phase A Reactive power
                     A_eq[
                         counteq,
-                        nbus_ABC * 3 + nbus_s1s2 + nbus_ABC * 3 + val_bus["idx"],
+                        nbus_ABC * 3 + nbus_s1s2 +
+                        nbus_ABC * 3 + val_bus["idx"],
                     ] = 1
                     b_eq[counteq] = val_bus["pq"][0][1] * BASE_S * mult
                     counteq += 1
                     # Phase B Reactive power
                     A_eq[
                         counteq,
-                        nbus_ABC * 3 + nbus_s1s2 + nbus_ABC * 4 + val_bus["idx"],
+                        nbus_ABC * 3 + nbus_s1s2 +
+                        nbus_ABC * 4 + val_bus["idx"],
                     ] = 1
                     b_eq[counteq] = val_bus["pq"][1][1] * BASE_S * mult
                     counteq += 1
                     # Phase C Reactive power
                     A_eq[
                         counteq,
-                        nbus_ABC * 3 + nbus_s1s2 + nbus_ABC * 5 + val_bus["idx"],
+                        nbus_ABC * 3 + nbus_s1s2 +
+                        nbus_ABC * 5 + val_bus["idx"],
                     ] = 1
                     b_eq[counteq] = val_bus["pq"][2][1] * BASE_S * mult
                     counteq += 1
@@ -648,7 +663,8 @@ def optimal_power_flow(
                 else:
                     A_eq[
                         counteq,
-                        nbus_ABC * 3 + nbus_s1s2 + nbus_ABC * 5 + val_bus["idx"],
+                        nbus_ABC * 3 + nbus_s1s2 +
+                        nbus_ABC * 5 + val_bus["idx"],
                     ] = 1
                     A_eq[counteq, state_variable_number + val_bus["idx"]] = 1
                     b_eq[counteq] = val_bus["pq"][0] * BASE_S * mult
@@ -666,7 +682,8 @@ def optimal_power_flow(
                     b_eq[counteq] = val_bus["pq"][1] * BASE_S
                     counteq += 1
 
-                    DG_up_lim[nbus_ABC * 3 + val_bus["idx"]] = val_bus["pv"][0] * BASE_S
+                    DG_up_lim[nbus_ABC * 3 + val_bus["idx"]
+                              ] = val_bus["pv"][0] * BASE_S
 
     elif control is ControlType.VAR:
         DG_up_lim = np.zeros((n_bus, 1))
@@ -678,7 +695,8 @@ def optimal_power_flow(
                     # Phase A Real Power
                     A_eq[
                         counteq,
-                        nbus_ABC * 3 + nbus_s1s2 + nbus_ABC * 0 + val_bus["idx"],
+                        nbus_ABC * 3 + nbus_s1s2 +
+                        nbus_ABC * 0 + val_bus["idx"],
                     ] = 1
                     b_eq[counteq] = (
                         -val_bus["pv"][0][0] * BASE_S
@@ -688,7 +706,8 @@ def optimal_power_flow(
                     # Phase B Real Power
                     A_eq[
                         counteq,
-                        nbus_ABC * 3 + nbus_s1s2 + nbus_ABC * 1 + val_bus["idx"],
+                        nbus_ABC * 3 + nbus_s1s2 +
+                        nbus_ABC * 1 + val_bus["idx"],
                     ] = 1
                     b_eq[counteq] = (
                         -val_bus["pv"][1][0] * BASE_S
@@ -698,7 +717,8 @@ def optimal_power_flow(
                     # Phase C Real Power
                     A_eq[
                         counteq,
-                        nbus_ABC * 3 + nbus_s1s2 + nbus_ABC * 2 + val_bus["idx"],
+                        nbus_ABC * 3 + nbus_s1s2 +
+                        nbus_ABC * 2 + val_bus["idx"],
                     ] = 1
                     b_eq[counteq] = (
                         -val_bus["pv"][2][0] * BASE_S
@@ -710,7 +730,8 @@ def optimal_power_flow(
                     # Phase A Reactive power
                     A_eq[
                         counteq,
-                        nbus_ABC * 3 + nbus_s1s2 + nbus_ABC * 3 + val_bus["idx"],
+                        nbus_ABC * 3 + nbus_s1s2 +
+                        nbus_ABC * 3 + val_bus["idx"],
                     ] = 1
                     A_eq[counteq, n_Qdg + nbus_ABC * 0 + val_bus["idx"]] = 1
                     b_eq[counteq] = val_bus["pq"][0][1] * BASE_S * mult
@@ -718,7 +739,8 @@ def optimal_power_flow(
                     # Phase B Reactive power
                     A_eq[
                         counteq,
-                        nbus_ABC * 3 + nbus_s1s2 + nbus_ABC * 4 + val_bus["idx"],
+                        nbus_ABC * 3 + nbus_s1s2 +
+                        nbus_ABC * 4 + val_bus["idx"],
                     ] = 1
                     A_eq[counteq, n_Qdg + nbus_ABC * 1 + val_bus["idx"]] = 1
                     b_eq[counteq] = val_bus["pq"][1][1] * BASE_S * mult
@@ -726,7 +748,8 @@ def optimal_power_flow(
                     # Phase C Reactive power
                     A_eq[
                         counteq,
-                        nbus_ABC * 3 + nbus_s1s2 + nbus_ABC * 5 + val_bus["idx"],
+                        nbus_ABC * 3 + nbus_s1s2 +
+                        nbus_ABC * 5 + val_bus["idx"],
                     ] = 1
                     A_eq[counteq, n_Qdg + nbus_ABC * 2 + val_bus["idx"]] = 1
                     b_eq[counteq] = val_bus["pq"][2][1] * BASE_S * mult
@@ -750,7 +773,8 @@ def optimal_power_flow(
                 else:
                     A_eq[
                         counteq,
-                        nbus_ABC * 3 + nbus_s1s2 + nbus_ABC * 5 + val_bus["idx"],
+                        nbus_ABC * 3 + nbus_s1s2 +
+                        nbus_ABC * 5 + val_bus["idx"],
                     ] = 1
                     A_eq[counteq, state_variable_number + val_bus["idx"]] = 1
                     b_eq[counteq] = val_bus["pq"][0] * BASE_S * mult
@@ -768,7 +792,8 @@ def optimal_power_flow(
                     b_eq[counteq] = val_bus["pq"][1] * BASE_S
                     counteq += 1
 
-                    DG_up_lim[nbus_ABC * 3 + val_bus["idx"]] = val_bus["pv"][0] * BASE_S
+                    DG_up_lim[nbus_ABC * 3 + val_bus["idx"]
+                              ] = val_bus["pv"][0] * BASE_S
 
     # Reactive power as a function of real power and inverter rating
     countineq = 0
@@ -838,8 +863,13 @@ def optimal_power_flow(
             b_ineq[countineq] = -(vmin**2)
             countineq += 1
 
+        # prob = cp.Problem(cp.Minimize(admm_penalty_term + q_obj_vector.T @ x),
+        #                  [A_ineq @ x <= b_ineq,
+        #                   A_eq @ x == b_eq])
+
     prob = cp.Problem(
-        cp.Minimize(q_obj_vector.T @ x), [A_ineq @ x <= b_ineq, A_eq @ x == b_eq]
+        cp.Minimize(q_obj_vector.T @ x), [A_ineq @
+                                          x <= b_ineq, A_eq @ x == b_eq]
     )
 
     prob.solve(solver=cp.ECOS, verbose=True)
@@ -879,7 +909,8 @@ def optimal_power_flow(
         i += 1
 
     n_flow_s1s2 = (
-        (nbus_ABC * 3 + nbus_s1s2) + (nbus_ABC * 6 + nbus_s1s2 * 2) + nbranch_ABC * 6
+        (nbus_ABC * 3 + nbus_s1s2) +
+        (nbus_ABC * 6 + nbus_s1s2 * 2) + nbranch_ABC * 6
     )
     name = []
     for key, val_br in bus_info.items():
@@ -901,8 +932,10 @@ def optimal_power_flow(
         #      '{:.4f}'.format(math.sqrt(abs(x.value[nbus_ABC * 2 + k])))])
         bus_voltage[key] = {}
         bus_voltage[key]["A"] = math.sqrt(abs(x.value[val_bus["idx"]]))
-        bus_voltage[key]["B"] = math.sqrt(abs(x.value[nbus_ABC + val_bus["idx"]]))
-        bus_voltage[key]["C"] = math.sqrt(abs(x.value[nbus_ABC * 2 + val_bus["idx"]]))
+        bus_voltage[key]["B"] = math.sqrt(
+            abs(x.value[nbus_ABC + val_bus["idx"]]))
+        bus_voltage[key]["C"] = math.sqrt(
+            abs(x.value[nbus_ABC * 2 + val_bus["idx"]]))
         i += 1
 
     if control is ControlType.WATT:
@@ -915,7 +948,8 @@ def optimal_power_flow(
         # injection.append([name[k], '{:.4f}'.format((x.value[k + state_variable_number]))])
         if DG_up_lim[k, 0]:
             if k < nbus_ABC:
-                generation_output[k, 0] = x.value[k + control_variable_idx_start]
+                generation_output[k, 0] = x.value[k +
+                                                  control_variable_idx_start]
             elif k < (nbus_ABC * 2):
                 generation_output[k - nbus_ABC, 1] = x.value[
                     k + control_variable_idx_start
