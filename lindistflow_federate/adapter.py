@@ -25,12 +25,58 @@ from oedisi.types.data_types import (
     VoltagesReal,
 )
 
-from bus_update import find_primary_parent, process_secondary_side
-
-
 logger = logging.getLogger(__name__)
 logger.addHandler(logging.StreamHandler())
 logger.setLevel(logging.INFO)
+
+# Function to find the first high voltage parent node
+
+
+def find_primary_parent(leaf_bus, bus_data, G):
+    current_bus = leaf_bus
+    while list(G.predecessors(current_bus)):
+        parent = next(G.predecessors(current_bus))
+        if bus_data[parent]["base_kv"] > 0.5:
+            return parent
+        current_bus = parent
+    return None
+
+
+# Function to update PQ values to the same phase
+
+
+def process_secondary_side(leaf_bus, parent_bus, bus_data, branch_data):
+    leaf_pq = bus_data[leaf_bus]["pq"]
+    leaf_pv = bus_data[leaf_bus]["pv"]
+    # parent_NZ_phase_idx = [idx for idx, val in enumerate(parent_phases) if val != 0]
+
+    leaf_phases = bus_data[leaf_bus]["phases"]
+    leaf_phase_bool = [p != 0 for p in leaf_phases]
+
+    if sum(leaf_phase_bool) == 3:
+        pass
+    else:
+        parent_phases = correct_secondary_network(
+            branch_data, bus_data, parent_bus, leaf_bus
+        )
+
+        # Assign all PQ of the leaf node to the corresponding phases of the parent node
+        # Create an empty PQ for three phases
+        new_pq = [[0.0, 0.0] for _ in range(3)]
+        new_pv = [[0.0, 0.0] for _ in range(3)]
+
+        leaf_pq_sum = [0, 0]
+        leaf_pv_sum = [0, 0]
+        for i, phase in enumerate(leaf_phases):
+            leaf_pq_sum = [x + y for x, y in zip(leaf_pq[i], leaf_pq_sum)]
+            leaf_pv_sum = [x + y for x, y in zip(leaf_pv[i], leaf_pv_sum)]
+
+        new_pq[parent_phases] = leaf_pq_sum
+        new_pv[parent_phases] = leaf_pv_sum
+
+        # Update the leaf node's PQ
+        bus_data[leaf_bus]["pq"] = new_pq
+        bus_data[leaf_bus]["pv"] = new_pv
 
 
 @dataclass

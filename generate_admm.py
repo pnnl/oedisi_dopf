@@ -391,11 +391,18 @@ def get_system(path: str) -> WiringDiagram:
 
 
 if __name__ == "__main__":
+    print(sys.argv)
+    if len(sys.argv) == 3:
+        model = sys.argv[1]
+        level = sys.argv[2]
+        print("generating: ", model, level)
+        generate(model, level)
+        exit()
+        
     if len(sys.argv) == 2:
         model = sys.argv[1]
-        for level in LEVELS:
-            print("generating: ", model, level)
-            generate(model, level)
+        print("generating: ", model)
+        generate(model, "medium")
         exit()
 
     for model in MODELS:

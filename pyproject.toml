@@ -6,15 +6,15 @@ authors = ["pnnl"]
 readme = "README.md"
 
 [tool.poetry.dependencies]
-python = "^3.12"
+python = ">=3.12, <3.13"
 helics-apps = "^3.4.0"
 helics = "^3.4.0"
 pydantic = "1.9"
 cvxpy = "^1.5"
-numpy = "^2.0.0"
 pandas = "^2.2.2"
 'OpenDSSDirect.py' = "^0.7.0"
 oedisi = "^2.0.2"
+scikit-learn = "*"
 jupyter = "*"
 boto3 = "*"
 pyarrow = "*"
@@ -23,6 +23,7 @@ networkx = "*"
 matplotlib = "*"
 geopy = "*"
 plotly = "*"
+bokeh = "*"
 
 [build-system]
 requires = ["poetry-core"]
