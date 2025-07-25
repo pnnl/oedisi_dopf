@@ -1,0 +1,4 @@
+new Capacitor.8dd4f411e8 AvailableSteps=0 IsDelta=False NumSteps=1 States=[1] Idx=1 bus=f3c806a872 kvar=600.5272154676951 kV=4.303513838780732 ;
+new Capacitor.0cf3e3761c AvailableSteps=0 IsDelta=False NumSteps=1 States=[1] Idx=2 bus=fb10df57b8 kvar=47.564295625912166 kV=2.3517277103188854 ;
+new Capacitor.27340f2ebf AvailableSteps=0 IsDelta=False NumSteps=1 States=[1] Idx=3 bus=b0080aaf8e kvar=51.48416504677393 kV=2.414088530496948 ;
+new Capacitor.56f4bf4fc9 AvailableSteps=0 IsDelta=False NumSteps=1 States=[1] Idx=4 bus=0be766edf9 kvar=47.85266404717042 kV=2.2847422265572166 ;
