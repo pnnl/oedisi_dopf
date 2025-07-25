@@ -19,7 +19,7 @@ poetry update
 The first step is to extract and develop a training dataset. Run the ./src/data_for_imputation_new.py command to prepapre the training dataset.
 
 ```shell
-poetry run python src/main.py --model=ieee123 --input=opendss/ --ouput=output/
+poetry run python src/model.py --model=ieee123 --input=opendss/
 ```
 
 
@@ -27,7 +27,7 @@ poetry run python src/main.py --model=ieee123 --input=opendss/ --ouput=output/
 Once the input data has been extracted, the InjPred_Train.py code is run to train the model
 
 ```shell
-python /src/InjPred_Train.py
+poetry run python src/train.py --model=ieee123
 ```
 ### Imputation Prediction
 To predict the imputed data, the Injection_Prediction.py is run. 
@@ -35,5 +35,5 @@ To predict the imputed data, the Injection_Prediction.py is run.
 ### Evaluate 
 
 ```shell
-poetry run python /src/Injection_Prediction.py
+poetry run python src/train.py --model=ieee123 --ouput=output/
 ```
