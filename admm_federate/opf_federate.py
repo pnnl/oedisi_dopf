@@ -99,7 +99,9 @@ class Subscriptions(object):
     injections: Injection
     topology: Topology
     pv_forecast: list
-    admm_voltages: VoltagesMagnitude
+    area_v: VoltagesMagnitude
+    area_p: PowersReal
+    area_q: PowersImaginary
 
 
 class OPFFederate(object):
@@ -151,26 +153,23 @@ class OPFFederate(object):
         self.sub.topology = self.fed.register_subscription(
             self.inputs["topology"], "")
         self.sub.powers_imag = self.fed.register_subscription(
-            self.inputs["power_imag"], ""
-        )
+            self.inputs["power_imag"], "")
         self.sub.powers_real = self.fed.register_subscription(
-            self.inputs["power_real"], ""
-        )
+            self.inputs["power_real"], "")
         self.sub.voltages_imag = self.fed.register_subscription(
-            self.inputs["voltage_imag"], ""
-        )
+            self.inputs["voltage_imag"], "")
         self.sub.voltages_real = self.fed.register_subscription(
-            self.inputs["voltage_real"], ""
-        )
+            self.inputs["voltage_real"], "")
         self.sub.injections = self.fed.register_subscription(
-            self.inputs["injections"], ""
-        )
+            self.inputs["injections"], "")
         self.sub.available_power = self.fed.register_subscription(
-            self.inputs["available_power"], ""
-        )
-        self.sub.admm_voltages = self.fed.register_subscription(
-            self.inputs["admm_voltage_sub"], ""
-        )
+            self.inputs["available_power"], "")
+        self.sub.area_v = self.fed.register_subscription(
+            self.inputs["area_v"], "")
+        self.sub.area_v = self.fed.register_subscription(
+            self.inputs["area_p"], "")
+        self.sub.area_v = self.fed.register_subscription(
+            self.inputs["area_q"], "")
 
     def register_publication(self) -> None:
         self.pub_pv_set = self.fed.register_publication(
@@ -194,8 +193,14 @@ class OPFFederate(object):
         self.pub_voltages_angle = self.fed.register_publication(
             "voltage_angle", h.HELICS_DATA_TYPE_STRING, ""
         )
-        self.pub_admm_voltages = self.fed.register_publication(
-            "admm_voltage_pub", h.HELICS_DATA_TYPE_STRING, ""
+        self.pub_admm_v.append(self.fed.register_publication(
+            "area_v", h.HELICS_DATA_TYPE_STRING, "")
+        )
+        self.pub_admm_p.append(self.fed.register_publication(
+            "area_p", h.HELICS_DATA_TYPE_STRING, "")
+        )
+        self.pub_admm_q.fed.register_publication(
+            "area_q", h.HELICS_DATA_TYPE_STRING, ""
         )
 
     def get_set_points(self, control: dict, bus_info: adapter.BusInfo) -> dict[complex]:
@@ -235,8 +240,21 @@ class OPFFederate(object):
                 powers_imag
             )
 
-            while self.sub.admm_voltages.is_updated():
-                print(VoltagesMagnitude.parse_obj(self.sub.admm_voltages.json))
+            if self.sub.area_v0 is not None:
+                if self.sub.area_v0.is_updated():
+                    print(VoltagesMagnitude.parse_obj(self.sub.area_v0.json))
+            if self.sub.area_v1 is not None:
+                if self.sub.area_v1.is_updated():
+                    print(VoltagesMagnitude.parse_obj(self.sub.area_v1.json))
+            if self.sub.area_v2 is not None:
+                if self.sub.area_v2.is_updated():
+                    print(VoltagesMagnitude.parse_obj(self.sub.area_v2.json))
+            if self.sub.area_v3 is not None:
+                if self.sub.area_v3.is_updated():
+                    print(VoltagesMagnitude.parse_obj(self.sub.area_v3.json))
+            if self.sub.area_v4 is not None:
+                if self.sub.area_v4.is_updated():
+                    print(VoltagesMagnitude.parse_obj(self.sub.area_v4.json))
 
             voltages_real = VoltagesReal.parse_obj(self.sub.voltages_real.json)
             voltages_imag = VoltagesImaginary.parse_obj(

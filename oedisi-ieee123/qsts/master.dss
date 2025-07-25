@@ -168,7 +168,7 @@ New Line.L117   Phases=3 Bus1=160r.1.2.3 Bus2=67.1.2.3   LineCode=6    Length=0.
 
 
 ! NORMALLY CLOSED SWITCHES ARE DEFINED AS SHORT LINES
-! Could also be defned by setting the Switch=Yes property
+! Could also be defined by setting the Switch=Yes property
 
 New Line.Sw1    phases=3  Bus1=150r   Bus2=149    r1=1e-3 r0=1e-3 x1=0.000 x0=0.000 c1=0.000 c0=0.000 Length=0.001
 New Line.Sw2    phases=3  Bus1=13     Bus2=152    r1=1e-3 r0=1e-3 x1=0.000 x0=0.000 c1=0.000 c0=0.000 Length=0.001

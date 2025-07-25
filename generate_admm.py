@@ -1,4 +1,4 @@
-from lindistflow_federate.adapter import (
+from admm_federate.adapter import (
     generate_graph,
     area_disconnects,
     disconnect_areas,
@@ -138,6 +138,43 @@ def link_feeder(system: WiringDiagram, feeder: Component) -> None:
     system.links.append(link)
 
 
+def link_hub_voltage(system: WiringDiagram, hub: Component, src: int) -> None:
+    system.links.append(
+        Link(source=f"{ALGO}_{src}", source_port="area_v",
+             target=f"{hub.name}", target_port=f"area_v{src}")
+    )
+    system.links.append(
+        Link(source=f"{hub.name}", source_port=f"area_v{src}",
+             target=f"{ALGO}_{src}", target_port="area_v")
+    )
+
+
+def link_hub_power(system: WiringDiagram, hub: Component, src: int) -> None:
+    system.links.append(
+        Link(source=f"{ALGO}_{src}", source_port="area_p",
+             target=f"{hub.name}", target_port=f"area_p{src}")
+    )
+    system.links.append(
+        Link(source=f"{hub.name}", source_port=f"area_p{src}",
+             target=f"{ALGO}_{src}", target_port="area_p")
+    )
+    system.links.append(
+        Link(source=f"{ALGO}_{src}", source_port="area_q",
+             target=f"{hub.name}", target_port=f"area_q{src}")
+    )
+    system.links.append(
+        Link(source=f"{hub.name}", source_port=f"area_q{src}",
+             target=f"{ALGO}_{src}", target_port="area_q")
+    )
+
+
+def link_hub_control(system: WiringDiagram, hub: Component, src: int) -> None:
+    system.links.append(
+        Link(source=f"{ALGO}_{src}", source_port="area_c",
+             target=f"{hub.name}", target_port=f"area_c{src}")
+    )
+
+
 def link_algo(system: WiringDiagram, algo: Component, feeder: Component) -> None:
     port = "voltage_real"
     system.links.append(
@@ -182,12 +219,6 @@ def link_algo(system: WiringDiagram, algo: Component, feeder: Component) -> None
     component, link = generate_recorder(port, algo.name, OUTPUTS)
     system.components.append(component)
     system.links.append(link)
-
-    port = "pv_set"
-    system.links.append(
-        Link(source=algo.name, source_port=port,
-             target=feeder.name, target_port=port)
-    )
 
     port = "solver_stats"
     component, link = generate_recorder(port, algo.name, OUTPUTS)
@@ -281,25 +312,38 @@ def generate(MODEL: str, LEVEL: str) -> None:
         system.components.append(algo)
         link_algo(system, algo, feeder)
 
-    for k, v in sub_areas.items():
-        for t in v:
-            src = f"{ALGO}_{k}"
-            dst = f"{ALGO}_{t}"
+    hub_voltage = Component(
+        name="hub_voltage",
+        type="VoltageHub",
+        parameters={
+            "max_iter": 10,
+        },
+    )
+    system.components.append(hub_voltage)
 
-            pub = "admm_voltage_pub"
-            sub = "admm_voltage_sub"
-            system.links.append(
-                Link(source=src,
-                     source_port=pub,
-                     target=dst,
-                     target_port=sub)
-            )
-            system.links.append(
-                Link(source=dst,
-                     source_port=pub,
-                     target=src,
-                     target_port=sub)
-            )
+    hub_power = Component(
+        name="hub_power",
+        type="PowerHub",
+        parameters={
+            "max_iter": 10,
+        },
+    )
+    system.components.append(hub_power)
+
+    hub_control = Component(
+        name="hub_control",
+        type="ControlHub",
+        parameters={
+            "max_iter": 10,
+        },
+    )
+    system.components.append(hub_control)
+
+    for k, v in sub_areas.items():
+        print(k, v)
+        link_hub_voltage(system, hub_voltage, k)
+        link_hub_power(system, hub_power, k)
+        link_hub_control(system, hub_control, k)
 
     if not os.path.exists(SCENARIOS):
         os.makedirs(SCENARIOS)
@@ -315,8 +359,16 @@ def generate(MODEL: str, LEVEL: str) -> None:
     components = {}
     for c in system.components:
         name = c.name
+        print("Linking Component: ", name)
+        if "hub" in name:
+            components[c.type] = f"{name}/component_definition.json"
+            continue
+
         if "_" in name:
             name, _ = c.name.split("_", 1)
+            components[c.type] = f"{
+                name}_federate/component_definition.json"
+
         components[c.type] = f"{name}_federate/component_definition.json"
 
     with open(f"{SCENARIOS}/components.json", "w") as f:

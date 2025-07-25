@@ -1,0 +1,15 @@
+{
+    "directory": "hub_control",
+    "execute_function": "python hub_federate.py",
+    "static_inputs": [],
+    "dynamic_inputs": [
+        {"type": "CommandList", "port_id":"area_c0", "optional": true},
+        {"type": "CommandList", "port_id":"area_c1", "optional": true},
+        {"type": "CommandList", "port_id":"area_c2", "optional": true},
+        {"type": "CommandList", "port_id":"area_c3", "optional": true},
+        {"type": "CommandList", "port_id":"area_c4", "optional": true},
+    ],
+    "dynamic_outputs": [
+        {"type": "CommandList", "port_id": "pv_set"},
+    ]
+}

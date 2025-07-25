@@ -1,0 +1,29 @@
+{
+    "directory": "hub_power",
+    "execute_function": "python hub_federate.py",
+    "static_inputs": [],
+    "dynamic_inputs": [
+        {"type": "PowersReal", "port_id":"area_p0", "optional": true},
+        {"type": "PowersReal", "port_id":"area_p1", "optional": true},
+        {"type": "PowersReal", "port_id":"area_p2", "optional": true},
+        {"type": "PowersReal", "port_id":"area_p3", "optional": true},
+        {"type": "PowersReal", "port_id":"area_p4", "optional": true},
+        {"type": "PowersImaginary", "port_id":"area_q0", "optional": true},
+        {"type": "PowersImaginary", "port_id":"area_q1", "optional": true},
+        {"type": "PowersImaginary", "port_id":"area_q2", "optional": true},
+        {"type": "PowersImaginary", "port_id":"area_q3", "optional": true},
+        {"type": "PowersImaginary", "port_id":"area_q4", "optional": true},
+    ],
+    "dynamic_outputs": [
+        {"type": "PowersReal", "port_id":"area_p0", "optional": true},
+        {"type": "PowersReal", "port_id":"area_p1", "optional": true},
+        {"type": "PowersReal", "port_id":"area_p2", "optional": true},
+        {"type": "PowersReal", "port_id":"area_p3", "optional": true},
+        {"type": "PowersReal", "port_id":"area_p4", "optional": true},
+        {"type": "PowersImaginary", "port_id":"area_q0", "optional": true},
+        {"type": "PowersImaginary", "port_id":"area_q1", "optional": true},
+        {"type": "PowersImaginary", "port_id":"area_q2", "optional": true},
+        {"type": "PowersImaginary", "port_id":"area_q3", "optional": true},
+        {"type": "PowersImaginary", "port_id":"area_q4", "optional": true},
+    ]
+}
