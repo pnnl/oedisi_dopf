@@ -89,6 +89,7 @@ def voltage_cons_pri(
     return A, b
 
 
+<<<<<<< Updated upstream
 def optimal_power_flow(
     branch_info: dict,
     bus_info: dict,
@@ -97,11 +98,82 @@ def optimal_power_flow(
     child: dict,
     control: ControlType,
     pf_flag: bool,
+=======
+def voltage_cons_sec(
+    A,
+    b,
+    p,
+    frm,
+    to,
+    counteq,
+    p_pri,
+    q_pri,
+    p_sec,
+    q_sec,
+    nbus_ABC,
+    nbus_s1s2,
+    nbranch_ABC,
+    nbranch_s1s2,
+):
+    A[counteq, frm] = 1
+    A[counteq, to] = -1
+    n_flow_s1s2 = (
+        (nbus_ABC * 3 + nbus_s1s2) +
+        (nbus_ABC * 6 + nbus_s1s2 * 2) + nbranch_ABC * 6
+    )
+    # real power drop
+    A[counteq, p + n_flow_s1s2] = p_pri + 0.5 * p_sec
+    # reactive power drop
+    A[counteq, p + n_flow_s1s2 + nbranch_s1s2] = q_pri + 0.5 * q_sec
+    b[counteq] = 0.0
+    return A, b
+
+
+def update_ratios(branch_info: BranchInfo, bus_info: BusInfo) -> BusInfo:
+    for node in branch_info.branches.values():
+        if "REG" == node.tag:
+            src = node.fr_bus
+            dst = node.to_bus
+            v1 = bus_info.buses[src].kv
+            v2 = bus_info.buses[dst].kv
+            r = v1 / v2
+
+            if v1 < 0.3 or v2 < 0.3:
+                continue
+
+            bus_info.buses[src].tap_ratio = 0
+            bus_info.buses[dst].tap_ratio = 1 / r
+
+    return bus_info
+
+
+class ADMMConfig:
+    slack: str
+    relaxed: bool
+    rho_sup: float
+    rho_vup: float
+    rho_sdn: float
+    rho_vdn: float
+
+
+def solve(branch_info: dict, bus_info: dict, parent: Bus, child_info: BusInfo, config: ADMMConfig):
+    try:
+        return optimal_power_flow(branch_info, bus_info, parent, child_info, config)
+
+    except:
+        config.relaxed = True
+        return optimal_power_flow(branch_info, bus_info, parent, child_info, config)
+
+
+def optimal_power_flow(
+    branch_info: BranchInfo, bus_info: BusInfo, parent: Bus, child_info: BusInfo, config: ADMMConfig
+>>>>>>> Stashed changes
 ):
     # System's base definition
     BASE_S = 1 / (1000000 * 100)
     S_CAPACITY = 1.2
     PRIMARY_V = 0.12
+<<<<<<< Updated upstream
     SOURCE_V = [1.04, 1.04, 1.04]
     rho_Vup = 1e9
     rho_Sup = 0
@@ -109,6 +181,25 @@ def optimal_power_flow(
     rho_Sdn = 1e9
     basekV = bus_info[source_bus]["kv"] / np.sqrt(3)
     baseZ = basekV**2 / 100
+=======
+    branch_pu, bus_pu, kw_converter = convert_pu(branch_info, bus_info)
+    bus_pu = update_ratios(branch_pu, bus_pu)
+
+    with open("bus_info_pu.json", "w") as outfile:
+        outfile.write(json.dumps(asdict(bus_pu)))
+
+    with open("branch_info_pu.json", "w") as outfile:
+        outfile.write(json.dumps(asdict(branch_pu)))
+
+    branches = branch_pu.branches
+    buses = bus_pu.buses
+
+    slack_v = max([b.kv for b in buses.values()])
+    slack_bus = config.slack
+    basekV = buses[slack_bus].base_kv
+    baseZ = 1.0
+    SOURCE_V = [slack_v / basekV] * 3
+>>>>>>> Stashed changes
 
     # Find the ABC phase and s1s2 phase triplex line and bus numbers
     nbranch_ABC = 0
@@ -132,6 +223,7 @@ def optimal_power_flow(
             nbus_s1s2 += 1
 
     # Number of Optimization Variables
+<<<<<<< Updated upstream
     voltage_count = (nbus_ABC * 3 + nbus_s1s2) + (nbus_ABC * 6 + nbus_s1s2 * 2)
     injection_count = nbranch_ABC * 6 + nbranch_s1s2 * 2
     flow_count = nbus_ABC * 3 + nbus_s1s2
@@ -139,21 +231,31 @@ def optimal_power_flow(
     flex_area = nbus_ABC * 6 + nbus_s1s2 * 2
     variable_number = voltage_count + injection_count + \
         flow_count + der_count + flex_area
+=======
+    voltage_count = nbus_ABC * 3 + nbus_s1s2
+    injection_count = nbus_ABC * 6 + nbus_s1s2 * 2
+    flow_count = nbranch_ABC * 6 + nbranch_s1s2 * 2
+    pdg_count = nbus_ABC * 3 + nbus_s1s2
+    qdg_count = nbus_ABC * 3 + nbus_s1s2
+    local_variable_number = (
+        voltage_count + injection_count + flow_count + pdg_count + qdg_count
+    )
+>>>>>>> Stashed changes
 
     # Number of equality/inequality constraints (Injection equations (ABC) at each bus)
     #    #  Check if this is correct number or not:
     n_bus = nbus_ABC * 3 + nbus_s1s2  # Total Bus Number
     n_branch = nbranch_ABC * 3 + nbranch_s1s2  # Total Branch Number
 
-    constraint_number = 1000 + variable_number + n_bus + 3 * n_bus + n_branch
-    A_ineq = np.zeros((constraint_number, variable_number))
+    constraint_number = 1000 + local_variable_number + n_bus + 3 * n_bus + n_branch
+    A_ineq = np.zeros((constraint_number, local_variable_number))
     b_ineq = np.zeros(constraint_number)
 
-    x = cp.Variable(variable_number)
+    x = cp.Variable(local_variable_number)
     # Initialize the matrices
-    P = np.zeros((variable_number, variable_number))
-    q_obj_vector = np.zeros(variable_number)
-    A_eq = np.zeros((constraint_number, variable_number))
+    P = np.zeros((local_variable_number, local_variable_number))
+    q_obj_vector = np.zeros(local_variable_number)
+    A_eq = np.zeros((constraint_number, local_variable_number))
     b_eq = np.zeros(constraint_number)
 
     # Some extra variable definition for clean code:
@@ -268,6 +370,7 @@ def optimal_power_flow(
 
     # sum(Sij) - sum(Sjk) == -sj
 
+<<<<<<< Updated upstream
     counteq=0
     for keyb, val_bus in bus_info.items():
         if keyb != source_bus:
@@ -280,6 +383,113 @@ def optimal_power_flow(
                        + nbus_ABC * 5
                        + nbus_s1s2,
                        )
+=======
+    # ADMM Upstream
+    rho_Sup = config.rho_sup
+    rho_Vup = config.rho_vup
+    obj_Vup = 0
+    obj_Pup = 0
+    obj_Qup = 0
+
+    vsrc = [parent.kv()]*3
+    psrc = parent.pq[0]
+    qsrc = parent.pq[1]
+
+    source_line_idx = branch_info[slack_bus].fr_idx
+    source_bus_idx = bus_info[slack_bus].fr_idx
+    obj_Pup += 0.5 * rho_Sup * ((x[flow_var_start_idx + source_line_idx + nbranch_ABC * 0] - psrc[0]) ** 2
+                                + (x[flow_var_start_idx + source_line_idx +
+                                   nbranch_ABC * 1] - psrc[1]) ** 2
+                                + (x[flow_var_start_idx + source_line_idx +
+                                   nbranch_ABC * 2] - psrc[2]) ** 2
+                                )
+    obj_Qup += 0.5 * rho_Sup * ((x[flow_var_start_idx + source_line_idx + nbranch_ABC * 3] - qsrc[0]) ** 2
+                                + (x[flow_var_start_idx + source_line_idx +
+                                   nbranch_ABC * 4] - qsrc[1]) ** 2
+                                + (x[flow_var_start_idx + source_line_idx +
+                                   nbranch_ABC * 5] - qsrc[2]) ** 2
+                                )
+
+    obj_Vup += 0.5 * rho_Vup * ((x[source_bus_idx + nbus_ABC * 0] - vsrc[0] ** 2) ** 2
+                                + (x[source_bus_idx + nbus_ABC * 1] -
+                                   vsrc[1] ** 2) ** 2
+                                + (x[source_bus_idx + nbus_ABC * 2] -
+                                   vsrc[2] ** 2) ** 2
+                                )
+    # ADMM Downstream
+    rho_Sdn = config.rho_sdn
+    rho_Vdn = config.rho_vdn
+    obj_Vdn = 0
+    obj_Pdn = 0
+    obj_Qdn = 0
+
+    for key, child in child_info.items():
+        child_bus_idx = child.idx
+        vdn = [child.kv()]*3
+        pdn = child.pq[0]
+        qdn = child.pq[1]
+
+        obj_Vdn += 0.5 * rho_Vdn * ((x[child_bus_idx + nbus_ABC * 0] - vdn[0] ** 2) ** 2
+                                    + (x[child_bus_idx + nbus_ABC *
+                                       1] - vdn[1] ** 2) ** 2
+                                    + (x[child_bus_idx + nbus_ABC *
+                                       2] - vdn[2] ** 2) ** 2
+                                    )
+        obj_Pdn += 0.5 * rho_Sdn * ((x[local_variable_number + child_bus_idx + nbus_ABC * 0] - pdn[0]) ** 2
+                                    + (x[local_variable_number + child_bus_idx + nbus_ABC * 1] - pdn[1]) ** 2
+                                    + (x[local_variable_number + child_bus_idx +
+                                         nbus_ABC * 2] - pdn[2]) ** 2
+                                    )
+
+        obj_Qdn += 0.5 * rho_Sdn * ((x[local_variable_number + child_bus_idx + nbus_ABC * 3] - qdn[0]) ** 2
+                                    + (x[local_variable_number + child_bus_idx + nbus_ABC * 4] - qdn[1]) ** 2
+                                    + (x[local_variable_number + child_bus_idx + nbus_ABC * 5] - qdn[2]) ** 2
+                                    )
+    # lossMin obj:
+    obj_loss = 0
+    # for line_k in range(nbranch_ABC):
+    #     obj_loss += x[flow_var_start_idx + line_k + nbranch_ABC * 3] + x[
+    #         flow_var_start_idx + line_k + nbranch_ABC * 4] + x[flow_var_start_idx + line_k + nbranch_ABC * 4]
+
+    admm_penalty_term = cp.sum(
+        obj_loss + obj_Vup + obj_Pup + obj_Qup + obj_Vdn + obj_Pdn + obj_Qdn)
+
+    counteq = 0
+    for keyb, val_bus in buses.items():
+        if keyb == slack_bus:
+            continue
+
+        k_frm_3p = []
+        k_to_3p = []
+        k_frm_1p = []
+        k_frm_1pa, k_frm_1pb, k_frm_1pc = [], [], []
+        k_frm_1qa, k_frm_1qb, k_frm_1qc = [], [], []
+        k_to_1p = []
+
+        # Find bus idx in "from" of branch_sw_data
+        ind_frm = 0
+        ind_to = 0
+        if val_bus.base_kv < PRIMARY_V:
+            for key, val_br in branches.items():
+                if val_bus.idx == val_br.fr_idx:
+                    k_frm_1p.append(ind_frm - nbranch_ABC)
+
+                if val_bus.idx == val_br.to_idx:
+                    k_to_1p.append(ind_to - nbranch_ABC)
+
+                ind_to += 1
+                ind_frm += 1
+
+            loc = (
+                (nbus_ABC * 3 + nbus_s1s2)
+                + (nbus_ABC * 6 + nbus_s1s2 * 2)
+                + nbranch_ABC * 6
+            )
+            real_idx = val_bus.idx + nbus_ABC * 3 + nbus_s1s2 + nbus_ABC * 5
+            A_eq, b_eq = power_balance(
+                A_eq, b_eq, k_frm_1p, k_to_1p, counteq, loc, real_idx
+            )
+>>>>>>> Stashed changes
             counteq += 1
             else:
                 for key, val_br in branch_info.items():
@@ -909,6 +1119,13 @@ def optimal_power_flow(
             b_ineq[countineq]=-(vmin**2)
             countineq += 1
 
+<<<<<<< Updated upstream
+=======
+    prob = cp.Problem(cp.Minimize(
+        admm_penalty_term + q_obj_vector.T @ x),
+        [A_ineq @ x <= b_ineq, A_eq @ x == b_eq]
+    )
+>>>>>>> Stashed changes
 
     prob=cp.Problem(cp.Minimize(admm_penalty_term + q_obj_vector.T @ x),
                       [A_ineq @ x <= b_ineq,

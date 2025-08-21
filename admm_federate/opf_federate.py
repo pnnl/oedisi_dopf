@@ -107,12 +107,19 @@ class OPFFederate(object):
                 )
                 continue
 
+<<<<<<< Updated upstream
             topology = Topology.parse_obj(self.sub.topology.json)
             [branch_info, bus_info] = adapter.extract_info(topology)
+=======
+            # TODO: split area by boundry switches
+            topology: Topology = Topology.parse_obj(self.sub.topology.json)
+            branch_info, bus_info, slack_bus = adapter.extract_info(topology)
+>>>>>>> Stashed changes
 
             slack = topology.slack_bus[0]
             [slack_bus, phase] = slack.split(".")
 
+<<<<<<< Updated upstream
             area_branch, area_bus = area_info(branch_info, bus_info, slack_bus)
 
             voltages_mag = VoltagesMagnitude.parse_obj(self.sub.voltages_mag.json)
@@ -131,6 +138,13 @@ class OPFFederate(object):
                 slack_bus,
                 self.static.control_type,
                 self.static.pf_flag,
+=======
+            # TODO:parse hubs for boundary info
+            powers_real = PowersReal.parse_obj(self.sub.powers_real.json)
+            powers_imag = PowersImaginary.parse_obj(self.sub.powers_imag.json)
+            powers = eqarray_to_xarray(powers_real) + 1j * eqarray_to_xarray(
+                powers_imag
+>>>>>>> Stashed changes
             )
 
             commands = []
@@ -161,8 +175,44 @@ class OPFFederate(object):
             if commands:
                 self.pub_commands.publish(json.dumps(commands))
 
+<<<<<<< Updated upstream
             pub_mags = adapter.pack_voltages(voltages, time)
             self.pub_voltages.publish(pub_mags.json())
+=======
+            v_mag = adapter.pack_voltages(v_mag, bus_info, time)
+            power_real = adapter.pack_powers_real(powers_real, p, time)
+            power_imag = adapter.pack_powers_imag(powers_real, q, time)
+
+            power = eqarray_to_xarray(power_real) + \
+                1j * eqarray_to_xarray(power_imag)
+
+            power_mag, power_ang = xarray_to_powers_pol(power)
+            power_mag.time = time
+            power_ang.time = time
+
+            solver_stats = MeasurementArray(
+                ids=list(stats.keys()),
+                values=list(stats.values()),
+                time=time,
+                units="s",
+            )
+
+            est_power = MeasurementArray(
+                ids=list(real_setpts.keys()),
+                values=list(real_setpts.values()),
+                time=time,
+                units="W",
+            )
+
+            # TODO:publish to hubs
+            self.pub_voltages_mag.publish(v_mag.json())
+            self.pub_voltages_angle.publish(voltages_ang.json())
+
+            self.pub_estimated_power.publish(est_power.json())
+            self.pub_solver_stats.publish(solver_stats.json())
+            self.pub_powers_mag.publish(power_mag.json())
+            self.pub_powers_angle.publish(power_ang.json())
+>>>>>>> Stashed changes
 
         self.stop()
 
