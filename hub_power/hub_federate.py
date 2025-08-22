@@ -67,7 +67,7 @@ class Subscriptions(object):
     area_q4: PowersImaginary
 
 
-class EstimatorFederate(object):
+class HubFederate(object):
     def __init__(self) -> None:
         self.sub = Subscriptions()
         self.load_static_inputs()
@@ -102,9 +102,7 @@ class EstimatorFederate(object):
         self.info.core_init = "--federates=1"
 
         h.helicsFederateInfoSetTimeProperty(
-            self.info, h.helics_property_time_delta, self.static.deltat
-        )
-
+            self.info, h.helics_property_time_delta, 0.01)
         self.fed = h.helicsCreateValueFederate(self.static.name, self.info)
 
     def register_subscription(self) -> None:
@@ -266,5 +264,5 @@ class EstimatorFederate(object):
 
 
 if __name__ == "__main__":
-    fed = EstimatorFederate()
+    fed = HubFederate()
     fed.run()

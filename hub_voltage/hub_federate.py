@@ -93,22 +93,14 @@ class EstimatorFederate(object):
             config = json.load(file)
 
         self.static.name = config["name"]
-        self.static.tol = config["tol"]
-        self.static.v_sigma = config["v_sigma"]
-        self.static.l_sigma = config["l_sigma"]
-        self.static.i_sigma = config["i_sigma"]
-        self.static.deltat = config["deltat"]
 
     def initilize(self) -> None:
         self.info = h.helicsCreateFederateInfo()
         self.info.core_name = self.static.name
         self.info.core_type = h.HELICS_CORE_TYPE_ZMQ
         self.info.core_init = "--federates=1"
-
         h.helicsFederateInfoSetTimeProperty(
-            self.info, h.helics_property_time_delta, self.static.deltat
-        )
-
+            self.info, h.helics_property_time_delta, 0.001)
         self.fed = h.helicsCreateValueFederate(self.static.name, self.info)
 
     def register_subscription(self) -> None:

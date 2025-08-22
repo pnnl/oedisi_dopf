@@ -172,6 +172,8 @@ class OPFFederate(object):
             self.inputs["area_q"], "")
 
     def register_publication(self) -> None:
+        name, id = self.static.name.split("_", 1)
+        print("register pubs: ", name, id)
         self.pub_pv_set = self.fed.register_publication(
             "pv_set", h.HELICS_DATA_TYPE_STRING, ""
         )
@@ -193,14 +195,14 @@ class OPFFederate(object):
         self.pub_voltages_angle = self.fed.register_publication(
             "voltage_angle", h.HELICS_DATA_TYPE_STRING, ""
         )
-        self.pub_admm_v.append(self.fed.register_publication(
-            "area_v", h.HELICS_DATA_TYPE_STRING, "")
+        self.pub_admm_v = self.fed.register_publication(
+            f"area_v{id}", h.HELICS_DATA_TYPE_STRING, ""
         )
-        self.pub_admm_p.append(self.fed.register_publication(
-            "area_p", h.HELICS_DATA_TYPE_STRING, "")
+        self.pub_admm_p = self.fed.register_publication(
+            f"area_p{id}", h.HELICS_DATA_TYPE_STRING, ""
         )
-        self.pub_admm_q.fed.register_publication(
-            "area_q", h.HELICS_DATA_TYPE_STRING, ""
+        self.pub_admm_q = self.fed.register_publication(
+            f"area_q{id}", h.HELICS_DATA_TYPE_STRING, ""
         )
 
     def get_set_points(self, control: dict, bus_info: adapter.BusInfo) -> dict[complex]:
@@ -240,21 +242,8 @@ class OPFFederate(object):
                 powers_imag
             )
 
-            if self.sub.area_v0 is not None:
-                if self.sub.area_v0.is_updated():
-                    print(VoltagesMagnitude.parse_obj(self.sub.area_v0.json))
-            if self.sub.area_v1 is not None:
-                if self.sub.area_v1.is_updated():
-                    print(VoltagesMagnitude.parse_obj(self.sub.area_v1.json))
-            if self.sub.area_v2 is not None:
-                if self.sub.area_v2.is_updated():
-                    print(VoltagesMagnitude.parse_obj(self.sub.area_v2.json))
-            if self.sub.area_v3 is not None:
-                if self.sub.area_v3.is_updated():
-                    print(VoltagesMagnitude.parse_obj(self.sub.area_v3.json))
-            if self.sub.area_v4 is not None:
-                if self.sub.area_v4.is_updated():
-                    print(VoltagesMagnitude.parse_obj(self.sub.area_v4.json))
+            if self.sub.area_v.is_updated():
+                print(VoltagesMagnitude.parse_obj(self.sub.area_v0.json))
 
             voltages_real = VoltagesReal.parse_obj(self.sub.voltages_real.json)
             voltages_imag = VoltagesImaginary.parse_obj(
