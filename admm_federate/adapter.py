@@ -619,6 +619,37 @@ def map_secondaries(
     return (branch_info, bus_info)
 
 
+def generate_area_info(graph: nx.Graph, topology: Topology, slack_bus: str, boundary: list[str]) -> (BranchInfo, BusInfo):
+    switches = []
+    for u, v, a in graph.edges(data=True):
+        if a["id"] in boundary:
+            switches.append(a["id"])
+
+    if sorted(switches) != sorted(boundary):
+        return None, None
+
+    branch_info = BranchInfo()
+    bus_info = BusInfo()
+
+    for u, v, a in graph.edges(data=True):
+        print(u, v, a)
+        branch_info.branches[a["name"]] = Branch(
+            fr_bus=u, to_bus=v, tag=a["tag"])
+        bus_info.buses[u] = Bus()
+        bus_info.buses[v] = Bus()
+
+    branch_info = direct_branch_flows(graph, branch_info, slack_bus)
+    branch_info = extract_admittance(branch_info, topology.admittance)
+    branch_info = generate_zprim(branch_info)
+    bus_info = extract_base_voltages(
+        bus_info, topology.base_voltage_magnitudes)
+    bus_info = extract_base_injection(bus_info, topology.injections)
+    branch_info = tag_regulators(branch_info, bus_info)
+    branch_info, bus_info = index_info(branch_info, bus_info)
+
+    return (branch_info, bus_info)
+
+
 def extract_info(topology: Topology) -> (BranchInfo, BusInfo, str):
     branch_info = BranchInfo()
     bus_info = BusInfo()

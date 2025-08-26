@@ -1,8 +1,1 @@
-{
-	"Feeder": "feeder_federate/component_definition.json",
-	"Recorder": "recorder_federate/component_definition.json",
-	"OptimalPowerFlow": "admm_federate/component_definition.json",
-	"VoltageHub": "hub_voltage/component_definition.json",
-	"PowerHub": "hub_power/component_definition.json",
-	"ControlHub": "hub_control/component_definition.json"
-}
+{"Feeder": "feeder_federate/component_definition.json", "Recorder": "recorder_federate/component_definition.json", "OptimalPowerFlow": "admm_federate/component_definition.json", "VoltageHub": "hub_voltage/component_definition.json", "PowerHub": "hub_power/component_definition.json", "ControlHub": "hub_control/component_definition.json"}

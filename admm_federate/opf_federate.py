@@ -1,3 +1,4 @@
+import copy
 import logging
 import helics as h
 import json
@@ -88,6 +89,7 @@ class StaticConfig(object):
     relaxed: bool
     switches: list[str]
     source: str
+    config: lindistflow.ADMMConfig
 
 
 class Subscriptions(object):
@@ -105,6 +107,9 @@ class Subscriptions(object):
 
 
 class OPFFederate(object):
+    area_branch: adapter.BranchInfo = None
+    area_bus: adapter.BusInfo = None
+
     def __init__(self) -> None:
         self.sub = Subscriptions()
         self.load_static_inputs()
@@ -136,6 +141,12 @@ class OPFFederate(object):
         self.static.relaxed = config["relaxed"]
         self.static.switches = config["switches"]
         self.static.source = config["source"]
+        self.static.config = lindistflow.ADMMConfig()
+        self.static.config.relaxed = config["relaxed"]
+        self.static.config.rho_vup = config["rho_vup"]
+        self.static.config.rho_sup = config["rho_sup"]
+        self.static.config.rho_vdn = config["rho_vdn"]
+        self.static.config.rho_sdn = config["rho_sdn"]
 
     def initilize(self) -> None:
         self.info = h.helicsCreateFederateInfo()
@@ -232,9 +243,36 @@ class OPFFederate(object):
 
             topology: Topology = Topology.parse_obj(self.sub.topology.json)
             branch_info, bus_info, slack_bus = adapter.extract_info(topology)
+            self.static.config.slack = slack_bus
+
+            G = adapter.generate_graph(topology.incidences, slack_bus)
+            graph = copy.deepcopy(G)
+            graph2 = copy.deepcopy(G)
+            boundaries = adapter.area_disconnects(graph)
+            boundary = []
+            for u, v, a in boundaries:
+                if a["id"] in self.static.switches:
+                    boundary.append((u, v, a))
+
+                if a["id"] == self.static.source:
+                    source = (u, v)
+            pprint(boundary)
+            areas = adapter.disconnect_areas(graph2, boundary)
+            areas = adapter.reconnect_area_switches(
+                areas, boundary)
+
+            # TODO: check if switchs exist for this area
+            if self.area_branch == None:
+                ids = [a["id"] for _, _, a in boundary]
+                for area in areas:
+                    area_branch, area_bus = adapter.generate_area_info(
+                        area, topology, source[0], ids)
+                    if area_branch != None and area_bus != None:
+                        self.area_branch = area_branch
+                        self.area_bus = area_bus
 
             injections = Injection.parse_obj(self.sub.injections.json)
-            bus_info = adapter.extract_injection(bus_info, injections)
+            bus_info = adapter.extract_injection(self.area_bus, injections)
 
             powers_real = PowersReal.parse_obj(self.sub.powers_real.json)
             powers_imag = PowersImaginary.parse_obj(self.sub.powers_imag.json)
@@ -262,7 +300,7 @@ class OPFFederate(object):
             bus_info = adapter.extract_voltages(bus_info, voltages_mag)
 
             branch_info, bus_info = adapter.map_secondaries(
-                branch_info, bus_info)
+                self.area_branch, bus_info)
 
             with open("bus_info.json", "w") as outfile:
                 outfile.write(json.dumps(asdict(bus_info)))
@@ -276,7 +314,7 @@ class OPFFederate(object):
 
             relaxed = self.static.relaxed
             v_mag, pq, control, stats = lindistflow.solve(
-                branch_info, bus_info, slack_bus, relaxed
+                branch_info, bus_info, slack_bus, relaxed, self.static.config
             )
             real_setpts = self.get_set_points(control, bus_info)
 

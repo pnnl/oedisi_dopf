@@ -25,6 +25,22 @@
         {
             "type": "",
             "port_id": "relaxed"
+        },
+        {
+            "type": "",
+            "port_id": "rho_vup"
+        },
+        {
+            "type": "",
+            "port_id": "rho_sup"
+        },
+        {
+            "type": "",
+            "port_id": "rho_vdn"
+        },
+        {
+            "type": "",
+            "port_id": "rho_sdn"
         }
     ],
     "dynamic_inputs": [

@@ -266,6 +266,7 @@ def generate(MODEL: str, LEVEL: str) -> None:
     graph = copy.deepcopy(G)
     graph2 = copy.deepcopy(G)
     boundaries = area_disconnects(graph)
+    print(boundaries)
     areas = disconnect_areas(graph2, boundaries)
     areas = reconnect_area_switches(areas, boundaries)
 
@@ -306,7 +307,11 @@ def generate(MODEL: str, LEVEL: str) -> None:
                 "relaxed": False,
                 "control_type": "real",
                 "switches": switch_map[k],
-                "source": source_map[k]
+                "source": source_map[k],
+                "rho_vup": 1e9,
+                "rho_sup": 0,
+                "rho_vdn": 1e9,
+                "rho_sdn": 0,
             },
         )
         system.components.append(algo)
@@ -398,7 +403,7 @@ if __name__ == "__main__":
         print("generating: ", model, level)
         generate(model, level)
         exit()
-        
+
     if len(sys.argv) == 2:
         model = sys.argv[1]
         print("generating: ", model)

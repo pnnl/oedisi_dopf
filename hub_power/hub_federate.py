@@ -102,7 +102,7 @@ class HubFederate(object):
         self.info.core_init = "--federates=1"
 
         h.helicsFederateInfoSetTimeProperty(
-            self.info, h.helics_property_time_delta, 0.01)
+            self.info, h.helics_property_time_delta, 0.001)
         self.fed = h.helicsCreateValueFederate(self.static.name, self.info)
 
     def register_subscription(self) -> None:
