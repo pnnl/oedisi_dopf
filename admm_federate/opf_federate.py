@@ -351,6 +351,22 @@ class OPFFederate(object):
 
                 commands.append((eq, val.real, val.imag))
 
+            stats["sdn"] = 0
+            print(stats)
+            for k, v in child_info.buses.items():
+                for phase in v.phases:
+                    real = p[f"{k}.{phase}"]
+                    imag = q[f"{k}.{phase}"]
+                    stats["sdn"] += real**2 + imag**2
+
+            kvup = 0
+            for k, v in v_mag.items():
+                bus, phase = k.split(".", 1)
+                if bus == parent_id:
+                    kvup += v/1000
+            stats["vup"] = abs(bus_info.buses[parent_id].kv - kvup/3)
+            print(stats)
+
             v_mag = adapter.pack_voltages(v_mag, bus_info, time)
             power_real = adapter.pack_powers_real(powers_real, p, time)
             power_imag = adapter.pack_powers_imag(powers_real, q, time)
