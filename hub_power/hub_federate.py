@@ -55,16 +55,16 @@ class StaticConfig(object):
 
 
 class Subscriptions(object):
-    area_p0: PowersReal
-    area_p1: PowersReal
-    area_p2: PowersReal
-    area_p3: PowersReal
-    area_p4: PowersReal
-    area_q0: PowersImaginary
-    area_q1: PowersImaginary
-    area_q2: PowersImaginary
-    area_q3: PowersImaginary
-    area_q4: PowersImaginary
+    p0: PowersReal
+    p1: PowersReal
+    p2: PowersReal
+    p3: PowersReal
+    p4: PowersReal
+    q0: PowersImaginary
+    q1: PowersImaginary
+    q2: PowersImaginary
+    q3: PowersImaginary
+    q4: PowersImaginary
 
 
 class HubFederate(object):
@@ -102,52 +102,52 @@ class HubFederate(object):
         self.info.core_init = "--federates=1"
 
         h.helicsFederateInfoSetTimeProperty(
-            self.info, h.helics_property_time_delta, 0.001)
+            self.info, h.helics_property_time_delta, 1e-3)
         self.fed = h.helicsCreateValueFederate(self.static.name, self.info)
 
     def register_subscription(self) -> None:
-        self.sub.area_p0 = self.fed.register_subscription(
-            self.inputs["area_p0"], ""
+        self.sub.p0 = self.fed.register_subscription(
+            self.inputs["sub_p0"], ""
         )
-        self.sub.area_p1 = self.fed.register_subscription(
-            self.inputs["area_p1"], ""
+        self.sub.p1 = self.fed.register_subscription(
+            self.inputs["sub_p1"], ""
         )
-        self.sub.area_p2 = self.fed.register_subscription(
-            self.inputs["area_p2"], ""
+        self.sub.p2 = self.fed.register_subscription(
+            self.inputs["sub_p2"], ""
         )
-        self.sub.area_p3 = self.fed.register_subscription(
-            self.inputs["area_p3"], ""
+        self.sub.p3 = self.fed.register_subscription(
+            self.inputs["sub_p3"], ""
         )
-        self.sub.area_p4 = self.fed.register_subscription(
-            self.inputs["area_p4"], ""
+        self.sub.p4 = self.fed.register_subscription(
+            self.inputs["sub_p4"], ""
         )
-        self.sub.area_q0 = self.fed.register_subscription(
-            self.inputs["area_q0"], ""
+        self.sub.q0 = self.fed.register_subscription(
+            self.inputs["sub_q0"], ""
         )
-        self.sub.area_q1 = self.fed.register_subscription(
-            self.inputs["area_q1"], ""
+        self.sub.q1 = self.fed.register_subscription(
+            self.inputs["sub_q1"], ""
         )
-        self.sub.area_q2 = self.fed.register_subscription(
-            self.inputs["area_q2"], ""
+        self.sub.q2 = self.fed.register_subscription(
+            self.inputs["sub_q2"], ""
         )
-        self.sub.area_q3 = self.fed.register_subscription(
-            self.inputs["area_q3"], ""
+        self.sub.q3 = self.fed.register_subscription(
+            self.inputs["sub_q3"], ""
         )
-        self.sub.area_q4 = self.fed.register_subscription(
-            self.inputs["area_q4"], ""
+        self.sub.q4 = self.fed.register_subscription(
+            self.inputs["sub_q4"], ""
         )
 
     def register_publication(self) -> None:
         self.pub_area_p = []
         for i in range(6):
             self.pub_area_p.append(self.fed.register_publication(
-                f"area_p{i}", h.HELICS_DATA_TYPE_STRING, "")
+                f"pub_p{i}", h.HELICS_DATA_TYPE_STRING, "")
             )
 
         self.pub_area_q = []
         for i in range(6):
             self.pub_area_q.append(self.fed.register_publication(
-                f"area_q{i}", h.HELICS_DATA_TYPE_STRING, "")
+                f"pub_q{i}", h.HELICS_DATA_TYPE_STRING, "")
             )
 
     def run(self) -> None:
@@ -159,97 +159,97 @@ class HubFederate(object):
         while granted_time < h.HELICS_TIME_MAXTIME:
             # each published power is sent to all areas immediatly because
             # some areas may be waiting on their neighbors input to run
-            if self.sub.area_p0.is_updated():
+            if self.sub.p0.is_updated():
                 p = PowersReal.parse_obj(
-                    self.sub.area_p0.json
+                    self.sub.p0.json
                 )
 
                 for area in range(6):
                     self.pub_area_p[area].publish(p.json())
 
-            if self.sub.area_p1.is_updated():
+            if self.sub.p1.is_updated():
                 p = PowersReal.parse_obj(
-                    self.sub.area_p1.json
+                    self.sub.p1.json
                 )
 
                 for area in range(6):
                     self.pub_area_p[area].publish(p.json())
 
-            if self.sub.area_p2.is_updated():
+            if self.sub.p2.is_updated():
                 p = PowersReal.parse_obj(
-                    self.sub.area_p2.json
+                    self.sub.p2.json
                 )
 
                 for area in range(6):
                     self.pub_area_p[area].publish(p.json())
 
-            if self.sub.area_p3.is_updated():
+            if self.sub.p3.is_updated():
                 p = PowersReal.parse_obj(
-                    self.sub.area_p3.json
+                    self.sub.p3.json
                 )
 
                 for area in range(6):
                     self.pub_area_p[area].publish(p.json())
 
-            if self.sub.area_p4.is_updated():
+            if self.sub.p4.is_updated():
                 p = PowersReal.parse_obj(
-                    self.sub.area_p4.json
+                    self.sub.p4.json
                 )
 
                 for area in range(6):
                     self.pub_area_p[area].publish(p.json())
 
-            if self.sub.area_p5.is_updated():
+            if self.sub.p5.is_updated():
                 p = PowersReal.parse_obj(
-                    self.sub.area_p5.json
+                    self.sub.p5.json
                 )
 
                 for area in range(6):
                     self.pub_area_p[area].publish(p.json())
 
-            if self.sub.area_q0.is_updated():
+            if self.sub.q0.is_updated():
                 q = PowersImaginary.parse_obj(
-                    self.sub.area_q0.json
+                    self.sub.q0.json
                 )
 
                 for area in range(6):
                     self.pub_area_q[area].publish(q.json())
 
-            if self.sub.area_q1.is_updated():
+            if self.sub.q1.is_updated():
                 q = PowersImaginary.parse_obj(
-                    self.sub.area_q1.json
+                    self.sub.q1.json
                 )
 
                 for area in range(6):
                     self.pub_area_q[area].publish(q.json())
 
-            if self.sub.area_q2.is_updated():
+            if self.sub.q2.is_updated():
                 q = PowersImaginary.parse_obj(
-                    self.sub.area_q2.json
+                    self.sub.q2.json
                 )
 
                 for area in range(6):
                     self.pub_area_q[area].publish(q.json())
 
-            if self.sub.area_q3.is_updated():
+            if self.sub.q3.is_updated():
                 q = PowersImaginary.parse_obj(
-                    self.sub.area_q3.json
+                    self.sub.q3.json
                 )
 
                 for area in range(6):
                     self.pub_area_q[area].publish(q.json())
 
-            if self.sub.area_q4.is_updated():
+            if self.sub.q4.is_updated():
                 q = PowersImaginary.parse_obj(
-                    self.sub.area_q4.json
+                    self.sub.q4.json
                 )
 
                 for area in range(6):
                     self.pub_area_q[area].publish(q.json())
 
-            if self.sub.area_q5.is_updated():
+            if self.sub.q5.is_updated():
                 q = PowersImaginary.parse_obj(
-                    self.sub.area_q5.json
+                    self.sub.q5.json
                 )
 
                 for area in range(6):

@@ -132,46 +132,41 @@ def link_feeder(system: WiringDiagram, feeder: Component) -> None:
     system.components.append(component)
     system.links.append(link)
 
-    port = "available_power"
-    component, link = generate_recorder(port, feeder.name, OUTPUTS)
-    system.components.append(component)
-    system.links.append(link)
-
 
 def link_hub_voltage(system: WiringDiagram, hub: Component, src: int) -> None:
     system.links.append(
-        Link(source=f"{ALGO}_{src}", source_port="area_v",
-             target=f"{hub.name}", target_port=f"area_v{src}")
+        Link(source=f"{ALGO}_{src}", source_port="pub_v",
+             target=f"{hub.name}", target_port=f"sub_v{src}")
     )
     system.links.append(
-        Link(source=f"{hub.name}", source_port=f"area_v{src}",
-             target=f"{ALGO}_{src}", target_port="area_v")
+        Link(source=f"{hub.name}", source_port=f"pub_v{src}",
+             target=f"{ALGO}_{src}", target_port="sub_v")
     )
 
 
 def link_hub_power(system: WiringDiagram, hub: Component, src: int) -> None:
     system.links.append(
-        Link(source=f"{ALGO}_{src}", source_port="area_p",
-             target=f"{hub.name}", target_port=f"area_p{src}")
+        Link(source=f"{ALGO}_{src}", source_port="pub_p",
+             target=f"{hub.name}", target_port=f"sub_p{src}")
     )
     system.links.append(
-        Link(source=f"{hub.name}", source_port=f"area_p{src}",
-             target=f"{ALGO}_{src}", target_port="area_p")
+        Link(source=f"{hub.name}", source_port=f"pub_p{src}",
+             target=f"{ALGO}_{src}", target_port="sub_p")
     )
     system.links.append(
-        Link(source=f"{ALGO}_{src}", source_port="area_q",
-             target=f"{hub.name}", target_port=f"area_q{src}")
+        Link(source=f"{ALGO}_{src}", source_port="pub_q",
+             target=f"{hub.name}", target_port=f"sub_q{src}")
     )
     system.links.append(
-        Link(source=f"{hub.name}", source_port=f"area_q{src}",
-             target=f"{ALGO}_{src}", target_port="area_q")
+        Link(source=f"{hub.name}", source_port=f"pub_q{src}",
+             target=f"{ALGO}_{src}", target_port="sub_q")
     )
 
 
 def link_hub_control(system: WiringDiagram, hub: Component, src: int) -> None:
     system.links.append(
-        Link(source=f"{ALGO}_{src}", source_port="area_c",
-             target=f"{hub.name}", target_port=f"area_c{src}")
+        Link(source=f"{ALGO}_{src}", source_port="pub_c",
+             target=f"{hub.name}", target_port=f"sub_c{src}")
     )
 
 
@@ -225,17 +220,6 @@ def link_algo(system: WiringDiagram, algo: Component, feeder: Component) -> None
     system.components.append(component)
     system.links.append(link)
 
-    port = "estimated_power"
-    component, link = generate_recorder(port, algo.name, OUTPUTS)
-    system.components.append(component)
-    system.links.append(link)
-
-    port = "available_power"
-    system.links.append(
-        Link(source=feeder.name, source_port=port,
-             target=algo.name, target_port=port)
-    )
-
     port = "injections"
     system.links.append(
         Link(source=feeder.name, source_port=port,
@@ -266,7 +250,6 @@ def generate(MODEL: str, LEVEL: str) -> None:
     graph = copy.deepcopy(G)
     graph2 = copy.deepcopy(G)
     boundaries = area_disconnects(graph)
-    print(boundaries)
     areas = disconnect_areas(graph2, boundaries)
     areas = reconnect_area_switches(areas, boundaries)
 
@@ -298,25 +281,6 @@ def generate(MODEL: str, LEVEL: str) -> None:
                     area_set.add(a)
         sub_areas[area] = area_set
 
-    for k, v in sub_areas.items():
-        algo = Component(
-            name=f"{ALGO}_{k}",
-            type="OptimalPowerFlow",
-            parameters={
-                "deltat": 0.1,
-                "relaxed": False,
-                "control_type": "real",
-                "switches": switch_map[k],
-                "source": source_map[k],
-                "rho_vup": 1e9,
-                "rho_sup": 0,
-                "rho_vdn": 1e9,
-                "rho_sdn": 0,
-            },
-        )
-        system.components.append(algo)
-        link_algo(system, algo, feeder)
-
     hub_voltage = Component(
         name="hub_voltage",
         type="VoltageHub",
@@ -343,12 +307,30 @@ def generate(MODEL: str, LEVEL: str) -> None:
         },
     )
     system.components.append(hub_control)
-
     for k, v in sub_areas.items():
         print(k, v)
         link_hub_voltage(system, hub_voltage, k)
         link_hub_power(system, hub_power, k)
         link_hub_control(system, hub_control, k)
+
+    for k, v in sub_areas.items():
+        algo = Component(
+            name=f"{ALGO}_{k}",
+            type="OptimalPowerFlow",
+            parameters={
+                "deltat": 0.1,
+                "relaxed": False,
+                "control_type": "real",
+                "switches": switch_map[k],
+                "source": source_map[k],
+                "rho_vup": 1e5,
+                "rho_sup": 0,
+                "rho_vdn": 0,
+                "rho_sdn": 1e5,
+            },
+        )
+        system.components.append(algo)
+        link_algo(system, algo, feeder)
 
     if not os.path.exists(SCENARIOS):
         os.makedirs(SCENARIOS)

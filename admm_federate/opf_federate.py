@@ -173,26 +173,19 @@ class OPFFederate(object):
             self.inputs["voltage_real"], "")
         self.sub.injections = self.fed.register_subscription(
             self.inputs["injections"], "")
-        self.sub.available_power = self.fed.register_subscription(
-            self.inputs["available_power"], "")
         self.sub.area_v = self.fed.register_subscription(
-            self.inputs["area_v"], "")
+            self.inputs["sub_v"], "")
         self.sub.area_v = self.fed.register_subscription(
-            self.inputs["area_p"], "")
+            self.inputs["sub_p"], "")
         self.sub.area_v = self.fed.register_subscription(
-            self.inputs["area_q"], "")
+            self.inputs["sub_q"], "")
 
     def register_publication(self) -> None:
-        name, id = self.static.name.split("_", 1)
-        print("register pubs: ", name, id)
         self.pub_pv_set = self.fed.register_publication(
-            "pv_set", h.HELICS_DATA_TYPE_STRING, ""
+            "pub_c", h.HELICS_DATA_TYPE_STRING, ""
         )
         self.pub_solver_stats = self.fed.register_publication(
             "solver_stats", h.HELICS_DATA_TYPE_STRING, ""
-        )
-        self.pub_estimated_power = self.fed.register_publication(
-            "estimated_power", h.HELICS_DATA_TYPE_STRING, ""
         )
         self.pub_powers_mag = self.fed.register_publication(
             "power_mag", h.HELICS_DATA_TYPE_STRING, ""
@@ -207,13 +200,13 @@ class OPFFederate(object):
             "voltage_angle", h.HELICS_DATA_TYPE_STRING, ""
         )
         self.pub_admm_v = self.fed.register_publication(
-            f"area_v{id}", h.HELICS_DATA_TYPE_STRING, ""
+            "pub_v", h.HELICS_DATA_TYPE_STRING, ""
         )
         self.pub_admm_p = self.fed.register_publication(
-            f"area_p{id}", h.HELICS_DATA_TYPE_STRING, ""
+            "pub_p", h.HELICS_DATA_TYPE_STRING, ""
         )
         self.pub_admm_q = self.fed.register_publication(
-            f"area_q{id}", h.HELICS_DATA_TYPE_STRING, ""
+            "pub_q", h.HELICS_DATA_TYPE_STRING, ""
         )
 
     def get_set_points(self, control: dict, bus_info: adapter.BusInfo) -> dict[complex]:
@@ -231,9 +224,11 @@ class OPFFederate(object):
     def run(self) -> None:
         logger.info(f"Federate connected: {datetime.now()}")
         self.fed.enter_executing_mode()
+        logger.info(f"Federate executing: {datetime.now()}")
         granted_time = h.helicsFederateRequestTime(
             self.fed, h.HELICS_TIME_MAXTIME)
 
+        logger.info(f"Granted Time: {granted_time}")
         while granted_time < h.HELICS_TIME_MAXTIME:
             if not self.sub.injections.is_updated():
                 granted_time = h.helicsFederateRequestTime(
@@ -256,7 +251,6 @@ class OPFFederate(object):
 
                 if a["id"] == self.static.source:
                     source = (u, v)
-            pprint(boundary)
             areas = adapter.disconnect_areas(graph2, boundary)
             areas = adapter.reconnect_area_switches(
                 areas, boundary)
@@ -288,6 +282,7 @@ class OPFFederate(object):
                 self.sub.voltages_imag.json)
             voltages = measurement_to_xarray(
                 voltages_real
+
             ) + 1j * measurement_to_xarray(voltages_imag)
 
             time = voltages_real.time
@@ -299,8 +294,31 @@ class OPFFederate(object):
 
             bus_info = adapter.extract_voltages(bus_info, voltages_mag)
 
+            parent = adapter.Bus()
+            child_buses = []
+            for u, v, a in boundary:
+                if a["id"] == self.static.source:
+                    parent_id = u
+                    parent_line = a["name"]
+                if a["id"] != self.static.source and a["id"] in self.static.switches:
+                    child_buses.append(v)
+
             branch_info, bus_info = adapter.map_secondaries(
                 self.area_branch, bus_info)
+
+            child_info = adapter.BusInfo()
+            for k, v in bus_info.buses.items():
+                if k == parent_id:
+                    parent = v
+                if k in child_buses:
+                    child_info.buses[k] = v
+
+            for k in child_info.buses.keys():
+                # del bus_info.buses[k]
+                pass
+
+            with open("child_info.json", "w") as outfile:
+                outfile.write(json.dumps(asdict(child_info)))
 
             with open("bus_info.json", "w") as outfile:
                 outfile.write(json.dumps(asdict(bus_info)))
@@ -312,9 +330,11 @@ class OPFFederate(object):
 
             p_inj = MeasurementArray.parse_obj(self.sub.available_power.json)
 
-            relaxed = self.static.relaxed
+            self.static.config.source_bus = parent_id
+            self.static.config.source_line = parent_line
+            self.static.config.relaxed = self.static.relaxed
             v_mag, pq, control, stats = lindistflow.solve(
-                branch_info, bus_info, slack_bus, relaxed, self.static.config
+                branch_info, bus_info, child_info, self.static.config
             )
             real_setpts = self.get_set_points(control, bus_info)
 

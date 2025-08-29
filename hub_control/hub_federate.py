@@ -49,11 +49,11 @@ class StaticConfig(object):
 
 
 class Subscriptions(object):
-    area_c0: CommandList
-    area_c1: CommandList
-    area_c2: CommandList
-    area_c3: CommandList
-    area_c4: CommandList
+    c0: CommandList
+    c1: CommandList
+    c2: CommandList
+    c3: CommandList
+    c4: CommandList
 
 
 class EstimatorFederate(object):
@@ -94,20 +94,20 @@ class EstimatorFederate(object):
         self.fed = h.helicsCreateValueFederate(self.static.name, self.info)
 
     def register_subscription(self) -> None:
-        self.sub.area_c0 = self.fed.register_subscription(
-            self.inputs["area_c0"], ""
+        self.sub.c0 = self.fed.register_subscription(
+            self.inputs["sub_c0"], ""
         )
-        self.sub.area_c1 = self.fed.register_subscription(
-            self.inputs["area_c1"], ""
+        self.sub.c1 = self.fed.register_subscription(
+            self.inputs["sub_c1"], ""
         )
-        self.sub.area_c2 = self.fed.register_subscription(
-            self.inputs["area_c2"], ""
+        self.sub.c2 = self.fed.register_subscription(
+            self.inputs["sub_c2"], ""
         )
-        self.sub.area_c3 = self.fed.register_subscription(
-            self.inputs["area_c3"], ""
+        self.sub.c3 = self.fed.register_subscription(
+            self.inputs["sub_c3"], ""
         )
-        self.sub.area_c4 = self.fed.register_subscription(
-            self.inputs["area_c4"], ""
+        self.sub.c4 = self.fed.register_subscription(
+            self.inputs["sub_c4"], ""
         )
 
     def register_publication(self) -> None:
@@ -123,39 +123,39 @@ class EstimatorFederate(object):
         while granted_time < h.HELICS_TIME_MAXTIME:
             # each published voltage is sent to all areas immediatly because
             # some areas may be waiting on their neighbors input to run
-            if self.sub.area_c0.is_updated():
+            if self.sub.c0.is_updated():
                 c = CommandList.parse_obj(
-                    self.sub.area_c0.json
+                    self.sub.c0.json
                 )
                 self.pub_pv_set.publish(c.json())
 
-            if self.sub.area_c1.is_updated():
+            if self.sub.c1.is_updated():
                 c = CommandList.parse_obj(
-                    self.sub.area_c1.json
+                    self.sub.c1.json
                 )
                 self.pub_pv_set.publish(c.json())
 
-            if self.sub.area_c2.is_updated():
+            if self.sub.c2.is_updated():
                 c = CommandList.parse_obj(
-                    self.sub.area_c2.json
+                    self.sub.c2.json
                 )
                 self.pub_pv_set.publish(c.json())
 
-            if self.sub.area_c3.is_updated():
+            if self.sub.c3.is_updated():
                 c = CommandList.parse_obj(
-                    self.sub.area_c3.json
+                    self.sub.c3.json
                 )
                 self.pub_pv_set.publish(c.json())
 
-            if self.sub.area_c4.is_updated():
+            if self.sub.c4.is_updated():
                 c = CommandList.parse_obj(
-                    self.sub.area_c4.json
+                    self.sub.c4.json
                 )
                 self.pub_pv_set.publish(c.json())
 
-            if self.sub.area_c5.is_updated():
+            if self.sub.c5.is_updated():
                 c = CommandList.parse_obj(
-                    self.sub.area_c5.json
+                    self.sub.c5.json
                 )
                 self.pub_pv_set.publish(c.json())
 

@@ -171,7 +171,8 @@ def update_ratios(branch_info: BranchInfo, bus_info: BusInfo) -> BusInfo:
 
 
 class ADMMConfig:
-    slack: str
+    source_bus: str
+    source_line: str
     relaxed: bool
     rho_sup: float
     rho_vup: float
@@ -179,17 +180,17 @@ class ADMMConfig:
     rho_vdn: float
 
 
-def solve(branch_info: dict, bus_info: dict, parent: Bus, child_info: BusInfo, config: ADMMConfig):
+def solve(branch_info: dict, bus_info: dict, child_info: BusInfo, config: ADMMConfig):
     try:
-        return optimal_power_flow(branch_info, bus_info, parent, child_info, config)
+        return optimal_power_flow(branch_info, bus_info, child_info, config)
 
     except:
         config.relaxed = True
-        return optimal_power_flow(branch_info, bus_info, parent, child_info, config)
+        return optimal_power_flow(branch_info, bus_info, child_info, config)
 
 
 def optimal_power_flow(
-    branch_info: BranchInfo, bus_info: BusInfo, parent: Bus, child_info: BusInfo, config: ADMMConfig
+    branch_info: BranchInfo, bus_info: BusInfo, child_info: BusInfo, config: ADMMConfig
 ):
     # System's base definition
     BASE_S = 1  # MVA
@@ -205,12 +206,15 @@ def optimal_power_flow(
 
     branches = branch_pu.branches
     buses = bus_pu.buses
-    slack_bus = config.slack
+    slack_bus = config.source_bus
 
     slack_v = max([b.kv for b in buses.values()])
     basekV = buses[slack_bus].base_kv
     baseZ = 1.0
     SOURCE_V = [slack_v / basekV] * 3
+
+    print("SOURCE Bus: ", slack_bus)
+    print("SOURCE kV: ", basekV)
 
     # Find the ABC phase and s1s2 phase triplex line and bus numbers
     nbranch_ABC = 0
@@ -239,9 +243,14 @@ def optimal_power_flow(
     flow_count = nbranch_ABC * 6 + nbranch_s1s2 * 2
     pdg_count = nbus_ABC * 3 + nbus_s1s2
     qdg_count = nbus_ABC * 3 + nbus_s1s2
-    variable_number = (
+    local_variable_number = (
         voltage_count + injection_count + flow_count + pdg_count + qdg_count
     )
+    flex_node_count = nbus_ABC*6 + nbus_s1s2*2
+    variable_number = local_variable_number + flex_node_count
+    print("local variable number: ", local_variable_number)
+    print("flex node count: ", flex_node_count)
+    print("variable number: ", variable_number)
 
     # Number of equality/inequality constraints (Injection equations (ABC) at each bus)
     #    #  Check if this is correct number or not:
@@ -264,6 +273,9 @@ def optimal_power_flow(
     inj_var_start_idx = n_bus
     flow_var_start_idx = n_bus + 2 * n_bus
     state_variable_number = n_bus + 2 * n_bus + 2 * n_branch
+    print("inj var start: ", inj_var_start_idx)
+    print("flow var start", flow_var_start_idx)
+    print("state var number: ", state_variable_number)
 
     # Q-dg variable starting number
     #                               P_dg
@@ -295,12 +307,13 @@ def optimal_power_flow(
     obj_Pup = 0
     obj_Qup = 0
 
-    vsrc = [parent.kv()]*3
-    psrc = parent.pq[0]
-    qsrc = parent.pq[1]
+    parent = bus_info.buses[config.source_bus]
+    vsrc = [parent.kv]*3
+    psrc = [pq[0] for pq in parent.pq]
+    qsrc = [pq[1] for pq in parent.pq]
 
-    source_line_idx = branch_info[slack_bus].fr_idx
-    source_bus_idx = bus_info[slack_bus].fr_idx
+    source_line_idx = branch_info.branches[config.source_line].idx
+    source_bus_idx = bus_info.buses[slack_bus].idx
     obj_Pup += 0.5 * rho_Sup * ((x[flow_var_start_idx + source_line_idx + nbranch_ABC * 0] - psrc[0]) ** 2
                                 + (x[flow_var_start_idx + source_line_idx +
                                    nbranch_ABC * 1] - psrc[1]) ** 2
@@ -327,31 +340,27 @@ def optimal_power_flow(
     obj_Pdn = 0
     obj_Qdn = 0
 
-    for key, child in child_info.items():
+    for key, child in child_info.buses.items():
         child_bus_idx = child.idx
-        vdn = [child.kv()]*3
-        pdn = child.pq[0]
-        qdn = child.pq[1]
+        vdn = [child.kv]*3
+        pdn = [pq[0] for pq in child.pq]
+        qdn = [pq[1] for pq in child.pq]
 
-        obj_Vdn += 0.5 * rho_Vdn * ((x[child_bus_idx + nbus_ABC * 0] - vdn[0] ** 2) ** 2
-                                    + (x[child_bus_idx + nbus_ABC *
-                                       1] - vdn[1] ** 2) ** 2
-                                    + (x[child_bus_idx + nbus_ABC *
-                                       2] - vdn[2] ** 2) ** 2
-                                    )
-        obj_Pdn += 0.5 * rho_Sdn * ((x[variable_number + child_bus_idx + nbus_ABC * 0] - pdn[0]) ** 2
-                                    + (x[variable_number + child_bus_idx +
-                                       nbus_ABC * 1] - pdn[1]) ** 2
-                                    + (x[variable_number + child_bus_idx +
-                                         nbus_ABC * 2] - pdn[2]) ** 2
-                                    )
-
-        obj_Qdn += 0.5 * rho_Sdn * ((x[variable_number + child_bus_idx + nbus_ABC * 3] - qdn[0]) ** 2
-                                    + (x[variable_number + child_bus_idx +
-                                       nbus_ABC * 4] - qdn[1]) ** 2
-                                    + (x[variable_number + child_bus_idx +
-                                       nbus_ABC * 5] - qdn[2]) ** 2
-                                    )
+        obj_Vdn += 0.5 * rho_Vdn * (
+            (x[child_bus_idx + nbus_ABC * 0] - vdn[0] ** 2) ** 2
+            + (x[child_bus_idx + nbus_ABC * 1] - vdn[1] ** 2) ** 2
+            + (x[child_bus_idx + nbus_ABC * 2] - vdn[2] ** 2) ** 2
+        )
+        obj_Pdn += 0.5 * rho_Sdn * (
+            (x[local_variable_number + child_bus_idx + nbus_ABC * 0] - pdn[0]) ** 2
+            + (x[local_variable_number + child_bus_idx + nbus_ABC * 1] - pdn[1]) ** 2
+            + (x[local_variable_number + child_bus_idx + nbus_ABC * 2] - pdn[2]) ** 2
+        )
+        obj_Qdn += 0.5 * rho_Sdn * (
+            (x[local_variable_number + child_bus_idx + nbus_ABC * 3] - qdn[0]) ** 2
+            + (x[local_variable_number + child_bus_idx + nbus_ABC * 4] - qdn[1]) ** 2
+            + (x[local_variable_number + child_bus_idx + nbus_ABC * 5] - qdn[2]) ** 2
+        )
     # lossMin obj:
     obj_loss = 0
     # for line_k in range(nbranch_ABC):
@@ -852,7 +861,7 @@ def optimal_power_flow(
     # print("Formulating voltage limit constraints")
     v_idxs = list(set(v_lim))
     # # Does the vmin make sense here?
-    if relaxed is True:
+    if config.relaxed is True:
         vmax = 1.1
         vmin = 0.9
     else:

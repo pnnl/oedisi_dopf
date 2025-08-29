@@ -18,7 +18,7 @@ logger.setLevel(logging.INFO)
 class Recorder:
     def __init__(self, name, feather_filename, csv_filename, input_mapping):
         self.rng = np.random.default_rng(12345)
-        deltat = 0.01
+        deltat = 0.001
         # deltat = 60.
 
         # Create Federate Info object that describes the federate properties #
@@ -36,7 +36,8 @@ class Recorder:
         logger.info("Value federate created")
 
         # Register the publication #
-        self.sub = self.vfed.register_subscription(input_mapping["subscription"], "")
+        self.sub = self.vfed.register_subscription(
+            input_mapping["subscription"], "")
         self.feather_filename = feather_filename
         self.csv_filename = csv_filename
 
@@ -47,7 +48,8 @@ class Recorder:
         logger.info("Entering execution mode")
 
         start = True
-        granted_time = h.helicsFederateRequestTime(self.vfed, h.HELICS_TIME_MAXTIME)
+        granted_time = h.helicsFederateRequestTime(
+            self.vfed, h.HELICS_TIME_MAXTIME)
 
         with pa.OSFile(self.feather_filename, "wb") as sink:
             writer = None
@@ -69,14 +71,16 @@ class Recorder:
                 logger.debug(measurement.time)
 
                 if start:
-                    schema_elements = [(key, pa.float64()) for key in measurement.ids]
+                    schema_elements = [(key, pa.float64())
+                                       for key in measurement.ids]
                     schema_elements.append(("time", pa.string()))
                     schema = pa.schema(schema_elements)
                     writer = pa.ipc.new_file(sink, schema)
                     start = False
                 cnt = 0
 
-                writer.write_batch(pa.RecordBatch.from_pylist([measurement_dict]))
+                writer.write_batch(
+                    pa.RecordBatch.from_pylist([measurement_dict]))
 
                 granted_time = h.helicsFederateRequestTime(
                     self.vfed, h.HELICS_TIME_MAXTIME

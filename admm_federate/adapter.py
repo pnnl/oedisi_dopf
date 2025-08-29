@@ -187,7 +187,6 @@ def pack_powers_imag(base: PowersImaginary, powers: dict, time: int) -> PowersIm
 
 def extract_forecast(bus: dict, forecast) -> dict:
     for eq, power in zip(forecast["ids"], forecast["values"]):
-        print(eq)
         if "_" in eq:
             [_, name] = eq.rsplit("_", 1)
         else:
@@ -632,7 +631,6 @@ def generate_area_info(graph: nx.Graph, topology: Topology, slack_bus: str, boun
     bus_info = BusInfo()
 
     for u, v, a in graph.edges(data=True):
-        print(u, v, a)
         branch_info.branches[a["name"]] = Branch(
             fr_bus=u, to_bus=v, tag=a["tag"])
         bus_info.buses[u] = Bus()

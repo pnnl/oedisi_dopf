@@ -59,11 +59,11 @@ class StaticConfig(object):
 
 
 class Subscriptions(object):
-    area_v0: VoltagesMagnitude
-    area_v1: VoltagesMagnitude
-    area_v2: VoltagesMagnitude
-    area_v3: VoltagesMagnitude
-    area_v4: VoltagesMagnitude
+    v0: VoltagesMagnitude
+    v1: VoltagesMagnitude
+    v2: VoltagesMagnitude
+    v3: VoltagesMagnitude
+    v4: VoltagesMagnitude
 
 
 class EstimatorFederate(object):
@@ -104,29 +104,27 @@ class EstimatorFederate(object):
         self.fed = h.helicsCreateValueFederate(self.static.name, self.info)
 
     def register_subscription(self) -> None:
-        self.sub.area_v0 = self.fed.register_subscription(
-            self.inputs["area_v0"], ""
+        self.sub.v0 = self.fed.register_subscription(
+            self.inputs["sub_v0"], ""
         )
-        self.sub.area_v1 = self.fed.register_subscription(
-            self.inputs["area_v1"], ""
+        self.sub.v1 = self.fed.register_subscription(
+            self.inputs["sub_v1"], ""
         )
-        self.sub.area_v2 = self.fed.register_subscription(
-            self.inputs["area_v2"], ""
+        self.sub.v2 = self.fed.register_subscription(
+            self.inputs["sub_v2"], ""
         )
-        self.sub.area_v3 = self.fed.register_subscription(
-            self.inputs["area_v3"], ""
+        self.sub.v3 = self.fed.register_subscription(
+            self.inputs["sub_v3"], ""
         )
-        self.sub.area_v4 = self.fed.register_subscription(
-            self.inputs["area_v4"], ""
+        self.sub.v4 = self.fed.register_subscription(
+            self.inputs["sub_v4"], ""
         )
 
     def register_publication(self) -> None:
-        self.pub_commands = self.fed.register_publication(
-            "pv_set", h.HELICS_DATA_TYPE_STRING, "")
         self.pub_area_voltages = []
         for i in range(6):
             self.pub_area_voltages.append(self.fed.register_publication(
-                f"area_v{i}", h.HELICS_DATA_TYPE_STRING, "")
+                f"pub_v{i}", h.HELICS_DATA_TYPE_STRING, "")
             )
 
     def run(self) -> None:
@@ -138,49 +136,49 @@ class EstimatorFederate(object):
         while granted_time < h.HELICS_TIME_MAXTIME:
             # each published voltage is sent to all areas immediatly because
             # some areas may be waiting on their neighbors input to run
-            if self.sub.area_v0.is_updated():
+            if self.sub.v0.is_updated():
                 v = VoltagesMagnitude.parse_obj(
-                    self.sub.area_v0.json
+                    self.sub.v0.json
                 )
 
                 for area in range(6):
                     self.pub_area_voltages[area].publish(v.json())
 
-            if self.sub.area_v1.is_updated():
+            if self.sub.v1.is_updated():
                 v = VoltagesMagnitude.parse_obj(
-                    self.sub.area_v1.json
+                    self.sub.v1.json
                 )
 
                 for area in range(6):
                     self.pub_area_voltages[area].publish(v.json())
 
-            if self.sub.area_v2.is_updated():
+            if self.sub.v2.is_updated():
                 v = VoltagesMagnitude.parse_obj(
-                    self.sub.area_v2.json
+                    self.sub.v2.json
                 )
 
                 for area in range(6):
                     self.pub_area_voltages[area].publish(v.json())
 
-            if self.sub.area_v3.is_updated():
+            if self.sub.v3.is_updated():
                 v = VoltagesMagnitude.parse_obj(
-                    self.sub.area_v3.json
+                    self.sub.v3.json
                 )
 
                 for area in range(6):
                     self.pub_area_voltages[area].publish(v.json())
 
-            if self.sub.area_v4.is_updated():
+            if self.sub.v4.is_updated():
                 v = VoltagesMagnitude.parse_obj(
-                    self.sub.area_v4.json
+                    self.sub.v4.json
                 )
 
                 for area in range(6):
                     self.pub_area_voltages[area].publish(v.json())
 
-            if self.sub.area_v5.is_updated():
+            if self.sub.v5.is_updated():
                 v = VoltagesMagnitude.parse_obj(
-                    self.sub.area_v5.json
+                    self.sub.v5.json
                 )
 
                 for area in range(6):
