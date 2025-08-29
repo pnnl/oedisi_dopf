@@ -12,7 +12,7 @@ from oedisi.types.data_types import MeasurementArray
 
 logger = logging.getLogger(__name__)
 logger.addHandler(logging.StreamHandler())
-logger.setLevel(logging.INFO)
+logger.setLevel(logging.DEBUG)
 
 
 class Recorder:
@@ -33,6 +33,8 @@ class Recorder:
         )
 
         self.vfed = h.helicsCreateValueFederate(name, fedinfo)
+        h.helicsFederateSetFlagOption(
+            self.vfed, h.helics_flag_slow_responding, True)
         logger.info("Value federate created")
 
         # Register the publication #
@@ -51,6 +53,8 @@ class Recorder:
         granted_time = h.helicsFederateRequestTime(
             self.vfed, h.HELICS_TIME_MAXTIME)
 
+        logger.info(f"Granted Time: {granted_time} out of {
+                    h.HELICS_TIME_MAXTIME}")
         with pa.OSFile(self.feather_filename, "wb") as sink:
             writer = None
             while granted_time < h.HELICS_TIME_MAXTIME:
@@ -94,8 +98,8 @@ class Recorder:
         self.destroy()
 
     def destroy(self):
-        h.helicsFederateDisconnect(self.vfed)
         logger.info("Federate disconnected")
+        h.helicsFederateDisconnect(self.vfed)
         h.helicsFederateFree(self.vfed)
         h.helicsCloseLibrary()
 

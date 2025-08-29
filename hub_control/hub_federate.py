@@ -7,7 +7,8 @@ from dataclasses import asdict
 from oedisi.types.data_types import (
     MeasurementArray,
     EquipmentNodeArray,
-    CommandList
+    CommandList,
+    Command
 )
 import xarray as xr
 import numpy as np
@@ -89,9 +90,12 @@ class EstimatorFederate(object):
         self.info.core_name = self.static.name
         self.info.core_type = h.HELICS_CORE_TYPE_ZMQ
         self.info.core_init = "--federates=1"
+
         h.helicsFederateInfoSetTimeProperty(
             self.info, h.helics_property_time_delta, 0.001)
         self.fed = h.helicsCreateValueFederate(self.static.name, self.info)
+        h.helicsFederateSetFlagOption(
+            self.fed, h.helics_flag_slow_responding, True)
 
     def register_subscription(self) -> None:
         self.sub.c0 = self.fed.register_subscription(
@@ -117,47 +121,56 @@ class EstimatorFederate(object):
     def run(self) -> None:
         logger.info(f"Federate connected: {datetime.now()}")
         self.fed.enter_executing_mode()
+        logger.info(f"Federate executing: {datetime.now()}")
+
         granted_time = h.helicsFederateRequestTime(
             self.fed, h.HELICS_TIME_MAXTIME)
+        logger.info(f"Granted Time: {granted_time}")
 
+        updated = [False]*5
+        commands = []
         while granted_time < h.HELICS_TIME_MAXTIME:
             # each published voltage is sent to all areas immediatly because
             # some areas may be waiting on their neighbors input to run
-            if self.sub.c0.is_updated():
-                c = CommandList.parse_obj(
-                    self.sub.c0.json
-                )
-                self.pub_pv_set.publish(c.json())
 
-            if self.sub.c1.is_updated():
-                c = CommandList.parse_obj(
-                    self.sub.c1.json
-                )
-                self.pub_pv_set.publish(c.json())
+            if not all(updated):
+                granted_time = h.helicsFederateRequestTime(
+                    self.fed, h.HELICS_TIME_MAXTIME)
 
-            if self.sub.c2.is_updated():
-                c = CommandList.parse_obj(
-                    self.sub.c2.json
-                )
-                self.pub_pv_set.publish(c.json())
+                if self.sub.c0.is_updated():
+                    updated[0] = True
+                    control = self.sub.c0.json
+                    for c in control:
+                        commands.append(c)
 
-            if self.sub.c3.is_updated():
-                c = CommandList.parse_obj(
-                    self.sub.c3.json
-                )
-                self.pub_pv_set.publish(c.json())
+                if self.sub.c1.is_updated():
+                    updated[1] = True
+                    control = self.sub.c1.json
+                    for c in control:
+                        commands.append(c)
 
-            if self.sub.c4.is_updated():
-                c = CommandList.parse_obj(
-                    self.sub.c4.json
-                )
-                self.pub_pv_set.publish(c.json())
+                if self.sub.c2.is_updated():
+                    updated[2] = True
+                    control = self.sub.c2.json
+                    for c in control:
+                        commands.append(c)
 
-            if self.sub.c5.is_updated():
-                c = CommandList.parse_obj(
-                    self.sub.c5.json
-                )
-                self.pub_pv_set.publish(c.json())
+                if self.sub.c3.is_updated():
+                    updated[3] = True
+                    control = self.sub.c3.json
+                    for c in control:
+                        commands.append(c)
+
+                if self.sub.c4.is_updated():
+                    updated[4] = True
+                    control = self.sub.c4.json
+                    for c in control:
+                        commands.append(c)
+            else:
+                logger.info(commands)
+                self.pub_commands.publish(json.dumps(commands))
+                updated = [False]*5
+                commands = []
 
         self.stop()
 

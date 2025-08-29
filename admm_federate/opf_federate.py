@@ -17,6 +17,8 @@ from oedisi.types.data_types import (
     VoltagesAngle,
     MeasurementArray,
     EquipmentNodeArray,
+    CommandList,
+    Command
 )
 import adapter
 import lindistflow
@@ -137,6 +139,7 @@ class OPFFederate(object):
 
         self.static.name = config["name"]
         self.static.deltat = config["deltat"]
+        self.static.deltat = 1
         self.static.control_type = config["control_type"]
         self.static.relaxed = config["relaxed"]
         self.static.switches = config["switches"]
@@ -159,10 +162,13 @@ class OPFFederate(object):
         )
 
         self.fed = h.helicsCreateValueFederate(self.static.name, self.info)
+        # h.helicsFederateSetFlagOption(self.fed, h.helics_flag_slow_responding, True)
 
     def register_subscription(self) -> None:
         self.sub.topology = self.fed.register_subscription(
             self.inputs["topology"], "")
+        self.sub.injections = self.fed.register_subscription(
+            self.inputs["injections"], "")
         self.sub.powers_imag = self.fed.register_subscription(
             self.inputs["power_imag"], "")
         self.sub.powers_real = self.fed.register_subscription(
@@ -171,14 +177,12 @@ class OPFFederate(object):
             self.inputs["voltage_imag"], "")
         self.sub.voltages_real = self.fed.register_subscription(
             self.inputs["voltage_real"], "")
-        self.sub.injections = self.fed.register_subscription(
-            self.inputs["injections"], "")
-        self.sub.area_v = self.fed.register_subscription(
-            self.inputs["sub_v"], "")
-        self.sub.area_v = self.fed.register_subscription(
-            self.inputs["sub_p"], "")
-        self.sub.area_v = self.fed.register_subscription(
-            self.inputs["sub_q"], "")
+#        self.sub.area_v = self.fed.register_subscription(
+#            self.inputs["sub_v"], "")
+#        self.sub.area_v = self.fed.register_subscription(
+#            self.inputs["sub_p"], "")
+#        self.sub.area_v = self.fed.register_subscription(
+#            self.inputs["sub_q"], "")
 
     def register_publication(self) -> None:
         self.pub_pv_set = self.fed.register_publication(
@@ -187,27 +191,27 @@ class OPFFederate(object):
         self.pub_solver_stats = self.fed.register_publication(
             "solver_stats", h.HELICS_DATA_TYPE_STRING, ""
         )
-        self.pub_powers_mag = self.fed.register_publication(
-            "power_mag", h.HELICS_DATA_TYPE_STRING, ""
-        )
-        self.pub_powers_angle = self.fed.register_publication(
-            "power_angle", h.HELICS_DATA_TYPE_STRING, ""
-        )
-        self.pub_voltages_mag = self.fed.register_publication(
-            "voltage_mag", h.HELICS_DATA_TYPE_STRING, ""
-        )
-        self.pub_voltages_angle = self.fed.register_publication(
-            "voltage_angle", h.HELICS_DATA_TYPE_STRING, ""
-        )
-        self.pub_admm_v = self.fed.register_publication(
-            "pub_v", h.HELICS_DATA_TYPE_STRING, ""
-        )
-        self.pub_admm_p = self.fed.register_publication(
-            "pub_p", h.HELICS_DATA_TYPE_STRING, ""
-        )
-        self.pub_admm_q = self.fed.register_publication(
-            "pub_q", h.HELICS_DATA_TYPE_STRING, ""
-        )
+#        self.pub_powers_mag = self.fed.register_publication(
+#            "power_mag", h.HELICS_DATA_TYPE_STRING, ""
+#        )
+#        self.pub_powers_angle = self.fed.register_publication(
+#            "power_angle", h.HELICS_DATA_TYPE_STRING, ""
+#        )
+#        self.pub_voltages_mag = self.fed.register_publication(
+#            "voltage_mag", h.HELICS_DATA_TYPE_STRING, ""
+#        )
+#        self.pub_voltages_angle = self.fed.register_publication(
+#            "voltage_angle", h.HELICS_DATA_TYPE_STRING, ""
+#        )
+#        self.pub_admm_v = self.fed.register_publication(
+#            "pub_v", h.HELICS_DATA_TYPE_STRING, ""
+#        )
+#        self.pub_admm_p = self.fed.register_publication(
+#            "pub_p", h.HELICS_DATA_TYPE_STRING, ""
+#        )
+#        self.pub_admm_q = self.fed.register_publication(
+#            "pub_q", h.HELICS_DATA_TYPE_STRING, ""
+#        )
 
     def get_set_points(self, control: dict, bus_info: adapter.BusInfo) -> dict[complex]:
         setpoints = {}
@@ -273,10 +277,10 @@ class OPFFederate(object):
             powers = eqarray_to_xarray(powers_real) + 1j * eqarray_to_xarray(
                 powers_imag
             )
-
-            if self.sub.area_v.is_updated():
-                print(VoltagesMagnitude.parse_obj(self.sub.area_v0.json))
-
+#
+#            if self.sub.area_v.is_updated():
+#                print(VoltagesMagnitude.parse_obj(self.sub.area_v0.json))
+#
             voltages_real = VoltagesReal.parse_obj(self.sub.voltages_real.json)
             voltages_imag = VoltagesImaginary.parse_obj(
                 self.sub.voltages_imag.json)
@@ -328,8 +332,6 @@ class OPFFederate(object):
 
             assert adapter.check_radiality(branch_info, bus_info)
 
-            p_inj = MeasurementArray.parse_obj(self.sub.available_power.json)
-
             self.static.config.source_bus = parent_id
             self.static.config.source_line = parent_line
             self.static.config.relaxed = self.static.relaxed
@@ -349,9 +351,6 @@ class OPFFederate(object):
 
                 commands.append((eq, val.real, val.imag))
 
-            if commands:
-                self.pub_pv_set.publish(json.dumps(commands))
-
             v_mag = adapter.pack_voltages(v_mag, bus_info, time)
             power_real = adapter.pack_powers_real(powers_real, p, time)
             power_imag = adapter.pack_powers_imag(powers_real, q, time)
@@ -369,21 +368,19 @@ class OPFFederate(object):
                 time=time,
                 units="s",
             )
+            logger.info(solver_stats)
 
-            est_power = MeasurementArray(
-                ids=list(real_setpts.keys()),
-                values=list(real_setpts.values()),
-                time=time,
-                units="W",
-            )
+            if commands:
+                self.pub_pv_set.publish(json.dumps(commands))
 
-            self.pub_voltages_mag.publish(v_mag.json())
-            self.pub_voltages_angle.publish(voltages_ang.json())
-
-            self.pub_estimated_power.publish(est_power.json())
             self.pub_solver_stats.publish(solver_stats.json())
-            self.pub_powers_mag.publish(power_mag.json())
-            self.pub_powers_angle.publish(power_ang.json())
+            # self.pub_voltages_mag.publish(v_mag.json())
+            # self.pub_voltages_angle.publish(voltages_ang.json())
+            # self.pub_powers_mag.publish(power_mag.json())
+            # self.pub_powers_angle.publish(power_ang.json())
+            # self.pub_admm_p.publish(power_real.json())
+            # self.pub_admm_q.publish(power_imag.json())
+            # self.pub_admm_v.publish(v_mag.json())
 
         self.stop()
 

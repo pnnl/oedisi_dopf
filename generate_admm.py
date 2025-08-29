@@ -59,9 +59,9 @@ def generate_feeder(MODEL: str, LEVEL: str, OUTPUTS: str) -> Component:
             "profile_location": profiles,
             "opendss_location": opendss,
             "feeder_file": file,
-            "start_date": "2018-05-01 11:30:00",
-            "number_of_timesteps": 5,
-            "run_freq_sec": 900,
+            "start_date": "2018-05-01 14:00:00",
+            "number_of_timesteps": 8,
+            "run_freq_sec": 3600,
             "topology_output": f"{OUTPUTS}/topology.json",
             "buscoords_output": f"{OUTPUTS}/Buscoords.dat",
         },
@@ -195,25 +195,25 @@ def link_algo(system: WiringDiagram, algo: Component, feeder: Component) -> None
              target=algo.name, target_port=port)
     )
 
-    port = "voltage_mag"
-    component, link = generate_recorder(port, algo.name, OUTPUTS)
-    system.components.append(component)
-    system.links.append(link)
-
-    port = "voltage_angle"
-    component, link = generate_recorder(port, algo.name, OUTPUTS)
-    system.components.append(component)
-    system.links.append(link)
-
-    port = "power_mag"
-    component, link = generate_recorder(port, algo.name, OUTPUTS)
-    system.components.append(component)
-    system.links.append(link)
-
-    port = "power_angle"
-    component, link = generate_recorder(port, algo.name, OUTPUTS)
-    system.components.append(component)
-    system.links.append(link)
+#    port = "voltage_mag"
+#    component, link = generate_recorder(port, algo.name, OUTPUTS)
+#    system.components.append(component)
+#    system.links.append(link)
+#
+#    port = "voltage_angle"
+#    component, link = generate_recorder(port, algo.name, OUTPUTS)
+#    system.components.append(component)
+#    system.links.append(link)
+#
+#    port = "power_mag"
+#    component, link = generate_recorder(port, algo.name, OUTPUTS)
+#    system.components.append(component)
+#    system.links.append(link)
+#
+#    port = "power_angle"
+#    component, link = generate_recorder(port, algo.name, OUTPUTS)
+#    system.components.append(component)
+#    system.links.append(link)
 
     port = "solver_stats"
     component, link = generate_recorder(port, algo.name, OUTPUTS)
@@ -234,14 +234,17 @@ def link_algo(system: WiringDiagram, algo: Component, feeder: Component) -> None
 
 
 def generate(MODEL: str, LEVEL: str) -> None:
-    OUTPUTS = f"{ROOT}/outputs/lindistflow/{MODEL}"
+    global OUTPUTS
+    TOPOLOGY = f"{ROOT}/outputs/lindistflow/{MODEL}"
+    OUTPUTS = f"{ROOT}/outputs/admm/{MODEL}"
     SCENARIOS = f"{ROOT}/scenarios/{ALGO}/{MODEL}"
 
     if "ieee" not in MODEL:
+        TOPOLOGY = f"{TOPOLOGY}/{LEVEL}"
         OUTPUTS = f"{OUTPUTS}/{LEVEL}"
         SCENARIOS = f"{SCENARIOS}/{LEVEL}"
 
-    path = f"{OUTPUTS}/topology.json"
+    path = f"{TOPOLOGY}/topology.json"
     topology = get_topology(path)
     slack_bus, _ = topology.slack_bus[0].split(".", 1)
 
@@ -281,36 +284,36 @@ def generate(MODEL: str, LEVEL: str) -> None:
                     area_set.add(a)
         sub_areas[area] = area_set
 
-    hub_voltage = Component(
-        name="hub_voltage",
-        type="VoltageHub",
-        parameters={
-            "max_iter": 10,
-        },
-    )
-    system.components.append(hub_voltage)
-
-    hub_power = Component(
-        name="hub_power",
-        type="PowerHub",
-        parameters={
-            "max_iter": 10,
-        },
-    )
-    system.components.append(hub_power)
-
+#    hub_voltage = Component(
+#        name="hub_voltage",
+#        type="VoltageHub",
+#        parameters={
+#            "max_iter": 2,
+#        },
+#    )
+#    system.components.append(hub_voltage)
+#
+#    hub_power = Component(
+#        name="hub_power",
+#        type="PowerHub",
+#        parameters={
+#            "max_iter": 2,
+#        },
+#    )
+#    system.components.append(hub_power)
+#
     hub_control = Component(
         name="hub_control",
         type="ControlHub",
         parameters={
-            "max_iter": 10,
+            "max_iter": 2,
         },
     )
     system.components.append(hub_control)
     for k, v in sub_areas.items():
         print(k, v)
-        link_hub_voltage(system, hub_voltage, k)
-        link_hub_power(system, hub_power, k)
+        # link_hub_voltage(system, hub_voltage, k)
+        # link_hub_power(system, hub_power, k)
         link_hub_control(system, hub_control, k)
 
     for k, v in sub_areas.items():
@@ -318,7 +321,7 @@ def generate(MODEL: str, LEVEL: str) -> None:
             name=f"{ALGO}_{k}",
             type="OptimalPowerFlow",
             parameters={
-                "deltat": 0.1,
+                "deltat": 0.01,
                 "relaxed": False,
                 "control_type": "real",
                 "switches": switch_map[k],

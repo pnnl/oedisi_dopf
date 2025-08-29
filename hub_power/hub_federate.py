@@ -104,6 +104,8 @@ class HubFederate(object):
         h.helicsFederateInfoSetTimeProperty(
             self.info, h.helics_property_time_delta, 1e-3)
         self.fed = h.helicsCreateValueFederate(self.static.name, self.info)
+        h.helicsFederateSetFlagOption(
+            self.fed, h.helics_flag_slow_responding, True)
 
     def register_subscription(self) -> None:
         self.sub.p0 = self.fed.register_subscription(
@@ -139,13 +141,13 @@ class HubFederate(object):
 
     def register_publication(self) -> None:
         self.pub_area_p = []
-        for i in range(6):
+        for i in range(5):
             self.pub_area_p.append(self.fed.register_publication(
                 f"pub_p{i}", h.HELICS_DATA_TYPE_STRING, "")
             )
 
         self.pub_area_q = []
-        for i in range(6):
+        for i in range(5):
             self.pub_area_q.append(self.fed.register_publication(
                 f"pub_q{i}", h.HELICS_DATA_TYPE_STRING, "")
             )
@@ -156,10 +158,14 @@ class HubFederate(object):
         granted_time = h.helicsFederateRequestTime(
             self.fed, h.HELICS_TIME_MAXTIME)
 
+        logger.info(f"Granted Time: {granted_time}")
+        p_updated = [False]*5
+        q_updated = [False]*5
         while granted_time < h.HELICS_TIME_MAXTIME:
             # each published power is sent to all areas immediatly because
             # some areas may be waiting on their neighbors input to run
             if self.sub.p0.is_updated():
+                p_updated[0] = True
                 p = PowersReal.parse_obj(
                     self.sub.p0.json
                 )
@@ -168,6 +174,7 @@ class HubFederate(object):
                     self.pub_area_p[area].publish(p.json())
 
             if self.sub.p1.is_updated():
+                p_updated[1] = True
                 p = PowersReal.parse_obj(
                     self.sub.p1.json
                 )
@@ -176,6 +183,7 @@ class HubFederate(object):
                     self.pub_area_p[area].publish(p.json())
 
             if self.sub.p2.is_updated():
+                p_updated[2] = True
                 p = PowersReal.parse_obj(
                     self.sub.p2.json
                 )
@@ -184,6 +192,7 @@ class HubFederate(object):
                     self.pub_area_p[area].publish(p.json())
 
             if self.sub.p3.is_updated():
+                p_updated[3] = True
                 p = PowersReal.parse_obj(
                     self.sub.p3.json
                 )
@@ -192,6 +201,7 @@ class HubFederate(object):
                     self.pub_area_p[area].publish(p.json())
 
             if self.sub.p4.is_updated():
+                p_updated[4] = True
                 p = PowersReal.parse_obj(
                     self.sub.p4.json
                 )
@@ -199,15 +209,8 @@ class HubFederate(object):
                 for area in range(6):
                     self.pub_area_p[area].publish(p.json())
 
-            if self.sub.p5.is_updated():
-                p = PowersReal.parse_obj(
-                    self.sub.p5.json
-                )
-
-                for area in range(6):
-                    self.pub_area_p[area].publish(p.json())
-
             if self.sub.q0.is_updated():
+                q_updated[0] = True
                 q = PowersImaginary.parse_obj(
                     self.sub.q0.json
                 )
@@ -216,6 +219,7 @@ class HubFederate(object):
                     self.pub_area_q[area].publish(q.json())
 
             if self.sub.q1.is_updated():
+                q_updated[1] = True
                 q = PowersImaginary.parse_obj(
                     self.sub.q1.json
                 )
@@ -224,6 +228,7 @@ class HubFederate(object):
                     self.pub_area_q[area].publish(q.json())
 
             if self.sub.q2.is_updated():
+                q_updated[2] = True
                 q = PowersImaginary.parse_obj(
                     self.sub.q2.json
                 )
@@ -232,6 +237,7 @@ class HubFederate(object):
                     self.pub_area_q[area].publish(q.json())
 
             if self.sub.q3.is_updated():
+                q_updated[3] = True
                 q = PowersImaginary.parse_obj(
                     self.sub.q3.json
                 )
@@ -240,6 +246,7 @@ class HubFederate(object):
                     self.pub_area_q[area].publish(q.json())
 
             if self.sub.q4.is_updated():
+                q_updated[4] = True
                 q = PowersImaginary.parse_obj(
                     self.sub.q4.json
                 )
@@ -247,13 +254,9 @@ class HubFederate(object):
                 for area in range(6):
                     self.pub_area_q[area].publish(q.json())
 
-            if self.sub.q5.is_updated():
-                q = PowersImaginary.parse_obj(
-                    self.sub.q5.json
-                )
-
-                for area in range(6):
-                    self.pub_area_q[area].publish(q.json())
+            if not all(p_updated) and not all(q_updated):
+                granted_time = h.helicsFederateRequestTime(
+                    self.fed, h.HELICS_TIME_MAXTIME)
         self.stop()
 
     def stop(self) -> None:

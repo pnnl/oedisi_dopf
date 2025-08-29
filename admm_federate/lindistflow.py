@@ -920,7 +920,7 @@ def optimal_power_flow(
     if prob.status.lower() != "optimal":
         logger.debug("Check for limits. Power flow didn't converge")
         logger.debug(prob.status)
-        raise prob.status
+        raise ValueError("solution not optimal")
 
     from_bus = []
     to_bus = []

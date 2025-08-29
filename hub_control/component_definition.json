@@ -4,27 +4,27 @@
     "static_inputs": [],
     "dynamic_inputs": [
         {
-            "type": "CommandList",
+            "type": "",
             "port_id": "sub_c0",
             "optional": true
         },
         {
-            "type": "CommandList",
+            "type": "",
             "port_id": "sub_c1",
             "optional": true
         },
         {
-            "type": "CommandList",
+            "type": "",
             "port_id": "sub_c2",
             "optional": true
         },
         {
-            "type": "CommandList",
+            "type": "",
             "port_id": "sub_c3",
             "optional": true
         },
         {
-            "type": "CommandList",
+            "type": "",
             "port_id": "sub_c4",
             "optional": true
         }
