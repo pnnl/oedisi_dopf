@@ -44,6 +44,7 @@ if __name__ == "__main__":
 
     for i in len(profiles):
         print("Generating: ", profiles[i])
+
         df = pd.read_csv(f"{data_dir}/{profiles[i]}", index_col=0)
         real = df.to_numpy()
 
