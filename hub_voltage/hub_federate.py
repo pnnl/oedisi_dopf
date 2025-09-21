@@ -137,58 +137,46 @@ class EstimatorFederate(object):
             self.fed, h.HELICS_TIME_MAXTIME)
 
         logger.info(f"Granted Time: {granted_time}")
-        updated = [False]*5
-        while granted_time < h.HELICS_TIME_MAXTIME:
+        itr = 0
+        itr_max = 10
+        itr_flag = h.helics_iteration_request_iterate_if_needed
+        while itr < itr_max:
             # each published voltage is sent to all areas immediatly because
             # some areas may be waiting on their neighbors input to run
-            if self.sub.v0.is_updated():
-                updated[0] = True
-                v = VoltagesMagnitude.parse_obj(
-                    self.sub.v0.json
-                )
+            itr_status = h.helicsFederateEnterExecutingModeIterative(
+                self.fed, itr_flag)
 
+            if itr_status == h.helics_iteration_result_next_step:
+                break
+            else:
+                itr += 1
+                logger.info(f"iter: {itr}")
+
+            if self.sub.v0.is_updated():
+                v = VoltagesMagnitude.parse_obj(self.sub.v0.json)
                 for area in range(6):
                     self.pub_area_voltages[area].publish(v.json())
 
             if self.sub.v1.is_updated():
-                updated[1] = True
-                v = VoltagesMagnitude.parse_obj(
-                    self.sub.v1.json
-                )
-
+                v = VoltagesMagnitude.parse_obj(self.sub.v1.json)
                 for area in range(6):
                     self.pub_area_voltages[area].publish(v.json())
 
             if self.sub.v2.is_updated():
-                updated[2] = True
-                v = VoltagesMagnitude.parse_obj(
-                    self.sub.v2.json
-                )
-
+                v = VoltagesMagnitude.parse_obj(self.sub.v2.json)
                 for area in range(6):
                     self.pub_area_voltages[area].publish(v.json())
 
             if self.sub.v3.is_updated():
-                updated[3] = True
-                v = VoltagesMagnitude.parse_obj(
-                    self.sub.v3.json
-                )
-
+                v = VoltagesMagnitude.parse_obj(self.sub.v3.json)
                 for area in range(6):
                     self.pub_area_voltages[area].publish(v.json())
 
             if self.sub.v4.is_updated():
-                updated[4] = True
-                v = VoltagesMagnitude.parse_obj(
-                    self.sub.v4.json
-                )
-
+                v = VoltagesMagnitude.parse_obj(self.sub.v4.json)
                 for area in range(6):
                     self.pub_area_voltages[area].publish(v.json())
 
-            if not all(updated):
-                granted_time = h.helicsFederateRequestTime(
-                    self.fed, h.HELICS_TIME_MAXTIME)
             logger.info(f"No Updates: {granted_time}")
         self.stop()
 
