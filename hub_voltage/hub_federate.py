@@ -56,6 +56,7 @@ def xarray_to_powers_cart(data, **kwargs):
 
 class StaticConfig(object):
     name: str
+    max_itr: int
 
 
 class Subscriptions(object):
@@ -93,6 +94,7 @@ class EstimatorFederate(object):
             config = json.load(file)
 
         self.static.name = config["name"]
+        self.static.max_itr = config["max_itr"]
 
     def initilize(self) -> None:
         self.info = h.helicsCreateFederateInfo()
@@ -130,54 +132,80 @@ class EstimatorFederate(object):
                 f"pub_v{i}", h.HELICS_DATA_TYPE_STRING, "")
             )
 
+    def publish_all(self):
+        all_v = VoltagesMagnitude(ids=[], values=[], time=0)
+        if self.sub.v0.is_updated():
+            logger.debug("area 1 updated")
+            v = VoltagesMagnitude.parse_obj(self.sub.v0.json)
+            logger.debug(v)
+            all_v.time = v.time
+            all_v.values += v.values
+            all_v.ids += v.ids
+
+        if self.sub.v1.is_updated():
+            logger.debug("area 2 updated")
+            v = VoltagesMagnitude.parse_obj(self.sub.v1.json)
+            logger.debug(v)
+            all_v.time = v.time
+            all_v.values += v.values
+            all_v.ids += v.ids
+
+        if self.sub.v2.is_updated():
+            logger.debug("area 3 updated")
+            v = VoltagesMagnitude.parse_obj(self.sub.v2.json)
+            logger.debug(v)
+            all_v.time = v.time
+            all_v.values += v.values
+            all_v.ids += v.ids
+
+        if self.sub.v3.is_updated():
+            logger.debug("area 4 updated")
+            v = VoltagesMagnitude.parse_obj(self.sub.v3.json)
+            logger.debug(v)
+            all_v.time = v.time
+            all_v.values += v.values
+            all_v.ids += v.ids
+
+        if self.sub.v4.is_updated():
+            logger.debug("area 5 updated")
+            v = VoltagesMagnitude.parse_obj(self.sub.v4.json)
+            logger.debug(v)
+            all_v.time = v.time
+            all_v.values += v.values
+            all_v.ids += v.ids
+
+        for area in range(6):
+            self.pub_area_voltages[area].publish(all_v.json())
+
     def run(self) -> None:
         logger.info(f"Federate connected: {datetime.now()}")
-        self.fed.enter_executing_mode()
-        granted_time = h.helicsFederateRequestTime(
-            self.fed, h.HELICS_TIME_MAXTIME)
-
-        logger.info(f"Granted Time: {granted_time}")
-        itr = 0
-        itr_max = 10
         itr_flag = h.helics_iteration_request_iterate_if_needed
-        while itr < itr_max:
-            # each published voltage is sent to all areas immediatly because
-            # some areas may be waiting on their neighbors input to run
-            itr_status = h.helicsFederateEnterExecutingModeIterative(
-                self.fed, itr_flag)
+        itr_skip = h.HELICS_ITERATION_REQUEST_ITERATE_IF_NEEDED
+        h.helicsFederateEnterExecutingMode(self.fed)
 
-            if itr_status == h.helics_iteration_result_next_step:
-                break
-            else:
+        granted_time = 0
+        while granted_time < h.HELICS_TIME_MAXTIME:
+            logger.debug(f"granted time: {granted_time}")
+            self.publish_all()
+            itr = 0
+            while True:
+                granted_time, itr_status = h.helicsFederateRequestTimeIterative(
+                    self.fed, h.HELICS_TIME_MAXTIME, itr_flag)
+
+                if itr_status == h.helics_iteration_result_next_step:
+                    logger.debug(f"itr next: {granted_time}")
+                    break
+
                 itr += 1
                 logger.info(f"iter: {itr}")
 
-            if self.sub.v0.is_updated():
-                v = VoltagesMagnitude.parse_obj(self.sub.v0.json)
-                for area in range(6):
-                    self.pub_area_voltages[area].publish(v.json())
+                if itr >= self.static.max_itr:
+                    logger.debug(f"itr max: {granted_time}")
+                    continue
 
-            if self.sub.v1.is_updated():
-                v = VoltagesMagnitude.parse_obj(self.sub.v1.json)
-                for area in range(6):
-                    self.pub_area_voltages[area].publish(v.json())
+                self.publish_all()
 
-            if self.sub.v2.is_updated():
-                v = VoltagesMagnitude.parse_obj(self.sub.v2.json)
-                for area in range(6):
-                    self.pub_area_voltages[area].publish(v.json())
-
-            if self.sub.v3.is_updated():
-                v = VoltagesMagnitude.parse_obj(self.sub.v3.json)
-                for area in range(6):
-                    self.pub_area_voltages[area].publish(v.json())
-
-            if self.sub.v4.is_updated():
-                v = VoltagesMagnitude.parse_obj(self.sub.v4.json)
-                for area in range(6):
-                    self.pub_area_voltages[area].publish(v.json())
-
-            logger.info(f"No Updates: {granted_time}")
+            logger.debug("EXITING ITER LOOP")
         self.stop()
 
     def stop(self) -> None:

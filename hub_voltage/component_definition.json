@@ -1,7 +1,12 @@
 {
     "directory": "hub_voltage",
     "execute_function": "python hub_federate.py",
-    "static_inputs": [],
+    "static_inputs": [
+        {
+            "type": "",
+            "port_id": "max_itr"
+        }
+    ],
     "dynamic_inputs": [
         {
             "type": "VoltagesMagnitude",

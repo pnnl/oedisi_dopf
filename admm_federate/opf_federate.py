@@ -27,6 +27,7 @@ from area import area_info, check_network_radiality
 import xarray as xr
 from pprint import pprint
 import numpy as np
+import time
 
 logger = logging.getLogger(__name__)
 logger.addHandler(logging.StreamHandler())
@@ -87,6 +88,7 @@ def xarray_to_voltages_pol(data, **kwargs):
 class StaticConfig(object):
     name: str
     deltat: float
+    max_itr: int
     control_type: str
     relaxed: bool
     switches: list[str]
@@ -111,6 +113,9 @@ class Subscriptions(object):
 class OPFFederate(object):
     area_branch: adapter.BranchInfo = None
     area_bus: adapter.BusInfo = None
+    area_v: VoltagesMagnitude
+    area_p: PowersReal
+    area_q: PowersImaginary
 
     def __init__(self) -> None:
         self.sub = Subscriptions()
@@ -139,6 +144,7 @@ class OPFFederate(object):
 
         self.static.name = config["name"]
         self.static.deltat = config["deltat"]
+        self.static.max_itr = config["max_itr"]
         self.static.deltat = 1
         self.static.control_type = config["control_type"]
         self.static.relaxed = config["relaxed"]
@@ -177,12 +183,12 @@ class OPFFederate(object):
             self.inputs["voltage_imag"], "")
         self.sub.voltages_real = self.fed.register_subscription(
             self.inputs["voltage_real"], "")
-#        self.sub.area_v = self.fed.register_subscription(
-#            self.inputs["sub_v"], "")
-#        self.sub.area_v = self.fed.register_subscription(
-#            self.inputs["sub_p"], "")
-#        self.sub.area_v = self.fed.register_subscription(
-#            self.inputs["sub_q"], "")
+        self.sub.area_v = self.fed.register_subscription(
+            self.inputs["sub_v"], "")
+        self.sub.area_p = self.fed.register_subscription(
+            self.inputs["sub_p"], "")
+        self.sub.area_q = self.fed.register_subscription(
+            self.inputs["sub_q"], "")
 
     def register_publication(self) -> None:
         self.pub_pv_set = self.fed.register_publication(
@@ -203,15 +209,15 @@ class OPFFederate(object):
 #        self.pub_voltages_angle = self.fed.register_publication(
 #            "voltage_angle", h.HELICS_DATA_TYPE_STRING, ""
 #        )
-#        self.pub_admm_v = self.fed.register_publication(
-#            "pub_v", h.HELICS_DATA_TYPE_STRING, ""
-#        )
-#        self.pub_admm_p = self.fed.register_publication(
-#            "pub_p", h.HELICS_DATA_TYPE_STRING, ""
-#        )
-#        self.pub_admm_q = self.fed.register_publication(
-#            "pub_q", h.HELICS_DATA_TYPE_STRING, ""
-#        )
+        self.pub_admm_v = self.fed.register_publication(
+            "pub_v", h.HELICS_DATA_TYPE_STRING, ""
+        )
+        self.pub_admm_p = self.fed.register_publication(
+            "pub_p", h.HELICS_DATA_TYPE_STRING, ""
+        )
+        self.pub_admm_q = self.fed.register_publication(
+            "pub_q", h.HELICS_DATA_TYPE_STRING, ""
+        )
 
     def get_set_points(self, control: dict, bus_info: adapter.BusInfo) -> dict[complex]:
         setpoints = {}
@@ -226,112 +232,42 @@ class OPFFederate(object):
         return setpoints
 
     def first_pub(self):
-        topology: Topology = Topology.parse_obj(self.sub.topology.json)
-        branch_info, bus_info, slack_bus = adapter.extract_info(topology)
-        self.static.config.slack = slack_bus
+        logger.info("running first publication for admm")
+        self.area_v = VoltagesMagnitude(ids=[], values=[], time=0)
+        self.area_p = PowersReal(ids=[], equipment_ids=[], values=[], time=0)
+        self.area_q = PowersImaginary(
+            ids=[], equipment_ids=[], values=[], time=0)
 
-        G = adapter.generate_graph(topology.incidences, slack_bus)
-        graph = copy.deepcopy(G)
-        graph2 = copy.deepcopy(G)
-        boundaries = adapter.area_disconnects(graph)
-        boundary = []
-        for u, v, a in boundaries:
-            if a["id"] in self.static.switches:
-                boundary.append((u, v, a))
-
-            if a["id"] == self.static.source:
-                source = (u, v)
-        areas = adapter.disconnect_areas(graph2, boundary)
-        areas = adapter.reconnect_area_switches(
-            areas, boundary)
-
-        # TODO: check if switchs exist for this area
-        if self.area_branch == None:
-            ids = [a["id"] for _, _, a in boundary]
-            for area in areas:
-                area_branch, area_bus = adapter.generate_area_info(
-                    area, topology, source[0], ids)
-                if area_branch != None and area_bus != None:
-                    self.area_branch = area_branch
-                    self.area_bus = area_bus
-
-        injections = Injection.parse_obj(self.sub.injections.json)
-        bus_info = adapter.extract_injection(self.area_bus, injections)
-
-        powers_real = PowersReal.parse_obj(self.sub.powers_real.json)
-        powers_imag = PowersImaginary.parse_obj(self.sub.powers_imag.json)
-        powers = eqarray_to_xarray(powers_real) + 1j * eqarray_to_xarray(
-            powers_imag
-        )
-#
-#            if self.sub.area_v.is_updated():
-#                print(VoltagesMagnitude.parse_obj(self.sub.area_v0.json))
-#
-        voltages_real = VoltagesReal.parse_obj(self.sub.voltages_real.json)
-        voltages_imag = VoltagesImaginary.parse_obj(
-            self.sub.voltages_imag.json)
-        voltages = measurement_to_xarray(
-            voltages_real) + 1j * measurement_to_xarray(voltages_imag)
-
-        time = voltages_real.time
-
-        voltages_mag, voltages_ang = xarray_to_voltages_pol(voltages)
-        voltages_mag.time = time
-        voltages_ang.time = time
-
-        bus_info = adapter.extract_voltages(bus_info, voltages_mag)
-
-        parent = adapter.Bus()
-        child_buses = []
-        for u, v, a in boundary:
-            if a["id"] == self.static.source:
-                parent_id = u
-                parent_line = a["name"]
-            if a["id"] != self.static.source and a["id"] in self.static.switches:
-                child_buses.append(v)
-
-        branch_info, bus_info = adapter.map_secondaries(
-            self.area_branch, bus_info)
-
-        child_info = adapter.BusInfo()
-        for k, v in bus_info.buses.items():
-            if k == parent_id:
-                parent = v
-            if k in child_buses:
-                child_info.buses[k] = v
-
-        with open("child_info.json", "w") as outfile:
-            outfile.write(json.dumps(asdict(child_info)))
-
-        with open("bus_info.json", "w") as outfile:
-            outfile.write(json.dumps(asdict(bus_info)))
-
-        with open("branch_info.json", "w") as outfile:
-            outfile.write(json.dumps(asdict(branch_info)))
-
-        assert adapter.check_radiality(branch_info, bus_info)
-
-        self.static.config.source_bus = parent_id
-        self.static.config.source_line = parent_line
-        self.static.config.relaxed = self.static.relaxed
-        v_mag, pq, control, stats = lindistflow.solve(
-            branch_info, bus_info, child_info, self.static.config
-        )
-        real_setpts = self.get_set_points(control, bus_info)
+        self.pub_admm_v.publish(self.area_v.json())
+        self.pub_admm_p.publish(self.area_p.json())
+        self.pub_admm_q.publish(self.area_q.json())
 
     def itr_pub(self):
         topology: Topology = Topology.parse_obj(self.sub.topology.json)
         branch_info, bus_info, slack_bus = adapter.extract_info(topology)
         self.static.config.slack = slack_bus
 
+        t = datetime.now()
+        if self.sub.voltages_real.is_updated():
+            logger.debug("vreal :")
+            vreal = VoltagesReal.parse_obj(self.sub.voltages_real.json)
+            t = vreal.time
+        if self.sub.voltages_imag.is_updated():
+            logger.debug("vimag :")
+        if self.sub.injections.is_updated():
+            logger.debug("injections:")
+
         G = adapter.generate_graph(topology.incidences, slack_bus)
         graph = copy.deepcopy(G)
         graph2 = copy.deepcopy(G)
         boundaries = adapter.area_disconnects(graph)
         boundary = []
+        shared = []
         for u, v, a in boundaries:
             if a["id"] in self.static.switches:
                 boundary.append((u, v, a))
+                shared.append(u)
+                shared.append(v)
 
             if a["id"] == self.static.source:
                 source = (u, v)
@@ -349,34 +285,35 @@ class OPFFederate(object):
                     self.area_branch = area_branch
                     self.area_bus = area_bus
 
-        injections = Injection.parse_obj(self.sub.injections.json)
+        injections = Injection.parse_obj(topology.injections)
         bus_info = adapter.extract_injection(self.area_bus, injections)
+        bus_info = adapter.extract_voltages(
+            bus_info, topology.base_voltage_magnitudes)
 
-        powers_real = PowersReal.parse_obj(self.sub.powers_real.json)
-        powers_imag = PowersImaginary.parse_obj(self.sub.powers_imag.json)
-        powers = eqarray_to_xarray(powers_real) + 1j * eqarray_to_xarray(
-            powers_imag
-        )
-#
-#            if self.sub.area_v.is_updated():
-#                print(VoltagesMagnitude.parse_obj(self.sub.area_v0.json))
-#
-        voltages_real = VoltagesReal.parse_obj(self.sub.voltages_real.json)
-        voltages_imag = VoltagesImaginary.parse_obj(
-            self.sub.voltages_imag.json)
-        voltages = measurement_to_xarray(
-            voltages_real
+        if self.sub.area_q.is_updated():
+            p = PowersImaginary.parse_obj(self.sub.area_q.json)
+            if self.area_q.values:
+                logger.debug("Updating Area Reactive Power")
+                p = adapter.filter_boundary_power_imag(shared, p)
+                p = adapter.replace_boundary_power_imag(self.area_q, p)
+                bus_info = adapter.extract_powers_imag(bus_info, p)
 
-        ) + 1j * measurement_to_xarray(voltages_imag)
+        if self.sub.area_p.is_updated():
+            p = PowersReal.parse_obj(self.sub.area_p.json)
+            if self.area_p.values:
+                logger.debug("Updating Area Real Power")
+                p = adapter.filter_boundary_power_real(shared, p)
+                p = adapter.replace_boundary_power_real(self.area_p, p)
+                bus_info = adapter.extract_powers_real(bus_info, p)
 
-        time = voltages_real.time
-        logger.debug(f"Timestep: {time}")
-
-        voltages_mag, voltages_ang = xarray_to_voltages_pol(voltages)
-        voltages_mag.time = time
-        voltages_ang.time = time
-
-        bus_info = adapter.extract_voltages(bus_info, voltages_mag)
+        if self.sub.area_v.is_updated():
+            vmag = VoltagesMagnitude.parse_obj(self.sub.area_v.json)
+            if self.area_v.values:
+                logger.debug("Updating Area Voltages")
+                vmag = adapter.filter_boundary_voltage(shared, vmag)
+                vmag = adapter.replace_boundary_voltage(self.area_v, vmag)
+                bus_info = adapter.extract_voltages(
+                    bus_info, vmag)
 
         parent = adapter.Bus()
         child_buses = []
@@ -396,15 +333,6 @@ class OPFFederate(object):
                 parent = v
             if k in child_buses:
                 child_info.buses[k] = v
-
-        with open("child_info.json", "w") as outfile:
-            outfile.write(json.dumps(asdict(child_info)))
-
-        with open("bus_info.json", "w") as outfile:
-            outfile.write(json.dumps(asdict(bus_info)))
-
-        with open("branch_info.json", "w") as outfile:
-            outfile.write(json.dumps(asdict(branch_info)))
 
         assert adapter.check_radiality(branch_info, bus_info)
 
@@ -428,7 +356,6 @@ class OPFFederate(object):
             commands.append((eq, val.real, val.imag))
 
         stats["sdn"] = 0
-        print(stats)
         for k, v in child_info.buses.items():
             for phase in v.phases:
                 real = p[f"{k}.{phase}"]
@@ -441,80 +368,70 @@ class OPFFederate(object):
             if bus == parent_id:
                 kvup += v/1000
         stats["vup"] = abs(bus_info.buses[parent_id].kv - kvup/3)
-        print(stats)
-
-        v_mag = adapter.pack_voltages(v_mag, bus_info, time)
-        power_real = adapter.pack_powers_real(powers_real, p, time)
-        power_imag = adapter.pack_powers_imag(powers_real, q, time)
-
-        power = eqarray_to_xarray(power_real) + \
-            1j * eqarray_to_xarray(power_imag)
-
-        power_mag, power_ang = xarray_to_powers_pol(power)
-        power_mag.time = time
-        power_ang.time = time
 
         solver_stats = MeasurementArray(
             ids=list(stats.keys()),
             values=list(stats.values()),
-            time=time,
+            time=t,
             units="s",
         )
-        logger.info(solver_stats)
 
-        if commands:
-            self.pub_pv_set.publish(json.dumps(commands))
-
-        self.pub_solver_stats.publish(solver_stats.json())
         # self.pub_voltages_mag.publish(v_mag.json())
         # self.pub_voltages_angle.publish(voltages_ang.json())
         # self.pub_powers_mag.publish(power_mag.json())
         # self.pub_powers_angle.publish(power_ang.json())
-        # self.pub_admm_p.publish(power_real.json())
-        # self.pub_admm_q.publish(power_imag.json())
-        # self.pub_admm_v.publish(v_mag.json())
+
+        v_mag = adapter.pack_voltages(v_mag, bus_info, t)
+        self.area_v = adapter.filter_boundary_voltage(shared, v_mag)
+
+        power_real = adapter.pack_powers_real(
+            topology.injections.power_real, p, t)
+        self.area_p = adapter.filter_boundary_power_real(shared, power_real)
+
+        power_imag = adapter.pack_powers_imag(
+            topology.injections.power_imaginary, q, t)
+        self.area_q = adapter.filter_boundary_power_imag(shared, power_imag)
+
+        self.pub_admm_p.publish(self.area_p.json())
+        self.pub_admm_q.publish(self.area_q.json())
+        self.pub_admm_v.publish(self.area_v.json())
+        return solver_stats, commands
 
     def run(self) -> None:
         logger.info(f"Federate connected: {datetime.now()}")
-        self.fed.enter_executing_mode()
+        itr_need = h.helics_iteration_request_iterate_if_needed
+        itr_skip = h.helics_iteration_request_no_iteration
+        h.helicsFederateEnterExecutingMode(self.fed)
         logger.info(f"Federate executing: {datetime.now()}")
 
-        self.first_pub()
-
-        granted_time = h.helicsFederateRequestTime(
-            self.fed, h.HELICS_TIME_MAXTIME)
-
-        logger.info(f"Granted Time: {granted_time}")
-        itr = 0
-        itr_max = 10
-        itr_finished = False
-        itr_flag = h.helics_iteration_request_iterate_if_needed
+        granted_time = 0
         while granted_time < h.HELICS_TIME_MAXTIME:
-            if not self.sub.injections.is_updated():
-                granted_time = h.helicsFederateRequestTime(
-                    self.fed, h.HELICS_TIME_MAXTIME
-                )
-                continue
-
-            while not itr_finished:
-                # each published voltage is sent to all areas immediatly because
-                # some areas may be waiting on their neighbors input to run
-                itr_status = h.helicsFederateEnterExecutingModeIterative(
-                    self.fed, itr_flag)
+            logger.debug(f"granted time: {granted_time}")
+            self.first_pub()
+            itr = 0
+            while True:
+                granted_time, itr_status = h.helicsFederateRequestTimeIterative(
+                    self.fed, h.HELICS_TIME_MAXTIME, itr_need)
 
                 if itr_status == h.helics_iteration_result_next_step:
-                    itr_finished = True
+                    logger.debug(f"itr next: {granted_time}")
                     break
 
                 itr += 1
                 logger.info(f"iter: {itr}")
 
-                if itr >= itr_max:
-                    itr_finished = True
-                    break
+                if itr >= self.static.max_itr:
+                    logger.debug(f"itr max: {granted_time}")
+                    continue
 
-                self.itr_pub()
+                solver_stats, commands = self.itr_pub()
 
+            logger.debug(solver_stats)
+            logger.debug(commands)
+            self.pub_solver_stats.publish(solver_stats.json())
+            self.pub_pv_set.publish(json.dumps(commands))
+
+            logger.debug("EXITING ITER LOOP")
         self.stop()
 
     def stop(self) -> None:

@@ -120,57 +120,52 @@ class EstimatorFederate(object):
 
     def run(self) -> None:
         logger.info(f"Federate connected: {datetime.now()}")
-        self.fed.enter_executing_mode()
+        itr_skip = h.helics_iteration_request_no_iteration
+        h.helicsFederateEnterExecutingMode(self.fed)
         logger.info(f"Federate executing: {datetime.now()}")
 
-        granted_time = h.helicsFederateRequestTime(
-            self.fed, h.HELICS_TIME_MAXTIME)
-        logger.info(f"Granted Time: {granted_time}")
-
-        updated = [False]*5
         commands = []
+        granted_time = 0
         while granted_time < h.HELICS_TIME_MAXTIME:
-            # each published voltage is sent to all areas immediatly because
-            # some areas may be waiting on their neighbors input to run
+            granted_time, itr_status = h.helicsFederateRequestTimeIterative(
+                self.fed, h.HELICS_TIME_MAXTIME, itr_skip)
 
-            if not all(updated):
-                granted_time = h.helicsFederateRequestTime(
-                    self.fed, h.HELICS_TIME_MAXTIME)
-
-                if self.sub.c0.is_updated():
-                    updated[0] = True
-                    control = self.sub.c0.json
-                    for c in control:
-                        commands.append(c)
-
-                if self.sub.c1.is_updated():
-                    updated[1] = True
-                    control = self.sub.c1.json
-                    for c in control:
-                        commands.append(c)
-
-                if self.sub.c2.is_updated():
-                    updated[2] = True
-                    control = self.sub.c2.json
-                    for c in control:
-                        commands.append(c)
-
-                if self.sub.c3.is_updated():
-                    updated[3] = True
-                    control = self.sub.c3.json
-                    for c in control:
-                        commands.append(c)
-
-                if self.sub.c4.is_updated():
-                    updated[4] = True
-                    control = self.sub.c4.json
-                    for c in control:
-                        commands.append(c)
-            else:
-                logger.info(commands)
+            if itr_status == h.helics_iteration_result_next_step:
+                logger.debug(f"itr next: {granted_time}")
                 self.pub_commands.publish(json.dumps(commands))
-                updated = [False]*5
-                commands = []
+                break
+
+            commands = []
+            if self.sub.c0.is_updated():
+                control = self.sub.c0.json
+                logger.debug(control)
+                for c in control:
+                    commands.append(c)
+
+            if self.sub.c1.is_updated():
+                control = self.sub.c1.json
+                logger.debug(control)
+                for c in control:
+                    commands.append(c)
+
+            if self.sub.c2.is_updated():
+                control = self.sub.c2.json
+                logger.debug(control)
+                for c in control:
+                    commands.append(c)
+
+            if self.sub.c3.is_updated():
+                control = self.sub.c3.json
+                logger.debug(control)
+                for c in control:
+                    commands.append(c)
+
+            if self.sub.c4.is_updated():
+                control = self.sub.c4.json
+                logger.debug(control)
+                for c in control:
+                    commands.append(c)
+                logger.info(commands)
 
         self.stop()
 

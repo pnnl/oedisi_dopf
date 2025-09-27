@@ -12,6 +12,10 @@
         },
         {
             "type": "",
+            "port_id": "max_itr"
+        },
+        {
+            "type": "",
             "port_id": "control_type"
         },
         {

@@ -27,7 +27,7 @@ from oedisi.types.data_types import (
 
 logger = logging.getLogger(__name__)
 logger.addHandler(logging.StreamHandler())
-logger.setLevel(logging.INFO)
+logger.setLevel(logging.DEBUG)
 
 
 @dataclass
@@ -205,6 +205,148 @@ def extract_forecast(bus: dict, forecast) -> dict:
             bus[name]["pv"][phase][0] = power * 1000 / len(phases)
             bus[name]["pv"][phase][1] = 0.0
     return bus
+
+
+def replace_boundary_voltage(v_self: VoltagesMagnitude, v_other: VoltagesMagnitude) -> VoltagesMagnitude:
+    if len(v_self.values) == 0:
+        return v_other
+    self_dict = {k: v for k, v in zip(v_self.ids, v_self.values)}
+    values = {}
+    for idx, (id, voltage) in enumerate(zip(v_other.ids, v_other.values)):
+        if id not in self_dict.keys():
+            continue
+
+        if id not in values.keys():
+            values[id] = voltage
+            continue
+
+        old_value = round(self_dict[id], 5) == round(values[id], 5)
+        if old_value:
+            values[id] = voltage
+        else:
+            values[id] = (values[id] + voltage)/2
+
+    v_other.ids = values.keys()
+    v_other.values = values.values()
+    return v_other
+
+
+def replace_boundary_power_real(p_self: PowersReal, p_other: PowersReal) -> PowersReal:
+    if len(p_self.values) == 0:
+        return p_other
+    self_dict = {k: v for k, v in zip(p_self.ids, p_self.values)}
+    values = {}
+    eqids = {}
+    for idx, (id, eq, power) in enumerate(zip(p_other.ids, p_other.equipment_ids, p_other.values)):
+        if id not in self_dict.keys():
+            continue
+
+        if id not in values.keys():
+            values[id] = power
+            eqids[id] = eq
+            continue
+
+        old_value = round(self_dict[id], 5) == round(values[id], 5)
+        if old_value:
+            values[id] = power
+            eqids[id] = eq
+        else:
+            values[id] = (values[id] + power)/2
+            eqids[id] = eq
+
+    p_other.ids = values.keys()
+    p_other.equipment_ids = eqids.values()
+    p_other.values = values.values()
+    return p_other
+
+
+def replace_boundary_power_imag(p_self: PowersImaginary, p_other: PowersImaginary) -> PowersImaginary:
+    if len(p_self.values) == 0:
+        return p_other
+    self_dict = {k: v for k, v in zip(p_self.ids, p_self.values)}
+    values = {}
+    eqids = {}
+    for idx, (id, eq, power) in enumerate(zip(p_other.ids, p_other.equipment_ids, p_other.values)):
+        if id not in self_dict.keys():
+            continue
+
+        if id not in values.keys():
+            values[id] = power
+            eqids[id] = eq
+            continue
+
+        old_value = round(self_dict[id], 5) == round(values[id], 5)
+        if old_value:
+            values[id] = power
+            eqids[id] = eq
+        else:
+            values[id] = (values[id] + power)/2
+            eqids[id] = eq
+
+    p_other.ids = values.keys()
+    p_other.equipment_ids = eqids.values()
+    p_other.values = values.values()
+    return p_other
+
+
+def filter_boundary_voltage(shared: list[str], voltages: VoltagesMagnitude) -> VoltagesMagnitude:
+    ids = []
+    values = []
+    for id, voltage in zip(voltages.ids, voltages.values):
+        name, phase = id.split(".", 1)
+        phase = int(phase) - 1
+
+        if name not in shared:
+            continue
+
+        ids.append(id)
+        values.append(voltage)
+
+    voltages.ids = ids
+    voltages.values = values
+    return voltages
+
+
+def filter_boundary_power_real(shared: list[str], powers: PowersReal) -> PowersReal:
+    ids = []
+    eqids = []
+    values = []
+    for id, eq, power in zip(powers.ids, powers.equipment_ids, powers.values):
+        name, phase = id.split(".", 1)
+        phase = int(phase) - 1
+
+        if name not in shared:
+            continue
+
+        ids.append(id)
+        eqids.append(eq)
+        values.append(power)
+
+    powers.ids = ids
+    powers.equipment_ids = eqids
+    powers.values = values
+    return powers
+
+
+def filter_boundary_power_imag(shared: list[str], powers: PowersImaginary) -> PowersImaginary:
+    ids = []
+    eqids = []
+    values = []
+    for id, eq, power in zip(powers.ids, powers.equipment_ids, powers.values):
+        name, phase = id.split(".", 1)
+        phase = int(phase) - 1
+
+        if name not in shared:
+            continue
+
+        ids.append(id)
+        eqids.append(eq)
+        values.append(power)
+
+    powers.ids = ids
+    powers.equipment_ids = eqids
+    powers.values = values
+    return powers
 
 
 def extract_powers_real(bus_info: BusInfo, real: PowersReal) -> BusInfo:

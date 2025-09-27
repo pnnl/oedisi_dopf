@@ -284,52 +284,63 @@ def generate(MODEL: str, LEVEL: str) -> None:
                     area_set.add(a)
         sub_areas[area] = area_set
 
-#    hub_voltage = Component(
-#        name="hub_voltage",
-#        type="VoltageHub",
-#        parameters={
-#            "max_iter": 2,
-#        },
-#    )
-#    system.components.append(hub_voltage)
-#
-#    hub_power = Component(
-#        name="hub_power",
-#        type="PowerHub",
-#        parameters={
-#            "max_iter": 2,
-#        },
-#    )
-#    system.components.append(hub_power)
-#
+    max_itr = 3
+    hub_voltage = Component(
+        name="hub_voltage",
+        type="VoltageHub",
+        parameters={
+            "max_itr": max_itr,
+        },
+    )
+    system.components.append(hub_voltage)
+
+    hub_power = Component(
+        name="hub_power",
+        type="PowerHub",
+        parameters={
+            "max_itr": max_itr,
+        },
+    )
+    system.components.append(hub_power)
+
     hub_control = Component(
         name="hub_control",
         type="ControlHub",
         parameters={
-            "max_iter": 2,
+            "max_itr": max_itr,
         },
     )
     system.components.append(hub_control)
+
+    port = "pv_set"
+    system.links.append(
+        Link(source=hub_control.name, source_port=port,
+             target=feeder.name, target_port=port)
+    )
+
     for k, v in sub_areas.items():
         print(k, v)
-        # link_hub_voltage(system, hub_voltage, k)
-        # link_hub_power(system, hub_power, k)
+        link_hub_voltage(system, hub_voltage, k)
+        link_hub_power(system, hub_power, k)
         link_hub_control(system, hub_control, k)
 
+    rho_vup = [1e5, 1e5, 1e5, 1e5, 1e5]
+    rho_sdn = [1e5, 1e5, 1e5, 1e5, 1e5]
     for k, v in sub_areas.items():
         algo = Component(
             name=f"{ALGO}_{k}",
             type="OptimalPowerFlow",
             parameters={
                 "deltat": 0.01,
+                "max_itr": max_itr,
                 "relaxed": False,
                 "control_type": "real",
                 "switches": switch_map[k],
                 "source": source_map[k],
-                "rho_vup": 1e5,
+                "rho_vup": rho_vup[k],
                 "rho_sup": 0,
                 "rho_vdn": 0,
-                "rho_sdn": 1e5,
+                "rho_sdn": rho_vup[k],
             },
         )
         system.components.append(algo)

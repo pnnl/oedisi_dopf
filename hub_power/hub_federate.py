@@ -52,6 +52,7 @@ def xarray_to_powers_cart(data, **kwargs):
 
 class StaticConfig(object):
     name: str
+    max_itr: int
 
 
 class Subscriptions(object):
@@ -94,6 +95,7 @@ class HubFederate(object):
             config = json.load(file)
 
         self.static.name = config["name"]
+        self.static.max_itr = config["max_itr"]
 
     def initilize(self) -> None:
         self.info = h.helicsCreateFederateInfo()
@@ -141,122 +143,147 @@ class HubFederate(object):
 
     def register_publication(self) -> None:
         self.pub_area_p = []
-        for i in range(5):
+        for i in range(6):
             self.pub_area_p.append(self.fed.register_publication(
                 f"pub_p{i}", h.HELICS_DATA_TYPE_STRING, "")
             )
 
         self.pub_area_q = []
-        for i in range(5):
+        for i in range(6):
             self.pub_area_q.append(self.fed.register_publication(
                 f"pub_q{i}", h.HELICS_DATA_TYPE_STRING, "")
             )
 
+    def publish_imag(self):
+        all_q = PowersImaginary(ids=[], equipment_ids=[], values=[], time=0)
+        if self.sub.q0.is_updated():
+            logger.debug("area 1 uqdated")
+            q = PowersImaginary.parse_obj(self.sub.q0.json)
+            logger.debug(q)
+            all_q.time = q.time
+            all_q.values += q.values
+            all_q.ids += q.ids
+            all_q.equipment_ids += q.equipment_ids
+
+        if self.sub.q1.is_updated():
+            logger.debug("area 2 uqdated")
+            q = PowersImaginary.parse_obj(self.sub.q1.json)
+            logger.debug(q)
+            all_q.time = q.time
+            all_q.values += q.values
+            all_q.ids += q.ids
+            all_q.equipment_ids += q.equipment_ids
+
+        if self.sub.q2.is_updated():
+            logger.debug("area 3 uqdated")
+            q = PowersImaginary.parse_obj(self.sub.q2.json)
+            logger.debug(q)
+            all_q.time = q.time
+            all_q.values += q.values
+            all_q.ids += q.ids
+            all_q.equipment_ids += q.equipment_ids
+
+        if self.sub.q3.is_updated():
+            logger.debug("area 4 uqdated")
+            q = PowersImaginary.parse_obj(self.sub.q3.json)
+            logger.debug(q)
+            all_q.time = q.time
+            all_q.values += q.values
+            all_q.ids += q.ids
+            all_q.equipment_ids += q.equipment_ids
+
+        if self.sub.q4.is_updated():
+            logger.debug("area 5 uqdated")
+            q = PowersImaginary.parse_obj(self.sub.q4.json)
+            all_q.time = q.time
+            all_q.values += q.values
+            all_q.ids += q.ids
+            all_q.equipment_ids += q.equipment_ids
+
+        for area in range(6):
+            self.pub_area_q[area].publish(all_q.json())
+
+    def publish_real(self):
+        all_p = PowersReal(ids=[], equipment_ids=[], values=[], time=0)
+        if self.sub.p0.is_updated():
+            logger.debug("area 1 updated")
+            p = PowersReal.parse_obj(self.sub.p0.json)
+            logger.debug(p)
+            all_p.time = p.time
+            all_p.values += p.values
+            all_p.ids += p.ids
+            all_p.equipment_ids += p.equipment_ids
+
+        if self.sub.p1.is_updated():
+            logger.debug("area 2 updated")
+            p = PowersReal.parse_obj(self.sub.p1.json)
+            logger.debug(p)
+            all_p.time = p.time
+            all_p.values += p.values
+            all_p.ids += p.ids
+            all_p.equipment_ids += p.equipment_ids
+
+        if self.sub.p2.is_updated():
+            logger.debug("area 3 updated")
+            p = PowersReal.parse_obj(self.sub.p2.json)
+            logger.debug(p)
+            all_p.time = p.time
+            all_p.values += p.values
+            all_p.ids += p.ids
+            all_p.equipment_ids += p.equipment_ids
+
+        if self.sub.p3.is_updated():
+            logger.debug("area 4 updated")
+            p = PowersReal.parse_obj(self.sub.p3.json)
+            logger.debug(p)
+            all_p.time = p.time
+            all_p.values += p.values
+            all_p.ids += p.ids
+            all_p.equipment_ids += p.equipment_ids
+
+        if self.sub.p4.is_updated():
+            logger.debug("area 5 updated")
+            p = PowersReal.parse_obj(self.sub.p4.json)
+            all_p.time = p.time
+            all_p.values += p.values
+            all_p.ids += p.ids
+            all_p.equipment_ids += p.equipment_ids
+
+        for area in range(6):
+            self.pub_area_p[area].publish(all_p.json())
+
     def run(self) -> None:
         logger.info(f"Federate connected: {datetime.now()}")
-        self.fed.enter_executing_mode()
-        granted_time = h.helicsFederateRequestTime(
-            self.fed, h.HELICS_TIME_MAXTIME)
+        itr_flag = h.helics_iteration_request_iterate_if_needed
+        itr_skip = h.helics_iteration_request_no_iteration
+        h.helicsFederateEnterExecutingMode(self.fed)
 
-        logger.info(f"Granted Time: {granted_time}")
-        p_updated = [False]*5
-        q_updated = [False]*5
+        granted_time = 0
         while granted_time < h.HELICS_TIME_MAXTIME:
-            # each published power is sent to all areas immediatly because
-            # some areas may be waiting on their neighbors input to run
-            if self.sub.p0.is_updated():
-                p_updated[0] = True
-                p = PowersReal.parse_obj(
-                    self.sub.p0.json
-                )
+            logger.debug(f"granted time: {granted_time}")
+            self.publish_real()
+            self.publish_imag()
 
-                for area in range(6):
-                    self.pub_area_p[area].publish(p.json())
+            itr = 0
+            while True:
+                granted_time, itr_status = h.helicsFederateRequestTimeIterative(
+                    self.fed, h.HELICS_TIME_MAXTIME, itr_flag)
 
-            if self.sub.p1.is_updated():
-                p_updated[1] = True
-                p = PowersReal.parse_obj(
-                    self.sub.p1.json
-                )
+                if itr_status == h.helics_iteration_result_next_step:
+                    logger.debug(f"itr next: {granted_time}")
+                    break
 
-                for area in range(6):
-                    self.pub_area_p[area].publish(p.json())
+                itr += 1
+                logger.info(f"iter: {itr}")
 
-            if self.sub.p2.is_updated():
-                p_updated[2] = True
-                p = PowersReal.parse_obj(
-                    self.sub.p2.json
-                )
+                if itr >= self.static.max_itr:
+                    logger.debug(f"itr max: {granted_time}")
+                    continue
 
-                for area in range(6):
-                    self.pub_area_p[area].publish(p.json())
+                self.publish_real()
+                self.publish_imag()
 
-            if self.sub.p3.is_updated():
-                p_updated[3] = True
-                p = PowersReal.parse_obj(
-                    self.sub.p3.json
-                )
-
-                for area in range(6):
-                    self.pub_area_p[area].publish(p.json())
-
-            if self.sub.p4.is_updated():
-                p_updated[4] = True
-                p = PowersReal.parse_obj(
-                    self.sub.p4.json
-                )
-
-                for area in range(6):
-                    self.pub_area_p[area].publish(p.json())
-
-            if self.sub.q0.is_updated():
-                q_updated[0] = True
-                q = PowersImaginary.parse_obj(
-                    self.sub.q0.json
-                )
-
-                for area in range(6):
-                    self.pub_area_q[area].publish(q.json())
-
-            if self.sub.q1.is_updated():
-                q_updated[1] = True
-                q = PowersImaginary.parse_obj(
-                    self.sub.q1.json
-                )
-
-                for area in range(6):
-                    self.pub_area_q[area].publish(q.json())
-
-            if self.sub.q2.is_updated():
-                q_updated[2] = True
-                q = PowersImaginary.parse_obj(
-                    self.sub.q2.json
-                )
-
-                for area in range(6):
-                    self.pub_area_q[area].publish(q.json())
-
-            if self.sub.q3.is_updated():
-                q_updated[3] = True
-                q = PowersImaginary.parse_obj(
-                    self.sub.q3.json
-                )
-
-                for area in range(6):
-                    self.pub_area_q[area].publish(q.json())
-
-            if self.sub.q4.is_updated():
-                q_updated[4] = True
-                q = PowersImaginary.parse_obj(
-                    self.sub.q4.json
-                )
-
-                for area in range(6):
-                    self.pub_area_q[area].publish(q.json())
-
-            if not all(p_updated) and not all(q_updated):
-                granted_time = h.helicsFederateRequestTime(
-                    self.fed, h.HELICS_TIME_MAXTIME)
+            logger.debug("EXITING ITER LOOP")
         self.stop()
 
     def stop(self) -> None:
