@@ -121,20 +121,17 @@ class EstimatorFederate(object):
     def run(self) -> None:
         logger.info(f"Federate connected: {datetime.now()}")
         itr_skip = h.helics_iteration_request_no_iteration
+        itr_status = h.helics_iteration_result_next_step
         h.helicsFederateEnterExecutingMode(self.fed)
         logger.info(f"Federate executing: {datetime.now()}")
 
         commands = []
         granted_time = 0
         while granted_time < h.HELICS_TIME_MAXTIME:
-            granted_time, itr_status = h.helicsFederateRequestTimeIterative(
-                self.fed, h.HELICS_TIME_MAXTIME, itr_skip)
+            if itr_status != h.helics_iteration_result_next_step:
+                continue
 
-            if itr_status == h.helics_iteration_result_next_step:
-                logger.debug(f"itr next: {granted_time}")
-                self.pub_commands.publish(json.dumps(commands))
-                break
-
+            logger.debug(f"itr next: {granted_time}")
             commands = []
             if self.sub.c0.is_updated():
                 control = self.sub.c0.json
@@ -166,6 +163,9 @@ class EstimatorFederate(object):
                 for c in control:
                     commands.append(c)
                 logger.info(commands)
+
+            granted_time, itr_status = h.helicsFederateRequestTimeIterative(
+                self.fed, h.HELICS_TIME_MAXTIME, itr_skip)
 
         self.stop()
 

@@ -371,13 +371,18 @@ def go_cosim(
     ]
     pub_pv_forecast.publish(json.dumps(PVforecast))
 
+    itr_flag = h.helics_iteration_request_iterate_if_needed
+    itr_status = h.helics_iteration_result_next_step
     granted_time = -1
     request_time = 0
     initial_timestamp = datetime.strptime(
         config.start_date, "%Y-%m-%d %H:%M:%S")
 
     while request_time < int(config.number_of_timesteps):
-        granted_time = h.helicsFederateRequestTime(vfed, request_time)
+        if itr_status != h.helics_iteration_result_next_step:
+            continue
+
+        # granted_time = h.helicsFederateRequestTime(vfed, request_time)
         logger.info(f"Granted Time: {granted_time}")
         assert (
             granted_time <= request_time + deltat
@@ -504,6 +509,9 @@ def go_cosim(
             )
 
         logger.info("end time: " + str(datetime.now()))
+
+        granted_time, itr_status = h.helicsFederateRequestTimeIterative(
+            vfed, request_time, itr_flag)
 
     h.helicsFederateDisconnect(vfed)
     h.helicsFederateFree(vfed)
