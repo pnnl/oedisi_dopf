@@ -163,12 +163,15 @@ class OPFFederate(object):
         self.info.core_type = h.HELICS_CORE_TYPE_ZMQ
         self.info.core_init = "--federates=1"
 
-        h.helicsFederateInfoSetTimeProperty(
-            self.info, h.helics_property_time_delta, self.static.deltat
-        )
+        # h.helicsFederateInfoSetTimeProperty(self.info, h.helics_property_time_delta, self.static.deltat)
 
         self.fed = h.helicsCreateValueFederate(self.static.name, self.info)
         # h.helicsFederateSetFlagOption(self.fed, h.helics_flag_slow_responding, True)
+        h.helicsFederateSetTimeProperty(
+            self.fed, h.HELICS_PROPERTY_TIME_PERIOD, 1)
+
+        # h.helicsFederateSetTimeProperty(self.fed, h.HELICS_PROPERTY_TIME_OFFSET, 0.1)
+        # h.helicsFederateSetFlagOption(self.fed, h.HELICS_FLAG_UNINTERRUPTIBLE, True)
 
     def register_subscription(self) -> None:
         self.sub.topology = self.fed.register_subscription(
@@ -395,43 +398,57 @@ class OPFFederate(object):
         self.pub_admm_p.publish(self.area_p.json())
         self.pub_admm_q.publish(self.area_q.json())
         self.pub_admm_v.publish(self.area_v.json())
-        return solver_stats, commands
+        logger.debug(solver_stats)
+        logger.debug(commands)
+        self.pub_solver_stats.publish(solver_stats.json())
+        self.pub_pv_set.publish(json.dumps(commands))
 
     def run(self) -> None:
         logger.info(f"Federate connected: {datetime.now()}")
         itr_need = h.helics_iteration_request_iterate_if_needed
-        itr_skip = h.helics_iteration_request_no_iteration
+        itr_stop = h.helics_iteration_request_no_iteration
         h.helicsFederateEnterExecutingMode(self.fed)
         logger.info(f"Federate executing: {datetime.now()}")
 
+        # setting up time properties
+        update_interval = int(h.helicsFederateGetTimeProperty(
+            self.fed, h.HELICS_PROPERTY_TIME_PERIOD))
+
         granted_time = 0
+        logger.debug("Step 0: Starting Time/Iter loop")
         while granted_time < h.HELICS_TIME_MAXTIME:
-            logger.debug(f"granted time: {granted_time}")
+            request_time = granted_time + update_interval
+            logger.debug("Step 1: published initial values for iteration")
+            itr_flag = itr_need
             self.first_pub()
             itr = 0
             while True:
+                logger.debug(f"Step 2: Requesting time {request_time}")
                 granted_time, itr_status = h.helicsFederateRequestTimeIterative(
-                    self.fed, h.HELICS_TIME_MAXTIME, itr_need)
+                    self.fed, request_time, itr_flag)
+                logger.info(f"\tgranted time = {granted_time}")
+                logger.info(f"\titr status = {itr_status}")
 
+                logger.debug("Step 3: checking if next step")
                 if itr_status == h.helics_iteration_result_next_step:
-                    logger.debug(f"itr next: {granted_time}")
+                    logger.debug(f"\titr next: {itr}")
+                    itr_flag = itr_stop
                     break
 
                 itr += 1
-                logger.info(f"iter: {itr}")
+                logger.debug("Step 4: update iteration")
+                logger.info(f"\titr: {itr}")
 
+                logger.debug("Step 5: checking max itr count")
                 if itr >= self.static.max_itr:
-                    logger.debug(f"itr max: {granted_time}")
+                    logger.debug("\t reached max itr")
+                    itr_flag = itr_stop
                     continue
 
-                solver_stats, commands = self.itr_pub()
+                logger.debug("Step 6: run solution solution")
+                self.itr_pub()
+                itr_flag = itr_need
 
-            logger.debug(solver_stats)
-            logger.debug(commands)
-            self.pub_solver_stats.publish(solver_stats.json())
-            self.pub_pv_set.publish(json.dumps(commands))
-
-            logger.debug("EXITING ITER LOOP")
         self.stop()
 
     def stop(self) -> None:

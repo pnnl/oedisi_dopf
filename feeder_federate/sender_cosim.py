@@ -32,7 +32,7 @@ from oedisi.types.data_types import (
 from scipy.sparse import coo_matrix
 
 logger = logging.getLogger(__name__)
-logger.addHandler(logging.StreamHandler())
+# logger.addHandler(logging.StreamHandler())
 logger.setLevel(logging.DEBUG)
 
 
@@ -286,10 +286,12 @@ def go_cosim(
     h.helicsFederateInfoSetCoreName(fedinfo, config.name)
     h.helicsFederateInfoSetCoreTypeFromString(fedinfo, "zmq")
     h.helicsFederateInfoSetCoreInitString(fedinfo, fedinitstring)
-    h.helicsFederateInfoSetTimeProperty(
-        fedinfo, h.helics_property_time_delta, deltat)
+
     vfed = h.helicsCreateValueFederate(config.name, fedinfo)
-    h.helicsFederateSetFlagOption(vfed, h.helics_flag_slow_responding, True)
+    # h.helicsFederateSetFlagOption(vfed, h.helics_flag_slow_responding, True)
+    h.helicsFederateSetTimeProperty(
+        vfed, h.HELICS_PROPERTY_TIME_PERIOD, 1)
+    h.helicsFederateSetFlagOption(vfed, h.HELICS_FLAG_TERMINATE_ON_ERROR, True)
 
     pub_voltages_real = h.helicsFederateRegisterPublication(
         vfed, "voltage_real", h.HELICS_DATA_TYPE_STRING, ""
@@ -351,7 +353,8 @@ def go_cosim(
     sub_pv_set.set_default("[]")
     sub_pv_set.option["CONNECTION_OPTIONAL"] = True
 
-    h.helicsFederateEnterExecutingMode(vfed)
+    logger.info("Enter Init Mode")
+    h.helicsFederateEnterInitializingMode(vfed)
     initial_data = get_initial_data(sim, config)
 
     topology_dict = initial_data.topology.dict()
@@ -360,7 +363,6 @@ def go_cosim(
     logger.info("Sending topology and saving to topology.json")
     with open(config.topology_output, "w") as f:
         f.write(topology_json)
-    pub_topology.publish(topology_json)
 
     # Publish the forecasted PV outputs as a list of MeasurementArray
     logger.info("Evaluating the forecasted PV")
@@ -369,45 +371,144 @@ def go_cosim(
         MeasurementArray(**xarray_to_dict(forecast), units="kW").json()
         for forecast in forecast_data
     ]
-    pub_pv_forecast.publish(json.dumps(PVforecast))
 
-    itr_flag = h.helics_iteration_request_iterate_if_needed
-    itr_status = h.helics_iteration_result_next_step
-    granted_time = -1
-    request_time = 0
     initial_timestamp = datetime.strptime(
         config.start_date, "%Y-%m-%d %H:%M:%S")
+    sim.snapshot_run()
+    sim.solve(
+        0,
+        60 * initial_timestamp.minute + initial_timestamp.second,
+    )
 
-    while request_time < int(config.number_of_timesteps):
-        if itr_status != h.helics_iteration_result_next_step:
-            continue
+    current_data = get_current_data(sim, initial_data.Y)
 
-        # granted_time = h.helicsFederateRequestTime(vfed, request_time)
-        logger.info(f"Granted Time: {granted_time}")
-        assert (
-            granted_time <= request_time + deltat
-        ), f"granted_time: {granted_time} past {request_time}"
-        if granted_time >= request_time - deltat:
-            request_time += 1
+    bad_bus_names = where_power_unbalanced(
+        current_data.PQ_injections_all, current_data.calculated_power
+    )
+    if len(bad_bus_names) > 0:
+        raise ValueError(
+            f"""
+        Bad buses at {bad_bus_names.data}
 
-        current_index = int(granted_time)  # floors
+        OpenDSS PQ
+        {current_data.PQ_injections_all.loc[bad_bus_names]}
+
+        PowerBalance PQ
+        {current_data.calculated_power.loc[bad_bus_names]}
+        """
+        )
+
+    logger.debug(
+        f"Publish load {current_data.feeder_voltages.ids.data[0]} "
+        f"{current_data.feeder_voltages.data[0]}"
+    )
+    voltages = current_data.feeder_voltages
+
+    logger.debug("Step 6: Publishing all values")
+
+    # had to move to regular loop to sync correctly
+    pub_topology.publish(topology_json)
+    pub_pv_forecast.publish(json.dumps(PVforecast))
+
+    pub_voltages_magnitude.publish(
+        VoltagesMagnitude(
+            **xarray_to_dict(np.abs(voltages)),
+            time=initial_timestamp,
+        ).json()
+    )
+    pub_voltages_angle.publish(
+        VoltagesAngle(
+            **xarray_to_dict(np.arctan2(voltages.imag, voltages.real)),
+            time=initial_timestamp,
+        ).json()
+    )
+    pub_voltages_real.publish(
+        VoltagesReal(
+            **xarray_to_dict(voltages.real),
+            time=initial_timestamp,
+        ).json()
+    )
+    pub_voltages_imag.publish(
+        VoltagesImaginary(
+            **xarray_to_dict(voltages.imag),
+            time=initial_timestamp,
+        ).json()
+    )
+    pub_powers_real.publish(
+        PowersReal(
+            **xarray_to_dict(current_data.PQ_injections_all.real),
+            time=initial_timestamp,
+        ).json()
+    )
+    pub_powers_imag.publish(
+        PowersImaginary(
+            **xarray_to_dict(current_data.PQ_injections_all.imag),
+            time=initial_timestamp,
+        ).json()
+    )
+    pub_injections.publish(current_data.injections.json())
+    pub_available_power.publish(
+        MeasurementArray(
+            **xarray_to_dict(sim.get_available_pv()),
+            time=initial_timestamp,
+            units="kWA",
+        ).json()
+    )
+
+    if config.use_sparse_admittance:
+        pub_load_y_matrix.publish(
+            sparse_to_admittance_sparse(
+                current_data.load_y_matrix, sim._AllNodeNames
+            ).json()
+        )
+    else:
+        pub_load_y_matrix.publish(
+            AdmittanceMatrix(
+                admittance_matrix=numpy_to_y_matrix(
+                    current_data.load_y_matrix.toarray()
+                ),
+                ids=sim._AllNodeNames,
+            ).json()
+        )
+
+    logger.info("Enter Exec Mode")
+    h.helicsFederateEnterExecutingMode(vfed)
+
+    # setting up time properties
+    update_interval = int(h.helicsFederateGetTimeProperty(
+        vfed, h.HELICS_PROPERTY_TIME_PERIOD))
+
+    current_index = 0
+    granted_time = 0
+    logger.debug("Step 0: Starting Time Loop")
+    while current_index < config.number_of_timesteps:
+        request_time = granted_time + update_interval
+        logger.debug(f"Step 1: Requesting Time {request_time}")
+        granted_time = h.helicsFederateRequestTime(vfed, request_time)
+        logger.info(f"\tgranted time = {granted_time}")
         current_timestamp = datetime.strptime(
             config.start_date, "%Y-%m-%d %H:%M:%S"
-        ) + timedelta(seconds=granted_time * config.run_freq_sec)
+        ) + timedelta(seconds=current_index * config.run_freq_sec)
         floored_timestamp = datetime.strptime(
             config.start_date, "%Y-%m-%d %H:%M:%S"
         ) + timedelta(seconds=current_index * config.run_freq_sec)
+        current_index += 1
 
+        logger.debug("Step 2: Collecting Commands")
         change_obj_cmds = CommandList.parse_obj(sub_command_set.json)
         sim.change_obj(change_obj_cmds.__root__)
 
-        inverter_controls = InverterControlList.parse_obj(sub_invcontrol.json)
+        logger.debug("Step 3: Collecting Inverter Controls")
+        inverter_controls = InverterControlList.parse_obj(
+            sub_invcontrol.json)
         for inv_control in inverter_controls.__root__:
             sim.apply_inverter_control(inv_control)
 
+        logger.debug("Step 4: Collecting PV Controls")
         pv_sets = sub_pv_set.json
         for pv_set in pv_sets:
-            sim.set_pv_output(pv_set[0].split(".")[1], pv_set[1], pv_set[2])
+            sim.set_pv_output(pv_set[0].split(
+                ".")[1], pv_set[1], pv_set[2])
 
         current_hour = (
             24 * (floored_timestamp.date() - initial_timestamp.date()).days
@@ -418,6 +519,7 @@ def go_cosim(
             f"{60*floored_timestamp.minute + floored_timestamp.second}"
         )
 
+        logger.debug("Step 5: Running new snapshot")
         sim.snapshot_run()
         sim.solve(
             current_hour,
@@ -447,6 +549,8 @@ def go_cosim(
             f"{current_data.feeder_voltages.data[0]}"
         )
         voltages = current_data.feeder_voltages
+
+        logger.debug("Step 6: Publishing all values")
         pub_voltages_magnitude.publish(
             VoltagesMagnitude(
                 **xarray_to_dict(np.abs(voltages)),
@@ -508,10 +612,8 @@ def go_cosim(
                 ).json()
             )
 
+        # get itr status that will inform the next loop update at the top
         logger.info("end time: " + str(datetime.now()))
-
-        granted_time, itr_status = h.helicsFederateRequestTimeIterative(
-            vfed, request_time, itr_flag)
 
     h.helicsFederateDisconnect(vfed)
     h.helicsFederateFree(vfed)

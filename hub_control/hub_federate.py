@@ -91,11 +91,11 @@ class EstimatorFederate(object):
         self.info.core_type = h.HELICS_CORE_TYPE_ZMQ
         self.info.core_init = "--federates=1"
 
-        h.helicsFederateInfoSetTimeProperty(
-            self.info, h.helics_property_time_delta, 0.001)
+        # h.helicsFederateInfoSetTimeProperty(self.info, h.helics_property_time_delta, 0.01)
         self.fed = h.helicsCreateValueFederate(self.static.name, self.info)
-        h.helicsFederateSetFlagOption(
-            self.fed, h.helics_flag_slow_responding, True)
+        # h.helicsFederateSetFlagOption(self.fed, h.helics_flag_slow_responding, True)
+        h.helicsFederateSetTimeProperty(
+            self.fed, h.HELICS_PROPERTY_TIME_PERIOD, 1)
 
     def register_subscription(self) -> None:
         self.sub.c0 = self.fed.register_subscription(
@@ -120,52 +120,64 @@ class EstimatorFederate(object):
 
     def run(self) -> None:
         logger.info(f"Federate connected: {datetime.now()}")
-        itr_skip = h.helics_iteration_request_no_iteration
-        itr_status = h.helics_iteration_result_next_step
         h.helicsFederateEnterExecutingMode(self.fed)
         logger.info(f"Federate executing: {datetime.now()}")
 
+        # setting up time properties
+        update_interval = h.helicsFederateGetTimeProperty(
+            self.fed, h.HELICS_PROPERTY_TIME_PERIOD)
+        logger.debug(f"update interval: {update_interval}")
+
         commands = []
         granted_time = 0
+        logger.debug("Step 0: Starting Time loop")
         while granted_time < h.HELICS_TIME_MAXTIME:
-            if itr_status != h.helics_iteration_result_next_step:
-                continue
+            request_time = granted_time + update_interval
+            logger.debug(f"Step 1: Requesting Time {request_time}")
+            granted_time = h.helicsFederateRequestTime(self.fed, request_time)
+            logger.debug(f"\tgranted time = {granted_time}")
 
-            logger.debug(f"itr next: {granted_time}")
+            logger.debug("Step 2: collect all commands")
             commands = []
             if self.sub.c0.is_updated():
+                logger.debug("\tarea 1: updated")
                 control = self.sub.c0.json
                 logger.debug(control)
                 for c in control:
                     commands.append(c)
 
             if self.sub.c1.is_updated():
+                logger.debug("\tarea 2: updated")
                 control = self.sub.c1.json
                 logger.debug(control)
                 for c in control:
                     commands.append(c)
 
             if self.sub.c2.is_updated():
+                logger.debug("\tarea 3: updated")
                 control = self.sub.c2.json
                 logger.debug(control)
                 for c in control:
                     commands.append(c)
 
             if self.sub.c3.is_updated():
+                logger.debug("\tarea 4: updated")
                 control = self.sub.c3.json
                 logger.debug(control)
                 for c in control:
                     commands.append(c)
 
             if self.sub.c4.is_updated():
+                logger.debug("\tarea 5: updated")
                 control = self.sub.c4.json
                 logger.debug(control)
                 for c in control:
                     commands.append(c)
-                logger.info(commands)
+            logger.debug("Step 3: Commands collected")
+            logger.info(commands)
 
-            granted_time, itr_status = h.helicsFederateRequestTimeIterative(
-                self.fed, h.HELICS_TIME_MAXTIME, itr_skip)
+            logger.debug("Step 4: Publishing commands")
+            self.pub_commands.publish(json.dumps(commands))
 
         self.stop()
 

@@ -33,6 +33,9 @@ SMART_DS = {
 MODELS = ["ieee123", "SFO/P1U", "SFO/P6U", "SFO/P9U"]
 LEVELS = ["low", "medium", "high", "extreme"]
 
+T_STEPS = 23
+DELTA_T = 60*60  # minutes * seconds per hour
+
 
 def generate_feeder(MODEL: str, LEVEL: str, OUTPUTS: str) -> Component:
     if "ieee" in MODEL:
@@ -59,9 +62,9 @@ def generate_feeder(MODEL: str, LEVEL: str, OUTPUTS: str) -> Component:
             "profile_location": profiles,
             "opendss_location": opendss,
             "feeder_file": file,
-            "start_date": "2018-05-01 14:00:00",
-            "number_of_timesteps": 8,
-            "run_freq_sec": 3600,
+            "start_date": "2018-05-01 00:00:00",
+            "number_of_timesteps": T_STEPS,
+            "run_freq_sec": DELTA_T,
             "topology_output": f"{OUTPUTS}/topology.json",
             "buscoords_output": f"{OUTPUTS}/Buscoords.dat",
         },
@@ -81,6 +84,8 @@ def generate_recorder(port: str, src: str, OUTPUTS: str) -> (Component, Link):
         parameters={
             "feather_filename": f"{OUTPUTS}/{file}.feather",
             "csv_filename": f"{OUTPUTS}/{file}.csv",
+            "number_of_timesteps": T_STEPS,
+            "deltat": DELTA_T
         },
     )
     link = Link(
@@ -103,6 +108,8 @@ def generate_sensor(port: str, src: str) -> (Component, Link):
             "additive_noise_stddev": 0.01,
             "multiplicative_noise_stddev": 0.001,
             "measurement_file": f"../{src}/{file}",
+            "number_of_timesteps": T_STEPS,
+            "deltat": DELTA_T
         },
     )
     link = Link(
@@ -290,6 +297,8 @@ def generate(MODEL: str, LEVEL: str) -> None:
         type="VoltageHub",
         parameters={
             "max_itr": max_itr,
+            "number_of_timesteps": T_STEPS,
+            "deltat": DELTA_T
         },
     )
     system.components.append(hub_voltage)
@@ -299,6 +308,8 @@ def generate(MODEL: str, LEVEL: str) -> None:
         type="PowerHub",
         parameters={
             "max_itr": max_itr,
+            "number_of_timesteps": T_STEPS,
+            "deltat": DELTA_T
         },
     )
     system.components.append(hub_power)
@@ -308,6 +319,8 @@ def generate(MODEL: str, LEVEL: str) -> None:
         type="ControlHub",
         parameters={
             "max_itr": max_itr,
+            "number_of_timesteps": T_STEPS,
+            "deltat": DELTA_T
         },
     )
     system.components.append(hub_control)
@@ -331,8 +344,9 @@ def generate(MODEL: str, LEVEL: str) -> None:
             name=f"{ALGO}_{k}",
             type="OptimalPowerFlow",
             parameters={
-                "deltat": 0.01,
                 "max_itr": max_itr,
+                "number_of_timesteps": T_STEPS,
+                "deltat": DELTA_T,
                 "relaxed": False,
                 "control_type": "real",
                 "switches": switch_map[k],
@@ -340,7 +354,7 @@ def generate(MODEL: str, LEVEL: str) -> None:
                 "rho_vup": rho_vup[k],
                 "rho_sup": 0,
                 "rho_vdn": 0,
-                "rho_sdn": rho_vup[k],
+                "rho_sdn": rho_sdn[k],
             },
         )
         system.components.append(algo)
