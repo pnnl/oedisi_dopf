@@ -223,8 +223,12 @@ def replace_boundary_voltage(v_self: VoltagesMagnitude, v_other: VoltagesMagnitu
         old_value = round(self_dict[id], 5) == round(values[id], 5)
         if old_value:
             values[id] = voltage
+            logger.debug(f"replace old bus: {id} from {
+                         self_dict[id]} to {values[id]}")
         else:
-            values[id] = (values[id] + voltage)/2
+            values[id] = -(values[id] + voltage)/2
+            logger.debug(f"replace bus: {id} from {
+                         self_dict[id]} to {values[id]}")
 
     v_other.ids = values.keys()
     v_other.values = values.values()
@@ -248,10 +252,13 @@ def replace_boundary_power_real(p_self: PowersReal, p_other: PowersReal) -> Powe
 
         old_value = round(self_dict[id], 5) == round(values[id], 5)
         if old_value:
+            logger.debug(f"replace old bus: {id} from {
+                         self_dict[id]} to {power}")
             values[id] = power
             eqids[id] = eq
         else:
-            values[id] = (values[id] + power)/2
+            logger.debug(f"replace bus: {id} from {self_dict[id]} to {power}")
+            values[id] = -(values[id] + power)/2
             eqids[id] = eq
 
     p_other.ids = values.keys()
@@ -277,9 +284,11 @@ def replace_boundary_power_imag(p_self: PowersImaginary, p_other: PowersImaginar
 
         old_value = round(self_dict[id], 5) == round(values[id], 5)
         if old_value:
+            logger.debug(f"replace bus: {id} from {self_dict[id]} to {power}")
             values[id] = power
             eqids[id] = eq
         else:
+            logger.debug(f"replace bus: {id} from {self_dict[id]} to {power}")
             values[id] = (values[id] + power)/2
             eqids[id] = eq
 
@@ -486,6 +495,14 @@ def disconnect_areas(graph: nx.Graph, switches) -> list[nx.Graph]:
     for c in nx.connected_components(graph):
         areas.append(graph.subgraph(c).copy())
     return areas
+
+
+def get_edge_name(graph: nx.Graph, src: str):
+    for u, v, a in graph.edges(data=True):
+        print(u, v, a)
+        if u == src or v == src:
+            return a['name']
+    return ""
 
 
 def get_switches(graph: nx.Graph):
@@ -999,6 +1016,18 @@ def process_secondary_side(leaf_bus, parent_bus, bus_data, branch_data):
         bus_data[leaf_bus]["pv"] = new_pv
 
     # Function to update the direction of the branch based on distance from root
+
+
+def branch_distance(branch_data: BranchInfo, root: str):
+    G = nx.Graph()
+
+    branch: Branch
+    for branch_id, branch in branch_data.items():
+        G.add_edge(branch.fr_bus, branch.to_bus)
+
+    distances_from_root = nx.single_source_shortest_path_length(
+        G, root)
+    return distances_from_root
 
 
 def update_branch_direction_based_on_root(

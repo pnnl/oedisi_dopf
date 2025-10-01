@@ -33,7 +33,7 @@ SMART_DS = {
 MODELS = ["ieee123", "SFO/P1U", "SFO/P6U", "SFO/P9U"]
 LEVELS = ["low", "medium", "high", "extreme"]
 
-T_STEPS = 23
+T_STEPS = 8
 DELTA_T = 60*60  # minutes * seconds per hour
 
 
@@ -62,7 +62,7 @@ def generate_feeder(MODEL: str, LEVEL: str, OUTPUTS: str) -> Component:
             "profile_location": profiles,
             "opendss_location": opendss,
             "feeder_file": file,
-            "start_date": "2018-05-01 00:00:00",
+            "start_date": "2018-05-01 08:00:00",
             "number_of_timesteps": T_STEPS,
             "run_freq_sec": DELTA_T,
             "topology_output": f"{OUTPUTS}/topology.json",
@@ -278,9 +278,15 @@ def generate(MODEL: str, LEVEL: str) -> None:
             if area.has_edge(u, v):
                 switches.append(a["id"])
                 src.append((u, v, a))
-        su, sv, sa = get_area_source(G, slack_bus, src)
+
+        if area.has_node(slack_bus):
+            source_map[i] = slack_bus
+        else:
+
+            su, sv, sa = get_area_source(G, slack_bus, src)
+            source_map[i] = sa["id"]
+
         switch_map[i] = switches
-        source_map[i] = sa["id"]
 
     sub_areas = {}
     for area, switches in switch_map.items():

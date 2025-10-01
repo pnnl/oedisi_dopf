@@ -6,7 +6,7 @@ import logging
 import copy
 import json
 from dataclasses import asdict
-from adapter import BranchInfo, Branch, BusInfo, Bus
+from adapter import BranchInfo, Branch, BusInfo, Bus, branch_distance
 
 logger = logging.getLogger(__name__)
 logger.addHandler(logging.StreamHandler())
@@ -214,7 +214,7 @@ def optimal_power_flow(
     SOURCE_V = [slack_v / basekV] * 3
 
     print("SOURCE Bus: ", slack_bus)
-    print("SOURCE kV: ", basekV)
+    print("SOURCE kV: ", slack_v)
 
     # Find the ABC phase and s1s2 phase triplex line and bus numbers
     nbranch_ABC = 0
@@ -931,10 +931,41 @@ def optimal_power_flow(
         to_bus.append(val_br.to_bus)
         name.append(key)
 
+    distances = branch_distance(branches, slack_bus)
+    flow = []
+
     i = 0
     mul = 1 / (BASE_S * 1000)
     line_flow = {}
     n_flow_ABC = (nbus_ABC * 3 + nbus_s1s2) + (nbus_ABC * 6 + nbus_s1s2 * 2)
+    n_flow_ABC = flow_var_start_idx
+    for k in range(n_flow_ABC, n_flow_ABC + nbranch_ABC):
+        if distances[to_bus[i]] - distances[from_bus[i]] == 1:
+            actual_from_bus = from_bus[i]
+            actual_to_bus = to_bus[i]
+            mul = 1*kw_converter
+
+        elif distances[from_bus[i]] - distances[to_bus[i]] == 1:
+            actual_from_bus = to_bus[i]
+            actual_to_bus = from_bus[i]
+            mul = -1*kw_converter
+
+        if actual_to_bus in child_info.buses.keys():
+            name = actual_to_bus
+        else:
+            name = actual_from_bus
+
+        line_flow[f"{name}.1"] = [x.value[k] *
+                                  mul, x.value[k + nbranch_ABC * 3] * mul]
+        line_flow[f"{name}.2"] = [x.value[k + nbranch_ABC]
+                                  * mul, x.value[k + nbranch_ABC * 4] * mul]
+        line_flow[f"{name}.3"] = \
+            [x.value[k + nbranch_ABC * 2] * mul,
+                x.value[k + nbranch_ABC * 5] * mul]
+
+        i += 1
+
+    logger.debug(line_flow)
 
     bus_names = list(buses.keys())
     bus_flows = {}
@@ -1020,4 +1051,4 @@ def optimal_power_flow(
             nbus_ABC * 2 + val_bus.idx + n_Qdg
         ]
 
-    return bus_voltage, bus_flows, opf_control_variable, stats
+    return bus_voltage, line_flow, opf_control_variable, stats
