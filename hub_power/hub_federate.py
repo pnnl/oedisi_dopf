@@ -159,7 +159,6 @@ class HubFederate(object):
         if self.sub.q0.is_updated():
             logger.debug("area 1 uqdated")
             q = PowersImaginary.parse_obj(self.sub.q0.json)
-            logger.debug(q)
             all_q.time = q.time
             all_q.values += q.values
             all_q.ids += q.ids
@@ -168,7 +167,6 @@ class HubFederate(object):
         if self.sub.q1.is_updated():
             logger.debug("area 2 uqdated")
             q = PowersImaginary.parse_obj(self.sub.q1.json)
-            logger.debug(q)
             all_q.time = q.time
             all_q.values += q.values
             all_q.ids += q.ids
@@ -177,7 +175,6 @@ class HubFederate(object):
         if self.sub.q2.is_updated():
             logger.debug("area 3 uqdated")
             q = PowersImaginary.parse_obj(self.sub.q2.json)
-            logger.debug(q)
             all_q.time = q.time
             all_q.values += q.values
             all_q.ids += q.ids
@@ -186,7 +183,6 @@ class HubFederate(object):
         if self.sub.q3.is_updated():
             logger.debug("area 4 uqdated")
             q = PowersImaginary.parse_obj(self.sub.q3.json)
-            logger.debug(q)
             all_q.time = q.time
             all_q.values += q.values
             all_q.ids += q.ids
@@ -200,6 +196,10 @@ class HubFederate(object):
             all_q.ids += q.ids
             all_q.equipment_ids += q.equipment_ids
 
+        logger.debug("All Imag Power")
+        for eq, v in zip(all_q.equipment_ids, all_q.values):
+            logger.debug(f"{eq} = {v}")
+
         for area in range(6):
             self.pub_area_q[area].publish(all_q.json())
 
@@ -208,7 +208,6 @@ class HubFederate(object):
         if self.sub.p0.is_updated():
             logger.debug("area 1 updated")
             p = PowersReal.parse_obj(self.sub.p0.json)
-            logger.debug(p)
             all_p.time = p.time
             all_p.values += p.values
             all_p.ids += p.ids
@@ -217,7 +216,6 @@ class HubFederate(object):
         if self.sub.p1.is_updated():
             logger.debug("area 2 updated")
             p = PowersReal.parse_obj(self.sub.p1.json)
-            logger.debug(p)
             all_p.time = p.time
             all_p.values += p.values
             all_p.ids += p.ids
@@ -226,7 +224,6 @@ class HubFederate(object):
         if self.sub.p2.is_updated():
             logger.debug("area 3 updated")
             p = PowersReal.parse_obj(self.sub.p2.json)
-            logger.debug(p)
             all_p.time = p.time
             all_p.values += p.values
             all_p.ids += p.ids
@@ -235,7 +232,6 @@ class HubFederate(object):
         if self.sub.p3.is_updated():
             logger.debug("area 4 updated")
             p = PowersReal.parse_obj(self.sub.p3.json)
-            logger.debug(p)
             all_p.time = p.time
             all_p.values += p.values
             all_p.ids += p.ids
@@ -248,6 +244,10 @@ class HubFederate(object):
             all_p.values += p.values
             all_p.ids += p.ids
             all_p.equipment_ids += p.equipment_ids
+
+        logger.debug("All Real Power")
+        for eq, v in zip(all_p.equipment_ids, all_p.values):
+            logger.debug(f"{eq} = {v}")
 
         for area in range(6):
             self.pub_area_p[area].publish(all_p.json())

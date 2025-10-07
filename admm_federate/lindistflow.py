@@ -53,7 +53,7 @@ def power_balance(A, b, k_frm, k_to, counteq, col, val):
 
 
 def convert_pu(
-    branch_info: BranchInfo, bus_info: BusInfo
+    bus_info: BusInfo, branch_info: BranchInfo = None
 ) -> (BranchInfo, BusInfo, float):
     pq_pu = 1 / (100 * 1e6)
     kw_to_va = 1.2
@@ -68,6 +68,9 @@ def convert_pu(
         bus_pu.buses[k].base_pv = [
             [pq * kw_to_va * pq_pu for pq in phase] for phase in v.base_pv
         ]
+
+    if branch_info is None:
+        return (branch_info, bus_pu, 1/pq_pu/1000)
 
     for k, v in branch_pu.branches.items():
         if (
@@ -180,29 +183,29 @@ class ADMMConfig:
     rho_vdn: float
 
 
-def solve(branch_info: dict, bus_info: dict, child_info: BusInfo, config: ADMMConfig):
+def solve(branch_info: dict, bus_info: dict, child_info: BusInfo, parent_info: BusInfo, config: ADMMConfig):
     try:
-        return optimal_power_flow(branch_info, bus_info, child_info, config)
+        return optimal_power_flow(branch_info, bus_info, child_info, parent_info, config)
 
     except:
         config.relaxed = True
-        return optimal_power_flow(branch_info, bus_info, child_info, config)
+        return optimal_power_flow(branch_info, bus_info, child_info, parent_info, config)
 
 
 def optimal_power_flow(
-    branch_info: BranchInfo, bus_info: BusInfo, child_info: BusInfo, config: ADMMConfig
+    branch_info: BranchInfo, bus_info: BusInfo, child_info: BusInfo, parent_info: BusInfo, config: ADMMConfig
 ):
     # System's base definition
     BASE_S = 1  # MVA
     PRIMARY_V = 0.12
-    branch_pu, bus_pu, kw_converter = convert_pu(branch_info, bus_info)
+    branch_pu, bus_pu, kw_converter = convert_pu(bus_info, branch_info)
     bus_pu = update_ratios(branch_pu, bus_pu)
 
-    with open("bus_info_pu.json", "w") as outfile:
-        outfile.write(json.dumps(asdict(bus_pu)))
+    _, parent_pu, _ = convert_pu(parent_info)
+    parent_pu = update_ratios(branch_pu, parent_pu)
 
-    with open("branch_info_pu.json", "w") as outfile:
-        outfile.write(json.dumps(asdict(branch_pu)))
+    _, child_pu, _ = convert_pu(child_info)
+    child_pu = update_ratios(branch_pu, child_pu)
 
     branches = branch_pu.branches
     buses = bus_pu.buses
@@ -212,9 +215,6 @@ def optimal_power_flow(
     basekV = buses[slack_bus].base_kv
     baseZ = 1.0
     SOURCE_V = [slack_v / basekV] * 3
-
-    print("SOURCE Bus: ", slack_bus)
-    print("SOURCE kV: ", slack_v)
 
     # Find the ABC phase and s1s2 phase triplex line and bus numbers
     nbranch_ABC = 0
@@ -248,9 +248,6 @@ def optimal_power_flow(
     )
     flex_node_count = nbus_ABC*6 + nbus_s1s2*2
     variable_number = local_variable_number + flex_node_count
-    print("local variable number: ", local_variable_number)
-    print("flex node count: ", flex_node_count)
-    print("variable number: ", variable_number)
 
     # Number of equality/inequality constraints (Injection equations (ABC) at each bus)
     #    #  Check if this is correct number or not:
@@ -273,9 +270,6 @@ def optimal_power_flow(
     inj_var_start_idx = n_bus
     flow_var_start_idx = n_bus + 2 * n_bus
     state_variable_number = n_bus + 2 * n_bus + 2 * n_branch
-    print("inj var start: ", inj_var_start_idx)
-    print("flow var start", flow_var_start_idx)
-    print("state var number: ", state_variable_number)
 
     # Q-dg variable starting number
     #                               P_dg
@@ -307,7 +301,7 @@ def optimal_power_flow(
     obj_Pup = 0
     obj_Qup = 0
 
-    parent = bus_info.buses[config.source_bus]
+    parent = parent_pu.buses[config.source_bus]
     vsrc = [parent.kv]*3
     psrc = [pq[0] for pq in parent.pq]
     qsrc = [pq[1] for pq in parent.pq]
@@ -340,7 +334,7 @@ def optimal_power_flow(
     obj_Pdn = 0
     obj_Qdn = 0
 
-    for key, child in child_info.buses.items():
+    for key, child in child_pu.buses.items():
         child_bus_idx = child.idx
         vdn = [child.kv]*3
         pdn = [pq[0] for pq in child.pq]
@@ -896,8 +890,7 @@ def optimal_power_flow(
         [A_ineq @ x <= b_ineq, A_eq @ x == b_eq]
     )
 
-    prob.solve(solver=cp.CLARABEL, verbose=True)
-    print(prob.solver_stats)
+    prob.solve(solver=cp.CLARABEL, verbose=False)
     extra_stats = prob.solver_stats.extra_stats
     if extra_stats is None:
         extra_stats = {}
@@ -937,6 +930,7 @@ def optimal_power_flow(
     i = 0
     mul = 1 / (BASE_S * 1000)
     line_flow = {}
+    branch_flow = {}
     n_flow_ABC = (nbus_ABC * 3 + nbus_s1s2) + (nbus_ABC * 6 + nbus_s1s2 * 2)
     n_flow_ABC = flow_var_start_idx
     for k in range(n_flow_ABC, n_flow_ABC + nbranch_ABC):
@@ -952,20 +946,31 @@ def optimal_power_flow(
 
         if actual_to_bus in child_info.buses.keys():
             name = actual_to_bus
+            line_name = f"{name}_{actual_from_bus}"
         else:
             name = actual_from_bus
+            line_name = f"{name}_{actual_to_bus}"
 
-        line_flow[f"{name}.1"] = [x.value[k] *
-                                  mul, x.value[k + nbranch_ABC * 3] * mul]
-        line_flow[f"{name}.2"] = [x.value[k + nbranch_ABC]
-                                  * mul, x.value[k + nbranch_ABC * 4] * mul]
-        line_flow[f"{name}.3"] = \
-            [x.value[k + nbranch_ABC * 2] * mul,
-                x.value[k + nbranch_ABC * 5] * mul]
+        branch_flow[f"{line_name}.1"] = [x.value[k] *
+                                         mul, x.value[k + nbranch_ABC * 3] * mul]
+        branch_flow[f"{line_name}.2"] = [x.value[k + nbranch_ABC]
+                                         * mul, x.value[k + nbranch_ABC * 4] * mul]
+        branch_flow[f"{line_name}.3"] = [x.value[k + nbranch_ABC * 2] * mul,
+                                         x.value[k + nbranch_ABC * 5] * mul]
+
+        if f"{name}.1" not in line_flow.keys():
+            line_flow[f"{name}.1"] = [0, 0]
+            line_flow[f"{name}.2"] = [0, 0]
+            line_flow[f"{name}.3"] = [0, 0]
+
+        line_flow[f"{name}.1"][0] += x.value[k] * mul
+        line_flow[f"{name}.1"][1] += x.value[k + nbranch_ABC * 3] * mul
+        line_flow[f"{name}.2"][0] += x.value[k + nbranch_ABC] * mul
+        line_flow[f"{name}.2"][1] += x.value[k + nbranch_ABC * 4] * mul
+        line_flow[f"{name}.3"][0] += x.value[k + nbranch_ABC * 2] * mul
+        line_flow[f"{name}.3"][1] += x.value[k + nbranch_ABC * 5] * mul
 
         i += 1
-
-    logger.debug(line_flow)
 
     bus_names = list(buses.keys())
     bus_flows = {}
@@ -979,10 +984,6 @@ def optimal_power_flow(
         bus_flows[f"{key}.1"] = [pa, qa]
         bus_flows[f"{key}.2"] = [pb, qb]
         bus_flows[f"{key}.3"] = [pc, qc]
-
-        if "76" in key:
-            print(key, bus_flows[f"{key}.1"],
-                  bus_flows[f"{key}.2"], bus_flows[f"{key}.3"])
 
     n_flow_s1s2 = (
         (nbus_ABC * 3 + nbus_s1s2) +
@@ -1028,6 +1029,8 @@ def optimal_power_flow(
     # %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
     opf_control_variable = {}
+    aux_load = {}
+    mul = kw_converter
     for key, val_bus in buses.items():
         opf_control_variable[key] = {}
         opf_control_variable[key]["Pdg_gen"] = {}
@@ -1051,4 +1054,20 @@ def optimal_power_flow(
             nbus_ABC * 2 + val_bus.idx + n_Qdg
         ]
 
-    return bus_voltage, line_flow, opf_control_variable, stats
+        if key in child_info.buses.keys():
+            p = x.value[nbus_ABC * 0 + val_bus.idx + local_variable_number]*mul
+            q = x.value[nbus_ABC * 3 + val_bus.idx + local_variable_number]*mul
+            if p != 0.0:
+                aux_load[f"{key}.1"] = [p, q]
+
+            p = x.value[nbus_ABC * 1 + val_bus.idx + local_variable_number]*mul
+            q = x.value[nbus_ABC * 4 + val_bus.idx + local_variable_number]*mul
+            if p != 0.0:
+                aux_load[f"{key}.2"] = [p, q]
+
+            p = x.value[nbus_ABC * 2 + val_bus.idx + local_variable_number]*mul
+            q = x.value[nbus_ABC * 5 + val_bus.idx + local_variable_number]*mul
+            if p != 0.0:
+                aux_load[f"{key}.3"] = [p, q]
+
+    return bus_voltage, branch_flow, aux_load, opf_control_variable, stats

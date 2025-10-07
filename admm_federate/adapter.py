@@ -78,7 +78,7 @@ class BusInfo:
 
 
 def check_radiality(branch_info: BranchInfo, bus_info: BusInfo) -> bool:
-    print(len(bus_info.buses), len(branch_info.branches))
+    # print(len(bus_info.buses), len(branch_info.branches))
     if len(bus_info.buses) - len(branch_info.branches) == 1:
         return True
 
@@ -207,7 +207,7 @@ def extract_forecast(bus: dict, forecast) -> dict:
     return bus
 
 
-def replace_boundary_voltage(v_self: VoltagesMagnitude, v_other: VoltagesMagnitude) -> VoltagesMagnitude:
+def update_boundary_voltage(v_self: VoltagesMagnitude, v_other: VoltagesMagnitude) -> VoltagesMagnitude:
     if len(v_self.values) == 0:
         return v_other
     self_dict = {k: v for k, v in zip(v_self.ids, v_self.values)}
@@ -216,49 +216,34 @@ def replace_boundary_voltage(v_self: VoltagesMagnitude, v_other: VoltagesMagnitu
         if id not in self_dict.keys():
             continue
 
-        if id not in values.keys():
-            values[id] = voltage
+        old_key = id in v_self.ids
+        old_value = round(self_dict[id], 5) == round(voltage, 5)
+        if old_value and old_key:
             continue
 
-        old_value = round(self_dict[id], 5) == round(values[id], 5)
-        if old_value:
+        if id not in values.keys():
             values[id] = voltage
-            logger.debug(f"replace old bus: {id} from {
-                         self_dict[id]} to {values[id]}")
-        else:
-            values[id] = -(values[id] + voltage)/2
-            logger.debug(f"replace bus: {id} from {
-                         self_dict[id]} to {values[id]}")
 
     v_other.ids = values.keys()
     v_other.values = values.values()
     return v_other
 
 
-def replace_boundary_power_real(p_self: PowersReal, p_other: PowersReal) -> PowersReal:
-    if len(p_self.values) == 0:
-        return p_other
-    self_dict = {k: v for k, v in zip(p_self.ids, p_self.values)}
+def update_boundary_power_real(p_other: PowersReal, area: str) -> PowersReal:
     values = {}
     eqids = {}
+    old = {}
     for idx, (id, eq, power) in enumerate(zip(p_other.ids, p_other.equipment_ids, p_other.values)):
-        if id not in self_dict.keys():
+        if area in eq:
+            old[id] = power
+
+    for idx, (id, eq, power) in enumerate(zip(p_other.ids, p_other.equipment_ids, p_other.values)):
+        if area in eq:
             continue
 
         if id not in values.keys():
+            logger.debug(f"update old bus: {id} from {old[id]} to {power}")
             values[id] = power
-            eqids[id] = eq
-            continue
-
-        old_value = round(self_dict[id], 5) == round(values[id], 5)
-        if old_value:
-            logger.debug(f"replace old bus: {id} from {
-                         self_dict[id]} to {power}")
-            values[id] = power
-            eqids[id] = eq
-        else:
-            logger.debug(f"replace bus: {id} from {self_dict[id]} to {power}")
-            values[id] = -(values[id] + power)/2
             eqids[id] = eq
 
     p_other.ids = values.keys()
@@ -267,29 +252,20 @@ def replace_boundary_power_real(p_self: PowersReal, p_other: PowersReal) -> Powe
     return p_other
 
 
-def replace_boundary_power_imag(p_self: PowersImaginary, p_other: PowersImaginary) -> PowersImaginary:
-    if len(p_self.values) == 0:
-        return p_other
-    self_dict = {k: v for k, v in zip(p_self.ids, p_self.values)}
+def update_boundary_power_imag(p_other: PowersImaginary, area: str) -> PowersImaginary:
     values = {}
     eqids = {}
+    old = {}
     for idx, (id, eq, power) in enumerate(zip(p_other.ids, p_other.equipment_ids, p_other.values)):
-        if id not in self_dict.keys():
+        if area in eq:
+            old[id] = power
+
+    for idx, (id, eq, power) in enumerate(zip(p_other.ids, p_other.equipment_ids, p_other.values)):
+        if area in eq:
             continue
 
         if id not in values.keys():
             values[id] = power
-            eqids[id] = eq
-            continue
-
-        old_value = round(self_dict[id], 5) == round(values[id], 5)
-        if old_value:
-            logger.debug(f"replace bus: {id} from {self_dict[id]} to {power}")
-            values[id] = power
-            eqids[id] = eq
-        else:
-            logger.debug(f"replace bus: {id} from {self_dict[id]} to {power}")
-            values[id] = (values[id] + power)/2
             eqids[id] = eq
 
     p_other.ids = values.keys()
@@ -316,20 +292,77 @@ def filter_boundary_voltage(shared: list[str], voltages: VoltagesMagnitude) -> V
     return voltages
 
 
+def filter_line_power_real(shared: list[str], powers: PowersReal, area: str = "") -> PowersReal:
+    if area != "":
+        area += "/"
+
+    ids = []
+    eqids = []
+    values = []
+    for id, eq, power in zip(powers.ids, powers.equipment_ids, powers.values):
+        name, phase = id.split(".", 1)
+        fr_bus, to_bus = name.split("_", 1)
+
+        if not (fr_bus in shared or to_bus in shared):
+            continue
+
+        branch = f"{area}{fr_bus}_{to_bus}.{phase}"
+        ids.append(f"{fr_bus}.{phase}")
+        eqids.append(branch)
+        values.append(power)
+
+        branch = f"{area}{to_bus}_{fr_bus}.{phase}"
+        ids.append(f"{to_bus}.{phase}")
+        eqids.append(branch)
+        values.append(-power)
+
+    powers.ids = ids
+    powers.equipment_ids = eqids
+    powers.values = values
+    return powers
+
+
+def filter_line_power_imag(shared: list[str], powers: PowersImaginary, area: str = "") -> PowersImaginary:
+    if area != "":
+        area += "/"
+
+    ids = []
+    eqids = []
+    values = []
+    for id, eq, power in zip(powers.ids, powers.equipment_ids, powers.values):
+        name, phase = id.split(".", 1)
+        fr_bus, to_bus = name.split("_", 1)
+
+        if not (fr_bus in shared or to_bus in shared):
+            continue
+
+        branch = f"{area}{fr_bus}_{to_bus}.{phase}"
+        ids.append(f"{fr_bus}.{phase}")
+        eqids.append(branch)
+        values.append(power)
+
+        branch = f"{area}{to_bus}_{fr_bus}.{phase}"
+        ids.append(f"{to_bus}.{phase}")
+        eqids.append(branch)
+        values.append(-power)
+
+    powers.ids = ids
+    powers.equipment_ids = eqids
+    powers.values = values
+    return powers
+
+
 def filter_boundary_power_real(shared: list[str], powers: PowersReal) -> PowersReal:
     ids = []
     eqids = []
     values = []
     for id, eq, power in zip(powers.ids, powers.equipment_ids, powers.values):
         name, phase = id.split(".", 1)
-        phase = int(phase) - 1
 
-        if name not in shared:
-            continue
-
-        ids.append(id)
-        eqids.append(eq)
-        values.append(power)
+        if name in shared:
+            ids.append(id)
+            eqids.append(eq)
+            values.append(power)
 
     powers.ids = ids
     powers.equipment_ids = eqids
@@ -343,14 +376,11 @@ def filter_boundary_power_imag(shared: list[str], powers: PowersImaginary) -> Po
     values = []
     for id, eq, power in zip(powers.ids, powers.equipment_ids, powers.values):
         name, phase = id.split(".", 1)
-        phase = int(phase) - 1
 
-        if name not in shared:
-            continue
-
-        ids.append(id)
-        eqids.append(eq)
-        values.append(power)
+        if name in shared:
+            ids.append(id)
+            eqids.append(eq)
+            values.append(power)
 
     powers.ids = ids
     powers.equipment_ids = eqids
@@ -358,7 +388,7 @@ def filter_boundary_power_imag(shared: list[str], powers: PowersImaginary) -> Po
     return powers
 
 
-def extract_powers_real(bus_info: BusInfo, real: PowersReal) -> BusInfo:
+def extract_powers_real(bus_info: BusInfo, real: PowersReal, replace: bool = False) -> BusInfo:
     for id, eq, power in zip(real.ids, real.equipment_ids, real.values):
         name, phase = id.split(".", 1)
         phase = int(phase) - 1
@@ -366,11 +396,14 @@ def extract_powers_real(bus_info: BusInfo, real: PowersReal) -> BusInfo:
         if name not in bus_info.buses:
             continue
 
-        bus_info.buses[name].pq[phase][0] += power * 1000
+        if replace:
+            bus_info.buses[name].pq[phase][0] = power * 1000
+        else:
+            bus_info.buses[name].pq[phase][0] += power * 1000
     return bus_info
 
 
-def extract_powers_imag(bus_info: BusInfo, imag: PowersImaginary) -> BusInfo:
+def extract_powers_imag(bus_info: BusInfo, imag: PowersImaginary, replace: bool = False) -> BusInfo:
     for id, eq, power in zip(imag.ids, imag.equipment_ids, imag.values):
         name, phase = id.split(".", 1)
         phase = int(phase) - 1
@@ -378,7 +411,10 @@ def extract_powers_imag(bus_info: BusInfo, imag: PowersImaginary) -> BusInfo:
         if name not in bus_info.buses:
             continue
 
-        bus_info.buses[name].pq[phase][1] += power * 1000
+        if replace:
+            bus_info.buses[name].pq[phase][1] = power * 1000
+        else:
+            bus_info.buses[name].pq[phase][1] += power * 1000
     return bus_info
 
 
@@ -499,7 +535,6 @@ def disconnect_areas(graph: nx.Graph, switches) -> list[nx.Graph]:
 
 def get_edge_name(graph: nx.Graph, src: str):
     for u, v, a in graph.edges(data=True):
-        print(u, v, a)
         if u == src or v == src:
             return a['name']
     return ""

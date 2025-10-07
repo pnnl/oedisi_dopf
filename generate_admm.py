@@ -297,7 +297,7 @@ def generate(MODEL: str, LEVEL: str) -> None:
                     area_set.add(a)
         sub_areas[area] = area_set
 
-    max_itr = 3
+    max_itr = 10
     hub_voltage = Component(
         name="hub_voltage",
         type="VoltageHub",

@@ -28,6 +28,7 @@ import xarray as xr
 from pprint import pprint
 import numpy as np
 import time
+import networkx as nx
 
 logger = logging.getLogger(__name__)
 logger.addHandler(logging.StreamHandler())
@@ -111,8 +112,16 @@ class Subscriptions(object):
 
 
 class OPFFederate(object):
+    parent_bus: str = ""
+    parent_line: str = ""
+    child_buses: [str] = []
+    shared_buses: [str] = []
+    shared_lines: {str, str} = {}
+    area_graph: nx.Graph = None
     area_branch: adapter.BranchInfo = None
     area_bus: adapter.BusInfo = None
+    parent_info: adapter.BusInfo = None
+    child_info: adapter.BusInfo = None
     area_v: VoltagesMagnitude
     area_p: PowersReal
     area_q: PowersImaginary
@@ -222,6 +231,83 @@ class OPFFederate(object):
             "pub_q", h.HELICS_DATA_TYPE_STRING, ""
         )
 
+    def bus_to_branch_power(self, buses: dict) -> dict:
+        branches = {}
+        for k, v in buses.items():
+            bus, phase = k.split(".", 1)
+            if bus in self.shared_lines.keys():
+                name = f"{self.shared_lines[bus]}.{phase}"
+                branches[name] = v
+        return branches
+
+    def init_area(self):
+        topology: Topology = Topology.parse_obj(self.sub.topology.json)
+        branch_info, bus_info, slack_bus = adapter.extract_info(topology)
+        self.static.config.slack = slack_bus
+
+        G = adapter.generate_graph(topology.incidences, slack_bus)
+        graph = copy.deepcopy(G)
+        graph2 = copy.deepcopy(G)
+        boundaries = adapter.area_disconnects(graph)
+
+        upstream = []
+        if self.static.source == slack_bus:
+            self.parent_bus = slack_bus
+            self.shared_buses.append(slack_bus)
+
+        boundary = []
+        for u, v, a in boundaries:
+            if a["id"] in self.static.switches and not a["id"] == self.static.source:
+                boundary.append((u, v, a))
+                self.child_buses.append(v)
+                self.shared_buses.append(v)
+                self.shared_lines[u] = f"{u}_{v}"
+                self.shared_lines[v] = f"{v}_{u}"
+
+            if a["id"] == self.static.source:
+                boundary.append((u, v, a))
+                self.parent_bus = u
+                self.shared_buses.append(u)
+                self.parent_line = f"{u}_{v}"
+                self.shared_lines[u] = f"{u}_{v}"
+                self.shared_lines[v] = f"{v}_{u}"
+
+        areas = adapter.disconnect_areas(graph2, boundary)
+        areas = adapter.reconnect_area_switches(
+            areas, boundary)
+
+        ids = [a["id"] for _, _, a in boundary]
+        for area in areas:
+            area_branch, area_bus = adapter.generate_area_info(
+                area, topology, self.parent_bus, ids)
+            if area_branch is not None and area_bus is not None:
+                for u, v in area.edges(self.parent_bus):
+                    if self.parent_line == "":
+                        self.parent_line = f"{u}_{v}"
+                self.area_branch = area_branch
+                self.area_bus = area_bus
+                self.area_graph = area
+
+        self.child_info = adapter.BusInfo()
+        for k in self.child_buses:
+            if k in self.area_bus.buses:
+                self.child_info.buses[k] = copy.deepcopy(
+                    self.area_bus.buses[k])
+                self.child_info.buses[k].pv = np.zeros((3, 2)).tolist()
+
+        self.parent_info = adapter.BusInfo()
+        self.parent_info.buses[self.parent_bus] = copy.deepcopy(
+            self.area_bus.buses[self.parent_bus])
+        self.parent_info.buses[self.parent_bus].pv = np.zeros((3, 2)).tolist()
+
+        logger.debug("Parent Info")
+        logger.debug(f"\tbus = {self.parent_bus}")
+        logger.debug(f"\tline = {self.parent_line}")
+        logger.debug("Child Info")
+        logger.debug(f"\tbuses = {self.child_buses}")
+        logger.debug("Shared Info")
+        logger.debug(f"\tbuses = {self.shared_buses}")
+
     def get_set_points(self, control: dict, bus_info: adapter.BusInfo) -> dict[complex]:
         setpoints = {}
         for key, val in control.items():
@@ -235,54 +321,18 @@ class OPFFederate(object):
         return setpoints
 
     def first_pub(self):
-        logger.info("running first publication for admm")
-        area_v = VoltagesMagnitude(ids=[], values=[], time=0)
-        area_p = PowersReal(ids=[], equipment_ids=[], values=[], time=0)
-        area_q = PowersImaginary(
+        self.area_v = VoltagesMagnitude(ids=[], values=[], time=0)
+        self.area_p = PowersReal(ids=[], equipment_ids=[], values=[], time=0)
+        self.area_q = PowersImaginary(
             ids=[], equipment_ids=[], values=[], time=0)
 
-        self.pub_admm_v.publish(area_v.json())
-        self.pub_admm_p.publish(area_p.json())
-        self.pub_admm_q.publish(area_q.json())
+        self.pub_admm_v.publish(self.area_v.json())
+        self.pub_admm_p.publish(self.area_p.json())
+        self.pub_admm_q.publish(self.area_q.json())
 
     def itr_pub(self):
-        topology: Topology = Topology.parse_obj(self.sub.topology.json)
-        branch_info, bus_info, slack_bus = adapter.extract_info(topology)
-        self.static.config.slack = slack_bus
-
-        G = adapter.generate_graph(topology.incidences, slack_bus)
-        graph = copy.deepcopy(G)
-        graph2 = copy.deepcopy(G)
-        boundaries = adapter.area_disconnects(graph)
-        boundary = []
-        shared = []
-        if self.static.source == slack_bus:
-            source = (slack_bus, 0)
-        for u, v, a in boundaries:
-            if a["id"] in self.static.switches and not a["id"] == self.static.source:
-                boundary.append((u, v, a))
-                shared.append(v)
-
-            if a["id"] == self.static.source:
-                boundary.append((u, v, a))
-                shared.append(u)
-                source = (u, v)
-
-        areas = adapter.disconnect_areas(graph2, boundary)
-        areas = adapter.reconnect_area_switches(
-            areas, boundary)
-
-        logger.debug(f"shared: {shared}")
-        # TODO: check if switchs exist for this area
-        if self.area_branch == None:
-            ids = [a["id"] for _, _, a in boundary]
-            for area in areas:
-                area_branch, area_bus = adapter.generate_area_info(
-                    area, topology, source[0], ids)
-                if area_branch != None and area_bus != None:
-                    self.area_branch = area_branch
-                    self.area_bus = area_bus
-                    self.area_graph = area
+        if self.area_graph is None:
+            self.init_area()
 
         voltages_real = VoltagesReal.parse_obj(self.sub.voltages_real.json)
         voltages_imag = VoltagesImaginary.parse_obj(
@@ -298,97 +348,129 @@ class OPFFederate(object):
 
         injections = Injection.parse_obj(self.sub.injections.json)
         bus_info = adapter.extract_injection(
-            self.area_bus, injections)
+            copy.deepcopy(self.area_bus), injections)
 
         bus_info = adapter.extract_voltages(
             bus_info, voltages_mag)
 
-        if self.sub.area_q.is_updated():
-            p = PowersImaginary.parse_obj(self.sub.area_q.json)
-            if p.values:
-                logger.debug("Updating Area Reactive Power")
-                p = adapter.filter_boundary_power_imag(shared, p)
-                p = adapter.replace_boundary_power_imag(self.area_q, p)
-                bus_info = adapter.extract_powers_imag(bus_info, p)
-
-        if self.sub.area_p.is_updated():
-            p = PowersReal.parse_obj(self.sub.area_p.json)
-            if p.values:
-                logger.debug("Updating Area Real Power")
-                p = adapter.filter_boundary_power_real(shared, p)
-                p = adapter.replace_boundary_power_real(self.area_p, p)
-                bus_info = adapter.extract_powers_real(bus_info, p)
-
-        if self.sub.area_v.is_updated():
-            vmag = VoltagesMagnitude.parse_obj(self.sub.area_v.json)
-            if vmag.values:
-                logger.debug("Updating Area Voltages")
-                vmag = adapter.filter_boundary_voltage(shared, vmag)
-                vmag = adapter.replace_boundary_voltage(self.area_v, vmag)
-                bus_info = adapter.extract_voltages(
-                    bus_info, vmag)
-
-        child_buses = []
-        for u, v, a in boundary:
-            if a["id"] != self.static.source and a["id"] in self.static.switches:
-                child_buses.append(v)
-
         branch_info, bus_info = adapter.map_secondaries(
-            self.area_branch, bus_info)
+            copy.deepcopy(self.area_branch), bus_info)
 
-        child_info = adapter.BusInfo()
-        parent = adapter.Bus()
-        for k, v in bus_info.buses.items():
-            if k == source[0]:
-                logger.debug(f"parent bus :{v}")
-                parent = v
-            if k in child_buses:
-                logger.debug(f"child buses {k}:{v}")
-                child_info.buses[k] = v
+        with open("bus_info.json", "w") as outfile:
+            outfile.write(json.dumps(asdict(bus_info)))
+
+        with open("branch_info.json", "w") as outfile:
+            outfile.write(json.dumps(asdict(branch_info)))
+
+        p = PowersReal.parse_obj(self.sub.area_p.json)
+        if p.values:
+            logger.debug("Updating Area Active Power")
+            p = adapter.filter_boundary_power_real(self.shared_buses, p)
+            p = adapter.update_boundary_power_real(p, self.static.name)
+            self.parent_info = adapter.extract_powers_real(
+                self.parent_info, p, True)
+            self.child_info = adapter.extract_powers_real(
+                self.child_info, p, True)
+
+        q = PowersImaginary.parse_obj(self.sub.area_q.json)
+        if p.values:
+            logger.debug("Updating Area Reactive Power")
+            q = adapter.filter_boundary_power_imag(self.shared_buses, q)
+            q = adapter.update_boundary_power_imag(q, self.static.name)
+            self.parent_info = adapter.extract_powers_imag(
+                self.parent_info, q, True)
+            self.child_info = adapter.extract_powers_imag(
+                self.child_info, q, True)
+
+        vmag = VoltagesMagnitude.parse_obj(self.sub.area_v.json)
+        if vmag.values:
+            logger.debug("Updating Area Voltages")
+            vmag = adapter.filter_boundary_voltage(self.shared_buses, vmag)
+            vmag = adapter.update_boundary_voltage(self.area_v, vmag)
+            self.parent_info = adapter.extract_voltages(
+                self.parent_info, vmag)
+            self.child_info = adapter.extract_voltages(
+                self.child_info, vmag)
+
+        with open("bus_info_updated.json", "w") as outfile:
+            outfile.write(json.dumps(asdict(bus_info)))
+
+        with open("branch_info_updated.json", "w") as outfile:
+            outfile.write(json.dumps(asdict(branch_info)))
 
         assert adapter.check_radiality(branch_info, bus_info)
 
-        self.static.config.source_bus = source[0]
+        self.static.config.source_bus = self.parent_bus
         self.static.config.source_line = adapter.get_edge_name(
-            self.area_graph, source[0])
+            self.area_graph, self.parent_bus)
         self.static.config.relaxed = self.static.relaxed
-        v_mag, pq, control, stats = lindistflow.solve(
-            branch_info, bus_info, child_info, self.static.config
+        v_mag, branch_pq, aux_pq, control, stats = lindistflow.solve(
+            branch_info, bus_info, self.child_info, self.parent_info, self.static.config
         )
         real_setpts = self.get_set_points(control, bus_info)
 
-        p = {k: p[0] for k, p in pq.items()}
-        q = {k: p[1] for k, p in pq.items()}
+        bp = {k: p[0] for k, p in branch_pq.items()}
+        bq = {k: p[1] for k, p in branch_pq.items()}
 
-        # get the control commands for the feeder federate
+        p = {k: p[0] for k, p in aux_pq.items()}
+        p = self.bus_to_branch_power(p)
+
+        q = {k: p[1] for k, p in aux_pq.items()}
+        q = self.bus_to_branch_power(q)
+
+        # replace branch flows with aux loads if they exist
+        for k, v in bp.items():
+            if k in p:
+                bp[k] = p[k]
+                bq[k] = q[k]
+
+        # CAPTURE STATS FOR PUB
+        power_real = PowersReal(
+            ids=list(bp.keys()), values=list(bp.values()), equipment_ids=list(bp.keys()), time=t)
+        self.area_p = copy.deepcopy(adapter.filter_line_power_real(
+            self.shared_buses, power_real, self.static.name))
+
+        power_imag = PowersImaginary(
+            ids=list(bq.keys()), values=list(bq.values()), equipment_ids=list(bq.keys()), time=t)
+        self.area_q = copy.deepcopy(adapter.filter_line_power_imag(
+            self.shared_buses, power_imag, self.static.name))
+
+        vmag = adapter.pack_voltages(v_mag, bus_info, t)
+        self.area_v = copy.deepcopy(
+            adapter.filter_boundary_voltage(self.shared_buses, vmag))
+
+        self.pub_admm_p.publish(self.area_p.json())
+        self.pub_admm_q.publish(self.area_q.json())
+        self.pub_admm_v.publish(self.area_v.json())
+
+        # SET COMMANDS FOR PUB
         commands = []
         for eq, val in real_setpts.items():
             if abs(val) < 1e-6:
                 continue
 
             commands.append((eq, val.real, val.imag))
+        self.pub_pv_set.publish(json.dumps(commands))
 
-        power_real = PowersReal(
-            ids=list(p.keys()), values=list(p.values()), equipment_ids=list(p.keys()), time=t)
-        # power_real = adapter.pack_powers_real(injections.power_real, p, t)
-        self.area_p = adapter.filter_boundary_power_real(shared, power_real)
-
-        logger.debug(power_real)
-        logger.debug(self.area_p)
-
-        stats["sdn"] = 0
-        for k, v in child_info.buses.items():
-            for phase in v.phases:
-                real = p[f"{k}.{phase}"]
-                imag = q[f"{k}.{phase}"]
-                stats["sdn"] += real**2 + imag**2
-
+        # CAPTURE STATS FOR PUB
         kvup = 0
         for k, v in v_mag.items():
             bus, phase = k.split(".", 1)
-            if bus == source[0]:
+            if bus == self.parent_bus:
                 kvup += v/1000
-        stats["vup"] = abs(bus_info.buses[source[0]].kv - kvup/3)
+        stats["vup"] = abs(bus_info.buses[self.parent_bus].kv - kvup/3)
+
+        sdn_real = adapter.filter_boundary_power_real(
+            self.child_buses, power_real)
+        sdn_imag = adapter.filter_boundary_power_imag(
+            self.child_buses, power_imag)
+
+        real = [power for power in sdn_real.values]
+        imag = [power for power in sdn_imag.values]
+        stats["sdn"] = 0
+        for watt, var in zip(real, imag):
+            bus, phase = k.split(".", 1)
+            stats["sdn"] += watt**2 + var**2
 
         solver_stats = MeasurementArray(
             ids=list(stats.keys()),
@@ -396,33 +478,12 @@ class OPFFederate(object):
             time=t,
             units="s",
         )
+        self.pub_solver_stats.publish(solver_stats.json())
 
         # self.pub_voltages_mag.publish(v_mag.json())
         # self.pub_voltages_angle.publish(voltages_ang.json())
         # self.pub_powers_mag.publish(power_mag.json())
         # self.pub_powers_angle.publish(power_ang.json())
-
-        v_mag = adapter.pack_voltages(v_mag, bus_info, t)
-        self.area_v = adapter.filter_boundary_voltage(shared, v_mag)
-
-        power_real = PowersReal(
-            ids=list(p.keys()), values=list(p.values()), equipment_ids=list(p.keys()), time=t)
-        # power_real = adapter.pack_powers_real(injections.power_real, p, t)
-        self.area_p = adapter.filter_boundary_power_real(shared, power_real)
-        logger.debug(p)
-
-        power_imag = PowersImaginary(
-            ids=list(q.keys()), values=list(q.values()), equipment_ids=list(p.keys()), time=t)
-        # power_imag = adapter.pack_powers_imag(topology.injections.power_imaginary, q, t)
-        self.area_q = adapter.filter_boundary_power_imag(shared, power_imag)
-
-        self.pub_admm_p.publish(self.area_p.json())
-        self.pub_admm_q.publish(self.area_q.json())
-        self.pub_admm_v.publish(self.area_v.json())
-        logger.debug(solver_stats)
-        logger.debug(commands)
-        self.pub_solver_stats.publish(solver_stats.json())
-        self.pub_pv_set.publish(json.dumps(commands))
 
     def run(self) -> None:
         logger.info(f"Federate connected: {datetime.now()}")
