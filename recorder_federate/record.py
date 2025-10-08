@@ -16,8 +16,9 @@ logger.setLevel(logging.DEBUG)
 
 
 class Recorder:
-    def __init__(self, name, feather_filename, csv_filename, input_mapping):
+    def __init__(self, name, feather_filename, csv_filename, input_mapping, t_steps):
         self.rng = np.random.default_rng(12345)
+        self.t_steps = t_steps
         deltat = 0.01
 
         # Create Federate Info object that describes the federate properties #
@@ -58,7 +59,7 @@ class Recorder:
         logger.debug("Step 0: Starting Time Loop")
         with pa.OSFile(self.feather_filename, "wb") as sink:
             writer = None
-            while granted_time < h.HELICS_TIME_MAXTIME:
+            while granted_time <= self.t_steps:
                 request_time = granted_time + update_interval
                 logger.debug(f"Step 1: Requesting Time {request_time}")
                 granted_time = h.helicsFederateRequestTime(
@@ -115,9 +116,10 @@ if __name__ == "__main__":
         name = config["name"]
         feather_path = config["feather_filename"]
         csv_path = config["csv_filename"]
+        t_steps = config["number_of_timesteps"]
 
     with open("input_mapping.json") as f:
         input_mapping = json.load(f)
 
-    sfed = Recorder(name, feather_path, csv_path, input_mapping)
+    sfed = Recorder(name, feather_path, csv_path, input_mapping, t_steps)
     sfed.run()

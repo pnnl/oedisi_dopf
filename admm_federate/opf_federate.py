@@ -29,6 +29,7 @@ from pprint import pprint
 import numpy as np
 import time
 import networkx as nx
+import math
 
 logger = logging.getLogger(__name__)
 logger.addHandler(logging.StreamHandler())
@@ -88,8 +89,11 @@ def xarray_to_voltages_pol(data, **kwargs):
 
 class StaticConfig(object):
     name: str
+    vup_tol: float
+    sdn_tol: float
     deltat: float
     max_itr: int
+    t_steps: int
     control_type: str
     relaxed: bool
     switches: list[str]
@@ -112,10 +116,12 @@ class Subscriptions(object):
 
 
 class OPFFederate(object):
+    converged: bool = False
     parent_bus: str = ""
     parent_line: str = ""
     child_buses: [str] = []
     shared_buses: [str] = []
+    switch_buses: [str] = []
     shared_lines: {str, str} = {}
     area_graph: nx.Graph = None
     area_branch: adapter.BranchInfo = None
@@ -152,8 +158,11 @@ class OPFFederate(object):
             config = json.load(file)
 
         self.static.name = config["name"]
+        self.static.vup_tol = config["vup_tol"]
+        self.static.sdn_tol = config["sdn_tol"]
         self.static.deltat = config["deltat"]
         self.static.max_itr = config["max_itr"]
+        self.static.t_steps = config["number_of_timesteps"]
         self.static.deltat = 1
         self.static.control_type = config["control_type"]
         self.static.relaxed = config["relaxed"]
@@ -261,6 +270,8 @@ class OPFFederate(object):
                 boundary.append((u, v, a))
                 self.child_buses.append(v)
                 self.shared_buses.append(v)
+                self.switch_buses.append(u)
+                self.switch_buses.append(v)
                 self.shared_lines[u] = f"{u}_{v}"
                 self.shared_lines[v] = f"{v}_{u}"
 
@@ -268,6 +279,8 @@ class OPFFederate(object):
                 boundary.append((u, v, a))
                 self.parent_bus = u
                 self.shared_buses.append(u)
+                self.switch_buses.append(u)
+                self.switch_buses.append(v)
                 self.parent_line = f"{u}_{v}"
                 self.shared_lines[u] = f"{u}_{v}"
                 self.shared_lines[v] = f"{v}_{u}"
@@ -362,11 +375,14 @@ class OPFFederate(object):
         with open("branch_info.json", "w") as outfile:
             outfile.write(json.dumps(asdict(branch_info)))
 
+        p_err = 0
+        q_err = 0
+        v_err = 0
         p = PowersReal.parse_obj(self.sub.area_p.json)
         if p.values:
             logger.debug("Updating Area Active Power")
             p = adapter.filter_boundary_power_real(self.shared_buses, p)
-            p = adapter.update_boundary_power_real(p, self.static.name)
+            p, p_err = adapter.update_boundary_power_real(p, self.static.name)
             self.parent_info = adapter.extract_powers_real(
                 self.parent_info, p, True)
             self.child_info = adapter.extract_powers_real(
@@ -376,7 +392,7 @@ class OPFFederate(object):
         if p.values:
             logger.debug("Updating Area Reactive Power")
             q = adapter.filter_boundary_power_imag(self.shared_buses, q)
-            q = adapter.update_boundary_power_imag(q, self.static.name)
+            q, q_err = adapter.update_boundary_power_imag(q, self.static.name)
             self.parent_info = adapter.extract_powers_imag(
                 self.parent_info, q, True)
             self.child_info = adapter.extract_powers_imag(
@@ -385,8 +401,8 @@ class OPFFederate(object):
         vmag = VoltagesMagnitude.parse_obj(self.sub.area_v.json)
         if vmag.values:
             logger.debug("Updating Area Voltages")
-            vmag = adapter.filter_boundary_voltage(self.shared_buses, vmag)
-            vmag = adapter.update_boundary_voltage(self.area_v, vmag)
+            vmag = adapter.filter_boundary_voltage(self.switch_buses, vmag)
+            vmag, v_err = adapter.update_boundary_voltage(self.area_v, vmag)
             self.parent_info = adapter.extract_voltages(
                 self.parent_info, vmag)
             self.child_info = adapter.extract_voltages(
@@ -437,7 +453,7 @@ class OPFFederate(object):
 
         vmag = adapter.pack_voltages(v_mag, bus_info, t)
         self.area_v = copy.deepcopy(
-            adapter.filter_boundary_voltage(self.shared_buses, vmag))
+            adapter.filter_boundary_voltage(self.switch_buses, vmag))
 
         self.pub_admm_p.publish(self.area_p.json())
         self.pub_admm_q.publish(self.area_q.json())
@@ -453,24 +469,16 @@ class OPFFederate(object):
         self.pub_pv_set.publish(json.dumps(commands))
 
         # CAPTURE STATS FOR PUB
-        kvup = 0
-        for k, v in v_mag.items():
-            bus, phase = k.split(".", 1)
-            if bus == self.parent_bus:
-                kvup += v/1000
-        stats["vup"] = abs(bus_info.buses[self.parent_bus].kv - kvup/3)
+        stats["vup"] = v_err
+        stats["sdn"] = math.sqrt(p_err**2 + q_err**2)
+        logger.debug(f"Errors : {stats["vup"]}, {stats["sdn"]}")
 
-        sdn_real = adapter.filter_boundary_power_real(
-            self.child_buses, power_real)
-        sdn_imag = adapter.filter_boundary_power_imag(
-            self.child_buses, power_imag)
-
-        real = [power for power in sdn_real.values]
-        imag = [power for power in sdn_imag.values]
-        stats["sdn"] = 0
-        for watt, var in zip(real, imag):
-            bus, phase = k.split(".", 1)
-            stats["sdn"] += watt**2 + var**2
+        if all([v_err != 0, p_err != 0, q_err != 0]):
+            v_settled = stats["vup"] <= self.static.vup_tol
+            p_settled = stats["sdn"] <= self.static.sdn_tol
+            if v_settled and p_settled:
+                logger.debug("Converged")
+                self.converged = True
 
         solver_stats = MeasurementArray(
             ids=list(stats.keys()),
@@ -498,11 +506,12 @@ class OPFFederate(object):
 
         granted_time = 0
         logger.debug("Step 0: Starting Time/Iter loop")
-        while granted_time < h.HELICS_TIME_MAXTIME:
+        while granted_time <= self.static.t_steps:
             request_time = granted_time + update_interval
             logger.debug("Step 1: published initial values for iteration")
             itr_flag = itr_need
             self.first_pub()
+            self.converged = False
             itr = 0
             while True:
                 logger.debug(f"Step 2: Requesting time {request_time}")
@@ -512,8 +521,14 @@ class OPFFederate(object):
                 logger.info(f"\titr status = {itr_status}")
 
                 logger.debug("Step 3: checking if next step")
+
                 if itr_status == h.helics_iteration_result_next_step:
                     logger.debug(f"\titr next: {itr}")
+                    itr_flag = itr_stop
+                    break
+
+                if self.converged:
+                    logger.debug(f"\tconverged: {itr}")
                     itr_flag = itr_stop
                     break
 
@@ -525,12 +540,13 @@ class OPFFederate(object):
                 if itr >= self.static.max_itr:
                     logger.debug("\t reached max itr")
                     itr_flag = itr_stop
-                    continue
+                    break
 
                 logger.debug("Step 6: run solution solution")
                 self.itr_pub()
                 itr_flag = itr_need
 
+        logger.debug("FINISHED")
         self.stop()
 
     def stop(self) -> None:

@@ -33,7 +33,7 @@ SMART_DS = {
 MODELS = ["ieee123", "SFO/P1U", "SFO/P6U", "SFO/P9U"]
 LEVELS = ["low", "medium", "high", "extreme"]
 
-T_STEPS = 8
+T_STEPS = 2
 DELTA_T = 60*60  # minutes * seconds per hour
 
 
@@ -343,13 +343,15 @@ def generate(MODEL: str, LEVEL: str) -> None:
         link_hub_power(system, hub_power, k)
         link_hub_control(system, hub_control, k)
 
-    rho_vup = [1e5, 1e5, 1e5, 1e5, 1e5]
-    rho_sdn = [1e5, 1e5, 1e5, 1e5, 1e5]
+    rho_vup = [1e3, 1e3, 1e3, 1e3, 1e3]
+    rho_sdn = [1e3, 1e3, 1e3, 1e3, 1e3]
     for k, v in sub_areas.items():
         algo = Component(
             name=f"{ALGO}_{k}",
             type="OptimalPowerFlow",
             parameters={
+                "vup_tol": 0.01,
+                "sdn_tol": 0.01,
                 "max_itr": max_itr,
                 "number_of_timesteps": T_STEPS,
                 "deltat": DELTA_T,

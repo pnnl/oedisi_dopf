@@ -53,6 +53,7 @@ def xarray_to_powers_cart(data, **kwargs):
 class StaticConfig(object):
     name: str
     max_itr: int
+    t_steps: int
 
 
 class Subscriptions(object):
@@ -96,6 +97,7 @@ class HubFederate(object):
 
         self.static.name = config["name"]
         self.static.max_itr = config["max_itr"]
+        self.static.t_steps = config["number_of_timesteps"]
 
     def initilize(self) -> None:
         self.info = h.helicsCreateFederateInfo()
@@ -264,7 +266,7 @@ class HubFederate(object):
         logger.debug(f"update interval: {update_interval}")
         granted_time = 0
         logger.debug("Step 0: Starting Time/Itr Loops")
-        while granted_time < h.HELICS_TIME_MAXTIME:
+        while granted_time <= self.static.t_steps:
             request_time = granted_time + update_interval
             logger.debug("Step 1: published initial values for iteration")
             itr_flag = itr_need

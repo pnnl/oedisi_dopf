@@ -619,6 +619,8 @@ def go_cosim(
     h.helicsFederateFree(vfed)
     h.helicsCloseLibrary()
 
+    logger.info("FINISHED : " + str(datetime.now()))
+
 
 def run_simulator(broker_config: BrokerConfig):
     """Load static_inputs and input_mapping and run JSON."""

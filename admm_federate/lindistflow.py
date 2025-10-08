@@ -302,7 +302,10 @@ def optimal_power_flow(
     obj_Qup = 0
 
     parent = parent_pu.buses[config.source_bus]
-    vsrc = [parent.kv]*3
+    vsrc = parent.kvs
+    if all([v == 0.0 for v in vsrc]):
+        vsrc = [bus_pu.buses[config.source_bus].kv]*3
+    logger.debug(f"vup: {vsrc}")
     psrc = [pq[0] for pq in parent.pq]
     qsrc = [pq[1] for pq in parent.pq]
 
@@ -336,7 +339,7 @@ def optimal_power_flow(
 
     for key, child in child_pu.buses.items():
         child_bus_idx = child.idx
-        vdn = [child.kv]*3
+        vdn = child.kvs
         pdn = [pq[0] for pq in child.pq]
         qdn = [pq[1] for pq in child.pq]
 

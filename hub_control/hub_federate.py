@@ -47,6 +47,7 @@ def xarray_to_eqarray(data):
 
 class StaticConfig(object):
     name: str
+    t_steps: int
 
 
 class Subscriptions(object):
@@ -84,6 +85,7 @@ class EstimatorFederate(object):
             config = json.load(file)
 
         self.static.name = config["name"]
+        self.static.t_steps = config["number_of_timesteps"]
 
     def initilize(self) -> None:
         self.info = h.helicsCreateFederateInfo()
@@ -131,7 +133,7 @@ class EstimatorFederate(object):
         commands = []
         granted_time = 0
         logger.debug("Step 0: Starting Time loop")
-        while granted_time < h.HELICS_TIME_MAXTIME:
+        while granted_time <= self.static.t_steps:
             request_time = granted_time + update_interval
             logger.debug(f"Step 1: Requesting Time {request_time}")
             granted_time = h.helicsFederateRequestTime(self.fed, request_time)

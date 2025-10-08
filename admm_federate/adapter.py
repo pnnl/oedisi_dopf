@@ -66,6 +66,7 @@ class Bus:
         default_factory=lambda: np.zeros((3, 2)).tolist()
     )
     kv: float = 0.0
+    kvs: list[float] = field(default_factory=lambda: [0.0] * 3)
     pq: list[list[float]] = field(
         default_factory=lambda: np.zeros((3, 2)).tolist())
     pv: list[list[float]] = field(
@@ -132,7 +133,16 @@ def extract_voltages(bus_info: BusInfo, voltages: VoltagesMagnitude) -> dict:
         if name not in bus_info.buses:
             continue
 
-        bus_info.buses[name].kv = voltage / 1000.0
+        bus_info.buses[name].kvs[phase] = voltage / 1000.0
+
+    for k, v in bus_info.buses.items():
+        kv = 0
+        n = 0
+        for p in v.phases:
+            if p != 0:
+                n += 1
+                kv += v.kvs[p-1]
+        bus_info.buses[k].kv = kv/n
     return bus_info
 
 
@@ -207,31 +217,46 @@ def extract_forecast(bus: dict, forecast) -> dict:
     return bus
 
 
-def update_boundary_voltage(v_self: VoltagesMagnitude, v_other: VoltagesMagnitude) -> VoltagesMagnitude:
-    if len(v_self.values) == 0:
-        return v_other
+def update_boundary_voltage(v_self: VoltagesMagnitude, v_other: VoltagesMagnitude) -> (VoltagesMagnitude, float):
     self_dict = {k: v for k, v in zip(v_self.ids, v_self.values)}
     values = {}
+
+    error = 0
+    n = len(v_other.ids)
+    if n == 0:
+        n = 1
+
     for idx, (id, voltage) in enumerate(zip(v_other.ids, v_other.values)):
         if id not in self_dict.keys():
             continue
 
-        old_key = id in v_self.ids
-        old_value = round(self_dict[id], 5) == round(voltage, 5)
-        if old_value and old_key:
+        if round(self_dict[id], 5) == round(voltage, 5):
             continue
 
         if id not in values.keys():
+            logger.debug(f"update old bus: {id} from {
+                         self_dict[id]} to {voltage}")
+            error += abs(self_dict[id] - voltage)/voltage
             values[id] = voltage
+        else:
+            avg_v = (values[id] + voltage)/2
+            logger.debug(f"update bus: {id} from {values[id]} to {avg_v}")
+            values[id] += avg_v
 
     v_other.ids = values.keys()
     v_other.values = values.values()
-    return v_other
+    return v_other, error/n
 
 
-def update_boundary_power_real(p_other: PowersReal, area: str) -> PowersReal:
+def update_boundary_power_real(p_other: PowersReal, area: str) -> (PowersReal, float):
     values = {}
     eqids = {}
+
+    error = 0
+    n = len(p_other.ids)
+    if n == 0:
+        n = 1
+
     old = {}
     for idx, (id, eq, power) in enumerate(zip(p_other.ids, p_other.equipment_ids, p_other.values)):
         if area in eq:
@@ -243,19 +268,26 @@ def update_boundary_power_real(p_other: PowersReal, area: str) -> PowersReal:
 
         if id not in values.keys():
             logger.debug(f"update old bus: {id} from {old[id]} to {power}")
+            error += abs(old[id] - power)/power
             values[id] = power
             eqids[id] = eq
 
     p_other.ids = values.keys()
     p_other.equipment_ids = eqids.values()
     p_other.values = values.values()
-    return p_other
+    return p_other, error/n
 
 
-def update_boundary_power_imag(p_other: PowersImaginary, area: str) -> PowersImaginary:
+def update_boundary_power_imag(p_other: PowersImaginary, area: str) -> (PowersImaginary, float):
     values = {}
     eqids = {}
     old = {}
+
+    error = 0
+    n = len(p_other.ids)
+    if n == 0:
+        n = 1
+
     for idx, (id, eq, power) in enumerate(zip(p_other.ids, p_other.equipment_ids, p_other.values)):
         if area in eq:
             old[id] = power
@@ -265,13 +297,14 @@ def update_boundary_power_imag(p_other: PowersImaginary, area: str) -> PowersIma
             continue
 
         if id not in values.keys():
+            error += abs(old[id] - power)/power
             values[id] = power
             eqids[id] = eq
 
     p_other.ids = values.keys()
     p_other.equipment_ids = eqids.values()
     p_other.values = values.values()
-    return p_other
+    return p_other, error/n
 
 
 def filter_boundary_voltage(shared: list[str], voltages: VoltagesMagnitude) -> VoltagesMagnitude:
