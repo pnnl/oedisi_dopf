@@ -379,7 +379,7 @@ class OPFFederate(object):
         q_err = 0
         v_err = 0
         p = PowersReal.parse_obj(self.sub.area_p.json)
-        if p.values:
+        if p.values and self.area_p.values:
             logger.debug("Updating Area Active Power")
             p = adapter.filter_boundary_power_real(self.shared_buses, p)
             p, p_err = adapter.update_boundary_power_real(p, self.static.name)
@@ -389,7 +389,7 @@ class OPFFederate(object):
                 self.child_info, p, True)
 
         q = PowersImaginary.parse_obj(self.sub.area_q.json)
-        if p.values:
+        if p.values and self.area_q.values:
             logger.debug("Updating Area Reactive Power")
             q = adapter.filter_boundary_power_imag(self.shared_buses, q)
             q, q_err = adapter.update_boundary_power_imag(q, self.static.name)
@@ -399,7 +399,7 @@ class OPFFederate(object):
                 self.child_info, q, True)
 
         vmag = VoltagesMagnitude.parse_obj(self.sub.area_v.json)
-        if vmag.values:
+        if vmag.values and self.area_v.values:
             logger.debug("Updating Area Voltages")
             vmag = adapter.filter_boundary_voltage(self.switch_buses, vmag)
             vmag, v_err = adapter.update_boundary_voltage(self.area_v, vmag)
@@ -469,6 +469,7 @@ class OPFFederate(object):
         self.pub_pv_set.publish(json.dumps(commands))
 
         # CAPTURE STATS FOR PUB
+        stats["admm_iteration"] = self.itr
         stats["vup"] = v_err
         stats["sdn"] = math.sqrt(p_err**2 + q_err**2)
         logger.debug(f"Errors : {stats["vup"]}, {stats["sdn"]}")
@@ -512,7 +513,7 @@ class OPFFederate(object):
             itr_flag = itr_need
             self.first_pub()
             self.converged = False
-            itr = 0
+            self.itr = 0
             while True:
                 logger.debug(f"Step 2: Requesting time {request_time}")
                 granted_time, itr_status = h.helicsFederateRequestTimeIterative(
@@ -523,21 +524,21 @@ class OPFFederate(object):
                 logger.debug("Step 3: checking if next step")
 
                 if itr_status == h.helics_iteration_result_next_step:
-                    logger.debug(f"\titr next: {itr}")
+                    logger.debug(f"\titr next: {self.itr}")
                     itr_flag = itr_stop
                     break
 
                 if self.converged:
-                    logger.debug(f"\tconverged: {itr}")
+                    logger.debug(f"\tconverged: {self.itr}")
                     itr_flag = itr_stop
                     break
 
-                itr += 1
+                self.itr += 1
                 logger.debug("Step 4: update iteration")
-                logger.info(f"\titr: {itr}")
+                logger.info(f"\titr: {self.itr}")
 
                 logger.debug("Step 5: checking max itr count")
-                if itr >= self.static.max_itr:
+                if self.itr >= self.static.max_itr:
                     logger.debug("\t reached max itr")
                     itr_flag = itr_stop
                     break

@@ -33,7 +33,7 @@ SMART_DS = {
 MODELS = ["ieee123", "SFO/P1U", "SFO/P6U", "SFO/P9U"]
 LEVELS = ["low", "medium", "high", "extreme"]
 
-T_STEPS = 2
+T_STEPS = 24
 DELTA_T = 60*60  # minutes * seconds per hour
 
 
@@ -62,7 +62,7 @@ def generate_feeder(MODEL: str, LEVEL: str, OUTPUTS: str) -> Component:
             "profile_location": profiles,
             "opendss_location": opendss,
             "feeder_file": file,
-            "start_date": "2018-05-01 08:00:00",
+            "start_date": "2018-05-01 00:00:00",
             "number_of_timesteps": T_STEPS,
             "run_freq_sec": DELTA_T,
             "topology_output": f"{OUTPUTS}/topology.json",

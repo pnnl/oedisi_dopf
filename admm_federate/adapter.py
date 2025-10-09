@@ -267,10 +267,11 @@ def update_boundary_power_real(p_other: PowersReal, area: str) -> (PowersReal, f
             continue
 
         if id not in values.keys():
-            logger.debug(f"update old bus: {id} from {old[id]} to {power}")
-            error += abs(old[id] - power)/power
             values[id] = power
             eqids[id] = eq
+            if id in old.keys():
+                logger.debug(f"update old bus: {id} from {old[id]} to {power}")
+                error += abs(old[id] - power)/power
 
     p_other.ids = values.keys()
     p_other.equipment_ids = eqids.values()
@@ -297,9 +298,11 @@ def update_boundary_power_imag(p_other: PowersImaginary, area: str) -> (PowersIm
             continue
 
         if id not in values.keys():
-            error += abs(old[id] - power)/power
             values[id] = power
             eqids[id] = eq
+            if id in old.keys():
+                # logger.debug(f"update old bus: {id} from {old[id]} to {power}")
+                error += abs(old[id] - power)/power
 
     p_other.ids = values.keys()
     p_other.equipment_ids = eqids.values()
