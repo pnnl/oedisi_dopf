@@ -1,0 +1,32 @@
+FROM python:3.12.6-slim-bullseye
+USER root
+ARG MODEL
+RUN apt-get update && apt-get install -y git ssh
+RUN mkdir -p /root/.ssh
+
+# Libraries specifically required for Mac machines
+RUN apt update && apt install -y \
+  libboost-dev \
+  libboost-filesystem-dev \
+  libboost-program-options-dev \
+  libboost-test-dev \
+  libzmq5-dev python3-dev \
+  libopenblas-dev \
+  build-essential swig cmake git
+
+WORKDIR /simulation
+COPY requirements.txt requirements.txt
+RUN pip install -r requirements.txt
+
+COPY outputs/lindistflow/$MODEL outputs/lindistflow/$MODEL
+COPY feeder_federate feeder_federate
+COPY admm_federate admm_federate
+COPY recorder_federate recorder_federate
+COPY hub_voltage hub_voltage
+COPY hub_power hub_power
+COPY hub_control hub_control
+COPY generate_admm.py .
+COPY workflow_admm.ipynb .
+RUN python3 generate_admm.py $MODEL
+EXPOSE 8888
+ENTRYPOINT ["jupyter", "notebook", "--allow-root", "--ip=0.0.0.0", "--no-browser"] 
