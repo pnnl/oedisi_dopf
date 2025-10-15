@@ -7,7 +7,8 @@ from dataclasses import asdict
 from oedisi.types.data_types import (
     MeasurementArray,
     EquipmentNodeArray,
-    CommandList
+    CommandList,
+    Command
 )
 import xarray as xr
 import numpy as np
@@ -46,14 +47,15 @@ def xarray_to_eqarray(data):
 
 class StaticConfig(object):
     name: str
+    t_steps: int
 
 
 class Subscriptions(object):
-    area_c0: CommandList
-    area_c1: CommandList
-    area_c2: CommandList
-    area_c3: CommandList
-    area_c4: CommandList
+    c0: CommandList
+    c1: CommandList
+    c2: CommandList
+    c3: CommandList
+    c4: CommandList
 
 
 class EstimatorFederate(object):
@@ -83,6 +85,7 @@ class EstimatorFederate(object):
             config = json.load(file)
 
         self.static.name = config["name"]
+        self.static.t_steps = config["number_of_timesteps"]
 
     def initilize(self) -> None:
         self.info = h.helicsCreateFederateInfo()
@@ -90,27 +93,27 @@ class EstimatorFederate(object):
         self.info.core_type = h.HELICS_CORE_TYPE_ZMQ
         self.info.core_init = "--federates=1"
 
-        h.helicsFederateInfoSetTimeProperty(
-            self.info, h.helics_property_time_delta, self.static.deltat
-        )
-
+        # h.helicsFederateInfoSetTimeProperty(self.info, h.helics_property_time_delta, 0.01)
         self.fed = h.helicsCreateValueFederate(self.static.name, self.info)
+        # h.helicsFederateSetFlagOption(self.fed, h.helics_flag_slow_responding, True)
+        h.helicsFederateSetTimeProperty(
+            self.fed, h.HELICS_PROPERTY_TIME_PERIOD, 1)
 
     def register_subscription(self) -> None:
-        self.sub.area_c0 = self.fed.register_subscription(
-            self.inputs["area_c0"], ""
+        self.sub.c0 = self.fed.register_subscription(
+            self.inputs["sub_c0"], ""
         )
-        self.sub.area_c1 = self.fed.register_subscription(
-            self.inputs["area_c1"], ""
+        self.sub.c1 = self.fed.register_subscription(
+            self.inputs["sub_c1"], ""
         )
-        self.sub.area_c2 = self.fed.register_subscription(
-            self.inputs["area_c2"], ""
+        self.sub.c2 = self.fed.register_subscription(
+            self.inputs["sub_c2"], ""
         )
-        self.sub.area_c3 = self.fed.register_subscription(
-            self.inputs["area_c3"], ""
+        self.sub.c3 = self.fed.register_subscription(
+            self.inputs["sub_c3"], ""
         )
-        self.sub.area_c4 = self.fed.register_subscription(
-            self.inputs["area_c4"], ""
+        self.sub.c4 = self.fed.register_subscription(
+            self.inputs["sub_c4"], ""
         )
 
     def register_publication(self) -> None:
@@ -119,48 +122,64 @@ class EstimatorFederate(object):
 
     def run(self) -> None:
         logger.info(f"Federate connected: {datetime.now()}")
-        self.fed.enter_executing_mode()
-        granted_time = h.helicsFederateRequestTime(
-            self.fed, h.HELICS_TIME_MAXTIME)
+        h.helicsFederateEnterExecutingMode(self.fed)
+        logger.info(f"Federate executing: {datetime.now()}")
 
-        while granted_time < h.HELICS_TIME_MAXTIME:
-            # each published voltage is sent to all areas immediatly because
-            # some areas may be waiting on their neighbors input to run
-            if self.sub.area_c0.is_updated():
-                c = CommandList.parse_obj(
-                    self.sub.area_c0.json
-                )
-                self.pub_pv_set.publish(c.json())
+        # setting up time properties
+        update_interval = h.helicsFederateGetTimeProperty(
+            self.fed, h.HELICS_PROPERTY_TIME_PERIOD)
+        logger.debug(f"update interval: {update_interval}")
 
-            if self.sub.area_c1.is_updated():
-                c = CommandList.parse_obj(
-                    self.sub.area_c1.json
-                )
-                self.pub_pv_set.publish(c.json())
+        commands = []
+        granted_time = 0
+        logger.debug("Step 0: Starting Time loop")
+        while granted_time <= self.static.t_steps:
+            request_time = granted_time + update_interval
+            logger.debug(f"Step 1: Requesting Time {request_time}")
+            granted_time = h.helicsFederateRequestTime(self.fed, request_time)
+            logger.debug(f"\tgranted time = {granted_time}")
 
-            if self.sub.area_c2.is_updated():
-                c = CommandList.parse_obj(
-                    self.sub.area_c2.json
-                )
-                self.pub_pv_set.publish(c.json())
+            logger.debug("Step 2: collect all commands")
+            commands = []
+            if self.sub.c0.is_updated():
+                logger.debug("\tarea 1: updated")
+                control = self.sub.c0.json
+                logger.debug(control)
+                for c in control:
+                    commands.append(c)
 
-            if self.sub.area_c3.is_updated():
-                c = CommandList.parse_obj(
-                    self.sub.area_c3.json
-                )
-                self.pub_pv_set.publish(c.json())
+            if self.sub.c1.is_updated():
+                logger.debug("\tarea 2: updated")
+                control = self.sub.c1.json
+                logger.debug(control)
+                for c in control:
+                    commands.append(c)
 
-            if self.sub.area_c4.is_updated():
-                c = CommandList.parse_obj(
-                    self.sub.area_c4.json
-                )
-                self.pub_pv_set.publish(c.json())
+            if self.sub.c2.is_updated():
+                logger.debug("\tarea 3: updated")
+                control = self.sub.c2.json
+                logger.debug(control)
+                for c in control:
+                    commands.append(c)
 
-            if self.sub.area_c5.is_updated():
-                c = CommandList.parse_obj(
-                    self.sub.area_c5.json
-                )
-                self.pub_pv_set.publish(c.json())
+            if self.sub.c3.is_updated():
+                logger.debug("\tarea 4: updated")
+                control = self.sub.c3.json
+                logger.debug(control)
+                for c in control:
+                    commands.append(c)
+
+            if self.sub.c4.is_updated():
+                logger.debug("\tarea 5: updated")
+                control = self.sub.c4.json
+                logger.debug(control)
+                for c in control:
+                    commands.append(c)
+            logger.debug("Step 3: Commands collected")
+            logger.info(commands)
+
+            logger.debug("Step 4: Publishing commands")
+            self.pub_commands.publish(json.dumps(commands))
 
         self.stop()
 

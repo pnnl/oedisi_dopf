@@ -6,9 +6,9 @@ authors = [
     {name = "Tylores",email = "tylor.slay@gmail.com"}
 ]
 readme = "README.md"
-requires-python = "^3.11"
+requires-python = "<3.14, >=3.11"
 dependencies = [
-    "tsgm",
+    "sdv>=1.27.0",
     "jupyter",
     "seaborn",
     "matplotlib",

@@ -56,14 +56,16 @@ def xarray_to_powers_cart(data, **kwargs):
 
 class StaticConfig(object):
     name: str
+    max_itr: int
+    t_steps: int
 
 
 class Subscriptions(object):
-    area_v0: VoltagesMagnitude
-    area_v1: VoltagesMagnitude
-    area_v2: VoltagesMagnitude
-    area_v3: VoltagesMagnitude
-    area_v4: VoltagesMagnitude
+    v0: VoltagesMagnitude
+    v1: VoltagesMagnitude
+    v2: VoltagesMagnitude
+    v3: VoltagesMagnitude
+    v4: VoltagesMagnitude
 
 
 class EstimatorFederate(object):
@@ -93,11 +95,8 @@ class EstimatorFederate(object):
             config = json.load(file)
 
         self.static.name = config["name"]
-        self.static.tol = config["tol"]
-        self.static.v_sigma = config["v_sigma"]
-        self.static.l_sigma = config["l_sigma"]
-        self.static.i_sigma = config["i_sigma"]
-        self.static.deltat = config["deltat"]
+        self.static.max_itr = config["max_itr"]
+        self.static.t_steps = config["number_of_timesteps"]
 
     def initilize(self) -> None:
         self.info = h.helicsCreateFederateInfo()
@@ -105,94 +104,126 @@ class EstimatorFederate(object):
         self.info.core_type = h.HELICS_CORE_TYPE_ZMQ
         self.info.core_init = "--federates=1"
 
-        h.helicsFederateInfoSetTimeProperty(
-            self.info, h.helics_property_time_delta, self.static.deltat
-        )
-
+        # h.helicsFederateInfoSetTimeProperty(self.info, h.helics_property_time_delta, 0.01)
         self.fed = h.helicsCreateValueFederate(self.static.name, self.info)
+        # h.helicsFederateSetFlagOption(self.fed, h.helics_flag_slow_responding, True)
+        h.helicsFederateSetTimeProperty(
+            self.fed, h.HELICS_PROPERTY_TIME_PERIOD, 1)
 
     def register_subscription(self) -> None:
-        self.sub.area_v0 = self.fed.register_subscription(
-            self.inputs["area_v0"], ""
+        self.sub.v0 = self.fed.register_subscription(
+            self.inputs["sub_v0"], ""
         )
-        self.sub.area_v1 = self.fed.register_subscription(
-            self.inputs["area_v1"], ""
+        self.sub.v1 = self.fed.register_subscription(
+            self.inputs["sub_v1"], ""
         )
-        self.sub.area_v2 = self.fed.register_subscription(
-            self.inputs["area_v2"], ""
+        self.sub.v2 = self.fed.register_subscription(
+            self.inputs["sub_v2"], ""
         )
-        self.sub.area_v3 = self.fed.register_subscription(
-            self.inputs["area_v3"], ""
+        self.sub.v3 = self.fed.register_subscription(
+            self.inputs["sub_v3"], ""
         )
-        self.sub.area_v4 = self.fed.register_subscription(
-            self.inputs["area_v4"], ""
+        self.sub.v4 = self.fed.register_subscription(
+            self.inputs["sub_v4"], ""
         )
 
     def register_publication(self) -> None:
-        self.pub_commands = self.fed.register_publication(
-            "pv_set", h.HELICS_DATA_TYPE_STRING, "")
         self.pub_area_voltages = []
         for i in range(6):
             self.pub_area_voltages.append(self.fed.register_publication(
-                f"area_v{i}", h.HELICS_DATA_TYPE_STRING, "")
+                f"pub_v{i}", h.HELICS_DATA_TYPE_STRING, "")
             )
+
+    def publish_all(self):
+        all_v = VoltagesMagnitude(ids=[], values=[], time=0)
+        if self.sub.v0.is_updated():
+            logger.debug("area 1 updated")
+            v = VoltagesMagnitude.parse_obj(self.sub.v0.json)
+            logger.debug(v)
+            all_v.time = v.time
+            all_v.values += v.values
+            all_v.ids += v.ids
+
+        if self.sub.v1.is_updated():
+            logger.debug("area 2 updated")
+            v = VoltagesMagnitude.parse_obj(self.sub.v1.json)
+            logger.debug(v)
+            all_v.time = v.time
+            all_v.values += v.values
+            all_v.ids += v.ids
+
+        if self.sub.v2.is_updated():
+            logger.debug("area 3 updated")
+            v = VoltagesMagnitude.parse_obj(self.sub.v2.json)
+            logger.debug(v)
+            all_v.time = v.time
+            all_v.values += v.values
+            all_v.ids += v.ids
+
+        if self.sub.v3.is_updated():
+            logger.debug("area 4 updated")
+            v = VoltagesMagnitude.parse_obj(self.sub.v3.json)
+            logger.debug(v)
+            all_v.time = v.time
+            all_v.values += v.values
+            all_v.ids += v.ids
+
+        if self.sub.v4.is_updated():
+            logger.debug("area 5 updated")
+            v = VoltagesMagnitude.parse_obj(self.sub.v4.json)
+            logger.debug(v)
+            all_v.time = v.time
+            all_v.values += v.values
+            all_v.ids += v.ids
+
+        logger.debug(all_v)
+        for area in range(6):
+            self.pub_area_voltages[area].publish(all_v.json())
 
     def run(self) -> None:
         logger.info(f"Federate connected: {datetime.now()}")
-        self.fed.enter_executing_mode()
-        granted_time = h.helicsFederateRequestTime(
-            self.fed, h.HELICS_TIME_MAXTIME)
+        itr_need = h.helics_iteration_request_iterate_if_needed
+        itr_stop = h.helics_iteration_request_no_iteration
+        h.helicsFederateEnterExecutingMode(self.fed)
 
-        while granted_time < h.HELICS_TIME_MAXTIME:
-            # each published voltage is sent to all areas immediatly because
-            # some areas may be waiting on their neighbors input to run
-            if self.sub.area_v0.is_updated():
-                v = VoltagesMagnitude.parse_obj(
-                    self.sub.area_v0.json
-                )
+        # setting up time properties
+        update_interval = int(h.helicsFederateGetTimeProperty(
+            self.fed, h.HELICS_PROPERTY_TIME_PERIOD))
 
-                for area in range(6):
-                    self.pub_area_voltages[area].publish(v.json())
+        granted_time = 0
+        logger.debug("Step 0: Starting Time/Itr Loop")
+        while granted_time <= self.static.t_steps:
+            request_time = granted_time + update_interval
+            logger.debug("Step 1: Publishing initial values")
+            itr_flag = itr_need
+            self.publish_all()
+            itr = 0
+            while True:
+                logger.debug(f"Step 2: Requesting time {request_time}")
+                granted_time, itr_status = h.helicsFederateRequestTimeIterative(
+                    self.fed, request_time, itr_flag)
+                logger.debug(f"\tgranted time = {granted_time}")
+                logger.debug(f"\titr status = {itr_status}")
 
-            if self.sub.area_v1.is_updated():
-                v = VoltagesMagnitude.parse_obj(
-                    self.sub.area_v1.json
-                )
+                logger.debug("Step 3: checking if next step")
+                if itr_status == h.helics_iteration_result_next_step:
+                    logger.debug(f"\titr next = {itr}")
+                    itr_flag = itr_stop
+                    break
 
-                for area in range(6):
-                    self.pub_area_voltages[area].publish(v.json())
+                logger.debug("Step 4: update iteration")
+                itr += 1
+                logger.info(f"\titr: {itr}")
 
-            if self.sub.area_v2.is_updated():
-                v = VoltagesMagnitude.parse_obj(
-                    self.sub.area_v2.json
-                )
+                logger.debug("Step 5: checking max itr count")
+                if itr >= self.static.max_itr:
+                    logger.debug("\t reached max itr")
+                    itr_flag = itr_stop
+                    continue
 
-                for area in range(6):
-                    self.pub_area_voltages[area].publish(v.json())
-
-            if self.sub.area_v3.is_updated():
-                v = VoltagesMagnitude.parse_obj(
-                    self.sub.area_v3.json
-                )
-
-                for area in range(6):
-                    self.pub_area_voltages[area].publish(v.json())
-
-            if self.sub.area_v4.is_updated():
-                v = VoltagesMagnitude.parse_obj(
-                    self.sub.area_v4.json
-                )
-
-                for area in range(6):
-                    self.pub_area_voltages[area].publish(v.json())
-
-            if self.sub.area_v5.is_updated():
-                v = VoltagesMagnitude.parse_obj(
-                    self.sub.area_v5.json
-                )
-
-                for area in range(6):
-                    self.pub_area_voltages[area].publish(v.json())
+                logger.debug("Step 6: publish all values")
+                self.publish_all()
+                itr_flag = itr_need
 
         self.stop()
 

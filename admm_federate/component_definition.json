@@ -12,6 +12,10 @@
         },
         {
             "type": "",
+            "port_id": "max_itr"
+        },
+        {
+            "type": "",
             "port_id": "control_type"
         },
         {
@@ -25,6 +29,22 @@
         {
             "type": "",
             "port_id": "relaxed"
+        },
+        {
+            "type": "",
+            "port_id": "rho_vup"
+        },
+        {
+            "type": "",
+            "port_id": "rho_sup"
+        },
+        {
+            "type": "",
+            "port_id": "rho_vdn"
+        },
+        {
+            "type": "",
+            "port_id": "rho_sdn"
         }
     ],
     "dynamic_inputs": [
@@ -46,10 +66,6 @@
         },
         {
             "type": "PowersReal",
-            "port_id": "available_power"
-        },
-        {
-            "type": "PowersReal",
             "port_id": "power_real"
         },
         {
@@ -57,20 +73,16 @@
             "port_id": "power_imag"
         },
         {
-            "type": "",
-            "port_id": "pv_forecast"
-        },
-        {
             "type": "PowersReal",
-            "port_id": "area_p"
+            "port_id": "sub_p"
         },
         {
             "type": "PowersImaginary",
-            "port_id": "area_q"
+            "port_id": "sub_q"
         },
         {
             "type": "VoltagesMagnitude",
-            "port_id": "area_v"
+            "port_id": "sub_v"
         }
     ],
     "dynamic_outputs": [
@@ -100,19 +112,19 @@
         },
         {
             "type": "PowersReal",
-            "port_id": "area_p"
+            "port_id": "pub_p"
         },
         {
             "type": "PowersImaginary",
-            "port_id": "area_q"
+            "port_id": "pub_q"
         },
         {
             "type": "VoltagesMagnitude",
-            "port_id": "area_v"
+            "port_id": "pub_v"
         },
         {
             "type": "CommandList",
-            "port_id": "area_c"
+            "port_id": "pub_c"
         }
     ]
 }

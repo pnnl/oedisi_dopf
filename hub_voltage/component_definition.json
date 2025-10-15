@@ -1,19 +1,64 @@
 {
     "directory": "hub_voltage",
     "execute_function": "python hub_federate.py",
-    "static_inputs": [],
+    "static_inputs": [
+        {
+            "type": "",
+            "port_id": "max_itr"
+        }
+    ],
     "dynamic_inputs": [
-        {"type": "VoltagesMagnitude", "port_id":"area_v0", "optional": true},
-        {"type": "VoltagesMagnitude", "port_id":"area_v1", "optional": true},
-        {"type": "VoltagesMagnitude", "port_id":"area_v2", "optional": true},
-        {"type": "VoltagesMagnitude", "port_id":"area_v3", "optional": true},
-        {"type": "VoltagesMagnitude", "port_id":"area_v4", "optional": true}
+        {
+            "type": "VoltagesMagnitude",
+            "port_id": "sub_v0",
+            "optional": true
+        },
+        {
+            "type": "VoltagesMagnitude",
+            "port_id": "sub_v1",
+            "optional": true
+        },
+        {
+            "type": "VoltagesMagnitude",
+            "port_id": "sub_v2",
+            "optional": true
+        },
+        {
+            "type": "VoltagesMagnitude",
+            "port_id": "sub_v3",
+            "optional": true
+        },
+        {
+            "type": "VoltagesMagnitude",
+            "port_id": "sub_v4",
+            "optional": true
+        }
     ],
     "dynamic_outputs": [
-        {"type": "VoltagesMagnitude", "port_id":"area_v0", "optional": true},
-        {"type": "VoltagesMagnitude", "port_id":"area_v1", "optional": true},
-        {"type": "VoltagesMagnitude", "port_id":"area_v2", "optional": true},
-        {"type": "VoltagesMagnitude", "port_id":"area_v3", "optional": true},
-        {"type": "VoltagesMagnitude", "port_id":"area_v4", "optional": true}
+        {
+            "type": "VoltagesMagnitude",
+            "port_id": "pub_v0",
+            "optional": true
+        },
+        {
+            "type": "VoltagesMagnitude",
+            "port_id": "pub_v1",
+            "optional": true
+        },
+        {
+            "type": "VoltagesMagnitude",
+            "port_id": "pub_v2",
+            "optional": true
+        },
+        {
+            "type": "VoltagesMagnitude",
+            "port_id": "pub_v3",
+            "optional": true
+        },
+        {
+            "type": "VoltagesMagnitude",
+            "port_id": "pub_v4",
+            "optional": true
+        }
     ]
 }

@@ -1,29 +1,114 @@
 {
     "directory": "hub_power",
     "execute_function": "python hub_federate.py",
-    "static_inputs": [],
+    "static_inputs": [
+        {
+            "type": "",
+            "port_id": "max_itr"
+        }
+    ],
     "dynamic_inputs": [
-        {"type": "PowersReal", "port_id":"area_p0", "optional": true},
-        {"type": "PowersReal", "port_id":"area_p1", "optional": true},
-        {"type": "PowersReal", "port_id":"area_p2", "optional": true},
-        {"type": "PowersReal", "port_id":"area_p3", "optional": true},
-        {"type": "PowersReal", "port_id":"area_p4", "optional": true},
-        {"type": "PowersImaginary", "port_id":"area_q0", "optional": true},
-        {"type": "PowersImaginary", "port_id":"area_q1", "optional": true},
-        {"type": "PowersImaginary", "port_id":"area_q2", "optional": true},
-        {"type": "PowersImaginary", "port_id":"area_q3", "optional": true},
-        {"type": "PowersImaginary", "port_id":"area_q4", "optional": true},
+        {
+            "type": "PowersReal",
+            "port_id": "sub_p0",
+            "optional": true
+        },
+        {
+            "type": "PowersReal",
+            "port_id": "sub_p1",
+            "optional": true
+        },
+        {
+            "type": "PowersReal",
+            "port_id": "sub_p2",
+            "optional": true
+        },
+        {
+            "type": "PowersReal",
+            "port_id": "sub_p3",
+            "optional": true
+        },
+        {
+            "type": "PowersReal",
+            "port_id": "sub_p4",
+            "optional": true
+        },
+        {
+            "type": "PowersImaginary",
+            "port_id": "sub_q0",
+            "optional": true
+        },
+        {
+            "type": "PowersImaginary",
+            "port_id": "sub_q1",
+            "optional": true
+        },
+        {
+            "type": "PowersImaginary",
+            "port_id": "sub_q2",
+            "optional": true
+        },
+        {
+            "type": "PowersImaginary",
+            "port_id": "sub_q3",
+            "optional": true
+        },
+        {
+            "type": "PowersImaginary",
+            "port_id": "sub_q4",
+            "optional": true
+        }
     ],
     "dynamic_outputs": [
-        {"type": "PowersReal", "port_id":"area_p0", "optional": true},
-        {"type": "PowersReal", "port_id":"area_p1", "optional": true},
-        {"type": "PowersReal", "port_id":"area_p2", "optional": true},
-        {"type": "PowersReal", "port_id":"area_p3", "optional": true},
-        {"type": "PowersReal", "port_id":"area_p4", "optional": true},
-        {"type": "PowersImaginary", "port_id":"area_q0", "optional": true},
-        {"type": "PowersImaginary", "port_id":"area_q1", "optional": true},
-        {"type": "PowersImaginary", "port_id":"area_q2", "optional": true},
-        {"type": "PowersImaginary", "port_id":"area_q3", "optional": true},
-        {"type": "PowersImaginary", "port_id":"area_q4", "optional": true},
+        {
+            "type": "PowersReal",
+            "port_id": "pub_p0",
+            "optional": true
+        },
+        {
+            "type": "PowersReal",
+            "port_id": "pub_p1",
+            "optional": true
+        },
+        {
+            "type": "PowersReal",
+            "port_id": "pub_p2",
+            "optional": true
+        },
+        {
+            "type": "PowersReal",
+            "port_id": "pub_p3",
+            "optional": true
+        },
+        {
+            "type": "PowersReal",
+            "port_id": "pub_p4",
+            "optional": true
+        },
+        {
+            "type": "PowersImaginary",
+            "port_id": "pub_q0",
+            "optional": true
+        },
+        {
+            "type": "PowersImaginary",
+            "port_id": "pub_q1",
+            "optional": true
+        },
+        {
+            "type": "PowersImaginary",
+            "port_id": "pub_q2",
+            "optional": true
+        },
+        {
+            "type": "PowersImaginary",
+            "port_id": "pub_q3",
+            "optional": true
+        },
+        {
+            "type": "PowersImaginary",
+            "port_id": "pub_q4",
+            "optional": true
+        }
     ]
 }
