@@ -244,10 +244,12 @@ def anon_lines(replace: dict) -> dict:
 
 
 def anon_loadshapes(replace: dict) -> dict:
+    cnt = 0
     for name in dss.LoadShape.AllNames():
         old_name = f"Loadshape.{name}"
-        new_name = f"Loadshape.{dp_randomized_response(
-            name, dss.LoadShape.AllNames())}"
+        new_name = f"Loadshape.profile_{cnt}"
+        cnt += 1
+
         _, anon = new_name.split(".", 1)
         replace[old_name] = new_name
         replace[f"Yearly={name}"] = f"Yearly={anon}"
@@ -303,9 +305,9 @@ if __name__ == "__main__":
     args = parser.parse_args()
     dss_folder = init_paths(args)
     init_opendss(dss_folder)
+    exit()
 
     # reload model to make sure names align
-    init_opendss(dss_folder)
     anon_names = anon_loadshapes({})
     anon_names = anon_caps(anon_names)
     anon_names = anon_loads(anon_names)
