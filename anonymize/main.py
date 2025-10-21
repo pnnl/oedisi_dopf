@@ -14,26 +14,55 @@ import opendssdirect as dss
 import uuid
 import random
 import hashlib
-from pathlib import Path
 import argparse
 
 
-def init_paths(args):
-    if not os.path.exists(args.input):
+def init_paths(args) -> str:
+    input = os.path.abspath(f"{args.data}/opendss")
+    if not os.path.exists(input):
         print("data location doesn't exist")
         exit()
 
-    output = os.path.abspath(f"{args.output}/{args.model}")
-    os.makedirs(output, exist_ok=True)
-    return output
+    return input
 
 
-def init_opendss(args):
-    os.chdir(os.path.abspath(args.input))
+def init_opendss(path: str):
+    os.chdir(path)
 
     dss.Text.Command("Clear")
     dss.Text.Command("Redirect master.dss")
     dss.Text.Command('Solve')
+
+
+def clear_folder(folder_path: str):
+    if not os.path.isdir(folder_path):
+        print(f"Error: '{folder_path}' is not a valid directory.")
+        return
+
+    for item in os.listdir(folder_path):
+        item_path = os.path.join(folder_path, item)
+        if os.path.isfile(item_path):
+            os.remove(item_path)
+            print(f"Removed file: {item_path}")
+
+
+def replace_in_file(filepath: str, old_string: str, new_string: str):
+    try:
+        # Read the entire content of the file
+        with open(filepath, 'r') as file:
+            file_content = file.read()
+
+        # Perform the replacement
+        modified_content = file_content.replace(old_string, new_string)
+
+        # Write the modified content back to the file
+        with open(filepath, 'w') as file:
+            file.write(modified_content)
+
+    except FileNotFoundError:
+        print(f"Error: File not found at '{filepath}'.")
+    except Exception as e:
+        print(f"An error occurred: {e}")
 
 
 def anonymize_name(original_names):
@@ -74,18 +103,33 @@ def write_dss_from_dataframe_auto(df, filename, object_type, object_name_column)
             for property_name in property_columns:
                 value = row[property_name]
                 f.write(f"{property_name}={value} ")
-            f.write(";\n")
+            f.write("\n")
 
 
-def create_master(path, **dss_files):
-    master_path = f"{output}/master.dss"
+def create_master(path: str, **dss_files):
+    master_path = f"{path}/master.dss"
+    circuit = dss.Circuit.Name()
 
     with open(master_path, 'w') as f:
         f.write("Clear\n")
         f.write(
-            "New Circuit.ieee123 basekv=4.16 Bus1=150 pu=1.00 R1=0 X1=0.0001 R0=0 X0=0.0001\n")
+            f"New Circuit.{circuit} basekv=4.16 Bus1=150 pu=1.00 R1=0 X1=0.0001 R0=0 X0=0.0001\n")
+
         for label, filename in dss_files.items():
             f.write(f"Redirect {filename}\n")
+
+
+def rename_loads(path: str):
+    for name in dss.Loads.AllNames():
+        old_name = f"Load.{name}"
+        new_name = f"Load.{name}NEW"
+        for item in os.listdir(path):
+            item_path = os.path.join(path, item)
+            if os.path.isfile(item_path):
+                os.remove(item_path)
+                print(f"Removed file: {item_path}")
+
+        replace_in_file()
 
 
 '''
@@ -97,16 +141,10 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(
         description="Anonymize OpenDSS data.")
     parser.add_argument(
-        "--model", help="model name: ieee123, SFO-P1U, ...")
-    parser.add_argument(
-        "--input", help="model path: ./opendss/master.dss")
-    parser.add_argument(
-        "--output", help="new model path: ./anon/opendss/")
+        "--data", help="path to folder that containes the models opendss folder e.g ./private_data")
     args = parser.parse_args()
-    feeder_name = args.model
-    input = args.input
-    output = init_paths(args)
-    init_opendss(args)
+    data = init_paths(args)
+    init_opendss(data)
 
     '''-----Gather Load data----'''
     df_load = dss.utils.loads_to_dataframe()
@@ -313,17 +351,20 @@ if __name__ == "__main__":
 
     ''' ---Converting dataframe back to .dss ---'''
 
-    write_dss_from_dataframe_auto(df_pv, f"{output}/PV.dss", "PV", "Name")
+    clear_folder(data)
+
     write_dss_from_dataframe_auto(
-        df_load, f"{output}/Load.dss", "Load", "Name")
+        df_pv, f"{data}/PVSystem.dss", "PVSystem", "Name")
     write_dss_from_dataframe_auto(
-        df_transformer, f"{output}/Transformer.dss", "Transformer", "Name")
+        df_load, f"{data}/Load.dss", "Load", "Name")
     write_dss_from_dataframe_auto(
-        df_line, f"{output}/Line.dss", "Line", "Name")
+        df_transformer, f"{data}/Transformer.dss", "Transformer", "Name")
     write_dss_from_dataframe_auto(
-        df_capacitor, f"{output}/Capacitor.dss", "Capacitor", "Name")
+        df_line, f"{data}/Line.dss", "Line", "Name")
+    write_dss_from_dataframe_auto(
+        df_capacitor, f"{data}/Capacitor.dss", "Capacitor", "Name")
 
     ''' ---Creating a new master.dss ---'''
 
-    create_master(output, PV="PV.dss", Transformer='Transformer.dss', Load="Load.dss",
+    create_master(data, PV="PVSystem.dss", Transformer='Transformer.dss', Load="Load.dss",
                   Capacitor="Capacitor.dss", Line="Line.dss")
