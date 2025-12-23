@@ -35,6 +35,8 @@ LEVELS = ["low", "medium", "high", "extreme"]
 
 T_STEPS = 24
 DELTA_T = 60*60  # minutes * seconds per hour
+recorder_cnt = 0
+sensor_cnt = 0
 
 
 def generate_feeder(MODEL: str, LEVEL: str, OUTPUTS: str) -> Component:
@@ -56,6 +58,8 @@ def generate_feeder(MODEL: str, LEVEL: str, OUTPUTS: str) -> Component:
     return Component(
         name="feeder",
         type="Feeder",
+        host="feeder",
+        container_port=5600,
         parameters={
             "use_smartds": smart_ds,
             "use_sparse_admittance": True,
@@ -78,9 +82,12 @@ def generate_recorder(port: str, src: str, OUTPUTS: str) -> (Component, Link):
         name = f"recorder_{port}"
         file = port
 
+    global recorder_cnt
     component = Component(
         name=name,
         type="Recorder",
+        host="recorder",
+        container_port=5700+recorder_cnt,
         parameters={
             "feather_filename": f"{OUTPUTS}/{file}.feather",
             "csv_filename": f"{OUTPUTS}/{file}.csv",
@@ -88,6 +95,9 @@ def generate_recorder(port: str, src: str, OUTPUTS: str) -> (Component, Link):
             "deltat": DELTA_T
         },
     )
+
+    recorder_cnt += 1
+
     link = Link(
         source=src, source_port=port, target=component.name, target_port="subscription"
     )
@@ -101,9 +111,13 @@ def generate_sensor(port: str, src: str) -> (Component, Link):
         file = "sensors/reactive_ids.json"
     if "voltage" in port:
         file = "sensors/voltage_ids.json"
+
+    global sensor_cnt
     component = Component(
         name=f"sensor_{port}",
         type="Sensor",
+        host="sensor",
+        container_port=5800+sensor_cnt,
         parameters={
             "additive_noise_stddev": 0.01,
             "multiplicative_noise_stddev": 0.001,
@@ -112,6 +126,9 @@ def generate_sensor(port: str, src: str) -> (Component, Link):
             "deltat": DELTA_T
         },
     )
+
+    sensor_cnt += 1
+
     link = Link(
         source=src, source_port=port, target=component.name, target_port="subscription"
     )
@@ -301,6 +318,8 @@ def generate(MODEL: str, LEVEL: str) -> None:
     hub_voltage = Component(
         name="hub_voltage",
         type="VoltageHub",
+        host="hub_voltage",
+        container_port=5900,
         parameters={
             "max_itr": max_itr,
             "number_of_timesteps": T_STEPS,
@@ -312,6 +331,8 @@ def generate(MODEL: str, LEVEL: str) -> None:
     hub_power = Component(
         name="hub_power",
         type="PowerHub",
+        host="hub_voltage",
+        container_port=5901,
         parameters={
             "max_itr": max_itr,
             "number_of_timesteps": T_STEPS,
@@ -323,6 +344,8 @@ def generate(MODEL: str, LEVEL: str) -> None:
     hub_control = Component(
         name="hub_control",
         type="ControlHub",
+        host="hub_control",
+        container_port=5902,
         parameters={
             "max_itr": max_itr,
             "number_of_timesteps": T_STEPS,
@@ -349,6 +372,8 @@ def generate(MODEL: str, LEVEL: str) -> None:
         algo = Component(
             name=f"{ALGO}_{k}",
             type="OptimalPowerFlow",
+            host=f"admm_{k}",
+            container_port=5902+k,
             parameters={
                 "vup_tol": 0.01,
                 "sdn_tol": 0.01,
@@ -425,7 +450,7 @@ if __name__ == "__main__":
     if len(sys.argv) == 2:
         model = sys.argv[1]
         print("generating: ", model)
-        generate(model, "medium")
+        generate(model, "low")
         exit()
 
     for model in MODELS:

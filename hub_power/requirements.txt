@@ -1,0 +1,9 @@
+helics
+helics-apps
+pydantic
+pyarrow
+numpy
+pandas
+fastapi
+uvicorn
+oedisi>=2.0.2,<3

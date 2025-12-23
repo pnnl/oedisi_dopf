@@ -4,6 +4,7 @@ import json
 from pathlib import Path
 from datetime import datetime
 from dataclasses import asdict
+from oedisi.types.common import BrokerConfig
 from oedisi.types.data_types import (
     MeasurementArray,
     EquipmentNodeArray,
@@ -58,12 +59,12 @@ class Subscriptions(object):
     c4: CommandList
 
 
-class EstimatorFederate(object):
-    def __init__(self) -> None:
+class HubFederate(object):
+    def __init__(self, broker_config) -> None:
         self.sub = Subscriptions()
         self.load_static_inputs()
         self.load_input_mapping()
-        self.initilize()
+        self.initilize(broker_config)
         self.load_component_definition()
         self.register_subscription()
         self.register_publication()
@@ -87,7 +88,7 @@ class EstimatorFederate(object):
         self.static.name = config["name"]
         self.static.t_steps = config["number_of_timesteps"]
 
-    def initilize(self) -> None:
+    def initilize(self, broker_config) -> None:
         self.info = h.helicsCreateFederateInfo()
         self.info.core_name = self.static.name
         self.info.core_type = h.HELICS_CORE_TYPE_ZMQ
@@ -98,6 +99,9 @@ class EstimatorFederate(object):
         # h.helicsFederateSetFlagOption(self.fed, h.helics_flag_slow_responding, True)
         h.helicsFederateSetTimeProperty(
             self.fed, h.HELICS_PROPERTY_TIME_PERIOD, 1)
+
+        h.helicsFederateInfoSetBroker(self.fed, broker_config.broker_ip)
+        h.helicsFederateInfoSetBrokerPort(self.fed, broker_config.broker_port)
 
     def register_subscription(self) -> None:
         self.sub.c0 = self.fed.register_subscription(
@@ -190,6 +194,10 @@ class EstimatorFederate(object):
         logger.info(f"Federate disconnected: {datetime.now()}")
 
 
+def run_simulator(broker_config: BrokerConfig):
+    sfed = HubFederate(broker_config)
+    sfed.run()
+
+
 if __name__ == "__main__":
-    fed = EstimatorFederate()
-    fed.run()
+    run_simulator(BrokerConfig(broker_ip="0.0.0.0"))

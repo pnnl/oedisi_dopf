@@ -255,14 +255,20 @@ def optimal_power_flow(
     n_branch = nbranch_ABC * 3 + nbranch_s1s2  # Total Branch Number
 
     constraint_number = 1000 + variable_number + n_bus + 3 * n_bus + n_branch
-    A_ineq = np.zeros((constraint_number, variable_number))
+    # A_ineq = np.zeros((constraint_number, variable_number))
+    A_ineq = np.memmap('Aineq.dat', dtype='float32', mode='w+',
+                       shape=(constraint_number, variable_number))
     b_ineq = np.zeros(constraint_number)
 
     x = cp.Variable(variable_number)
     # Initialize the matrices
-    P = np.zeros((variable_number, variable_number))
+    # P = np.zeros((variable_number, variable_number))
+    P = np.memmap('P.dat', dtype='float32', mode='w+',
+                  shape=(variable_number, variable_number))
     q_obj_vector = np.zeros(variable_number)
-    A_eq = np.zeros((constraint_number, variable_number))
+    # A_eq = np.zeros((constraint_number, variable_number))
+    A_eq = np.memmap('Aeq.dat', dtype='float32', mode='w+',
+                     shape=(constraint_number, variable_number))
     b_eq = np.zeros(constraint_number)
 
     # Some extra variable definition for clean code:

@@ -1,22 +1,23 @@
-import asyncio
-import json
-import logging
-import os
-import socket
-import sys
-import time
-import traceback
-import zipfile
-
-import uvicorn
-from fastapi import BackgroundTasks, FastAPI, Request, UploadFile
+from fastapi import FastAPI, BackgroundTasks, UploadFile, Request
 from fastapi.exceptions import HTTPException
 from fastapi.responses import JSONResponse
-from oedisi.types.common import BrokerConfig, HeathCheck, ServerReply
-from sender_cosim import run_simulator
+from feeder_federate import run_simulator
+import traceback
+import asyncio
+import logging
+import zipfile
+import uvicorn
+import socket
+import json
+import time
+import os
 
+from oedisi.componentframework.system_configuration import ComponentStruct
+from oedisi.types.common import ServerReply, HeathCheck, DefaultFileNames
+from oedisi.types.common import BrokerConfig
+
+logger = logging.getLogger("uvicorn.error")
 REQUEST_TIMEOUT_SEC = 1200
-
 app = FastAPI()
 
 base_path = os.getcwd()
@@ -27,7 +28,8 @@ async def timeout_middleware(request: Request, call_next):
     try:
         return await asyncio.wait_for(call_next(request), timeout=REQUEST_TIMEOUT_SEC)
     except asyncio.TimeoutError:
-        endpoint = str(request.url).replace(str(request.base_url), "").replace("/", "")
+        endpoint = str(request.url).replace(
+            str(request.base_url), "").replace("/", "")
         if endpoint == "sensor":
             response = ServerReply(
                 detail="Request processing time exceeded limit. Upload a model and associated profiles before simulation before starting the simulation."
@@ -49,24 +51,43 @@ def read_root():
     return JSONResponse(response, 200)
 
 
-@app.get("/sensor/")
+@app.get("/sensor")
 async def sensor():
-    logging.info(os.getcwd())
+    logger.info("Checking for sensors.json file")
+    logger.info(os.getcwd())
     sensor_path = os.path.join(base_path, "sensors", "sensors.json")
     while not os.path.exists(sensor_path):
         time.sleep(1)
-        logging.info(f"waiting {sensor_path}")
-    logging.info("success")
+        logger.info(f"waiting {sensor_path}")
+    logger.info("success")
     data = json.load(open(sensor_path, "r"))
     return data
 
 
-@app.post("/profiles/")
+@app.post("/sensor")
+async def sensor_post(sensor_list: list[str]):
+    sensor_dir = os.path.join(base_path, "sensors")
+    sensor_path = os.path.join(sensor_dir, "sensors.json")
+    try:
+        os.makedirs(sensor_dir, exist_ok=True)
+        with open(sensor_path, "w") as f:
+            json.dump(sensor_list, f, indent=2)
+        response = ServerReply(detail=f"Wrote {len(sensor_list)} sensors to {
+                               sensor_path}").dict()
+        return JSONResponse(response, 200)
+    except Exception as e:
+        err = traceback.format_exc()
+        logger.error(f"Failed to write sensors file: {err}")
+        raise HTTPException(status_code=500, detail=str(err))
+
+
+@app.post("/profiles")
 async def upload_profiles(file: UploadFile):
     try:
         data = file.file.read()
         if not file.filename.endswith(".zip"):
-            HTTPException(400, "Invalid file type. Only zipped profiles are accepted.")
+            raise HTTPException(
+                400, "Invalid file type. Only zipped profiles are accepted.")
 
         profile_path = "./profiles"
 
@@ -94,12 +115,12 @@ async def upload_profiles(file: UploadFile):
         )
 
 
-@app.post("/model/")
+@app.post("/model")
 async def upload_model(file: UploadFile):
     try:
         data = file.file.read()
         if not file.filename.endswith(".zip"):
-            HTTPException(
+            raise HTTPException(
                 400, "Invalid file type. Only zipped opendss models are accepted."
             )
 
@@ -118,26 +139,42 @@ async def upload_model(file: UploadFile):
             return JSONResponse(response, 200)
 
         else:
-            HTTPException(400, "A valid opendss model should have a master.dss file.")
+            raise HTTPException(
+                400, "A valid opendss model should have a master.dss file.")
     except Exception as e:
-        HTTPException(500, "Unknown error while uploading userdefined opendss model.")
+        raise HTTPException(
+            500, "Unknown error while uploading userdefined opendss model.")
 
 
-@app.post("/run/")
+@app.post("/run")
 async def run_feeder(
     broker_config: BrokerConfig, background_tasks: BackgroundTasks
 ):  # :BrokerConfig
-    logging.info(broker_config)
+    logger.info(broker_config)
     try:
         background_tasks.add_task(run_simulator, broker_config)
         response = ServerReply(detail="Task sucessfully added.").dict()
-
         return JSONResponse(response, 200)
     except Exception as e:
         err = traceback.format_exc()
-        HTTPException(500, str(err))
+        logger.error(f"Error in /run: {err}")
+        raise HTTPException(500, str(err))
 
+
+@app.post("/configure")
+async def configure(component_struct: ComponentStruct):
+    component = component_struct.component
+    params = component.parameters
+    params["name"] = component.name
+    links = {}
+    for link in component_struct.links:
+        links[link.target_port] = f"{link.source}/{link.source_port}"
+    json.dump(links, open(DefaultFileNames.INPUT_MAPPING.value, "w"))
+    json.dump(params, open(DefaultFileNames.STATIC_INPUTS.value, "w"))
+    response = ServerReply(
+        detail=f"Sucessfully updated configuration files."
+    ).dict()
+    return JSONResponse(response, 200)
 
 if __name__ == "__main__":
-    port = int(sys.argv[2])
-    uvicorn.run(app, host="0.0.0.0", port=port)
+    uvicorn.run(app, host="0.0.0.0", port=int(os.environ['PORT']))

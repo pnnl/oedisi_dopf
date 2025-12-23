@@ -4,6 +4,7 @@ import helics as h
 import json
 from pathlib import Path
 from datetime import datetime
+from oedisi.types.common import BrokerConfig
 from oedisi.types.data_types import (
     PowersImaginary,
     PowersReal,
@@ -132,11 +133,11 @@ class OPFFederate(object):
     area_p: PowersReal
     area_q: PowersImaginary
 
-    def __init__(self) -> None:
+    def __init__(self, broker_config) -> None:
         self.sub = Subscriptions()
         self.load_static_inputs()
         self.load_input_mapping()
-        self.initilize()
+        self.initilize(broker_config)
         self.load_component_definition()
         self.register_subscription()
         self.register_publication()
@@ -175,7 +176,7 @@ class OPFFederate(object):
         self.static.config.rho_vdn = config["rho_vdn"]
         self.static.config.rho_sdn = config["rho_sdn"]
 
-    def initilize(self) -> None:
+    def initilize(self, broker_config) -> None:
         self.info = h.helicsCreateFederateInfo()
         self.info.core_name = self.static.name
         self.info.core_type = h.HELICS_CORE_TYPE_ZMQ
@@ -190,6 +191,9 @@ class OPFFederate(object):
 
         # h.helicsFederateSetTimeProperty(self.fed, h.HELICS_PROPERTY_TIME_OFFSET, 0.1)
         # h.helicsFederateSetFlagOption(self.fed, h.HELICS_FLAG_UNINTERRUPTIBLE, True)
+
+        h.helicsFederateInfoSetBroker(self.fed, broker_config.broker_ip)
+        h.helicsFederateInfoSetBrokerPort(self.fed, broker_config.broker_port)
 
     def register_subscription(self) -> None:
         self.sub.topology = self.fed.register_subscription(
@@ -557,6 +561,10 @@ class OPFFederate(object):
         logger.info(f"Federate disconnected: {datetime.now()}")
 
 
+def run_simulator(broker_config: BrokerConfig):
+    sfed = OPFFederate(broker_config)
+    sfed.run()
+
+
 if __name__ == "__main__":
-    fed = OPFFederate()
-    fed.run()
+    run_simulator(BrokerConfig(broker_ip="127.0.0.1"))
