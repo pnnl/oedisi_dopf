@@ -2,7 +2,9 @@ helics
 helics-apps
 pydantic
 pyarrow
+python-multipart
 numpy
+xarray
 pandas
 fastapi
 uvicorn

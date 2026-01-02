@@ -147,7 +147,8 @@ class FeederSimulator(object):
         ):
             if self._use_smartds:
                 self._feeder_file = os.path.join("opendss", "Master.dss")
-                self.download_data("oedi-data-lake", update_loadshape_location=True)
+                self.download_data(
+                    "oedi-data-lake", update_loadshape_location=True)
             elif not self._use_smartds and not self._user_uploads_model:
                 self._feeder_file = os.path.join("opendss", "master.dss")
                 self.download_data("gadal")
@@ -186,7 +187,8 @@ class FeederSimulator(object):
             flag = dss.PVsystems.First()
             avg_irradiance = dss.PVsystems.IrradianceNow()
             while flag:
-                avg_irradiance = (avg_irradiance + dss.PVsystems.IrradianceNow()) / 2
+                avg_irradiance = (
+                    avg_irradiance + dss.PVsystems.IrradianceNow()) / 2
                 flag = dss.PVsystems.Next()
 
             # now compute the power output from the evaluated average irradiance
@@ -223,7 +225,8 @@ class FeederSimulator(object):
         """Download data from bucket path."""
         logging.info(f"Downloading from bucket {bucket_name}")
         # Equivalent to --no-sign-request
-        s3_resource = boto3.resource("s3", config=Config(signature_version=UNSIGNED))
+        s3_resource = boto3.resource(
+            "s3", config=Config(signature_version=UNSIGNED))
         bucket = s3_resource.Bucket(bucket_name)
         opendss_location = self._opendss_location
         profile_location = self._profile_location
@@ -247,7 +250,8 @@ class FeederSimulator(object):
                     for token in new_row.split(" "):
                         if token.startswith("(file="):
                             location = (
-                                token.split("=../profiles/")[1].strip().strip(")")
+                                token.split(
+                                    "=../profiles/")[1].strip().strip(")")
                             )
                             all_profiles.add(location)
                     modified_loadshapes = modified_loadshapes + new_row
@@ -255,18 +259,21 @@ class FeederSimulator(object):
                 fp_loadshapes.write(modified_loadshapes)
             for profile in all_profiles:
                 s3_location = f"{profile_location}/{profile}"
-                bucket.download_file(s3_location, os.path.join("profiles", profile))
+                bucket.download_file(
+                    s3_location, os.path.join("profiles", profile))
 
         else:
             for obj in bucket.objects.filter(Prefix=profile_location):
                 output_location = os.path.join(
-                    "profiles", obj.key.replace(profile_location, "").strip("/")
+                    "profiles", obj.key.replace(
+                        profile_location, "").strip("/")
                 )
                 os.makedirs(os.path.dirname(output_location), exist_ok=True)
                 bucket.download_file(obj.key, output_location)
 
         if sensor_location is not None:
-            output_location = os.path.join("sensors", os.path.basename(sensor_location))
+            output_location = os.path.join(
+                "sensors", os.path.basename(sensor_location))
             if not os.path.exists(os.path.dirname(output_location)):
                 os.makedirs(os.path.dirname(output_location))
             bucket.download_file(sensor_location, output_location)
@@ -319,7 +326,8 @@ class FeederSimulator(object):
 
     def get_bus_coords(self) -> Dict[str, Tuple[float, float]] | None:
         """Load bus coordinates from OpenDSS."""
-        bus_path = os.path.join(os.path.dirname(self._feeder_file), "Buscoords.dss")
+        bus_path = os.path.join(os.path.dirname(
+            self._feeder_file), "Buscoords.dss")
         if not os.path.exists(bus_path):
             self.bus_coords = None
             return self.bus_coords
@@ -331,7 +339,8 @@ class FeederSimulator(object):
                     identifier, x, y = row
                     bus_coords[identifier] = (float(x), float(y))
                 except ValueError as e:
-                    logging.warning(f"Unable to parse row in bus coords: {row}, {e}")
+                    logging.warning(
+                        f"Unable to parse row in bus coords: {row}, {e}")
                     return None
             return bus_coords
 
@@ -348,7 +357,8 @@ class FeederSimulator(object):
         self._circuit = dss.Circuit
         self._AllNodeNames = self._circuit.YNodeOrder()
         self._node_number = len(self._AllNodeNames)
-        self._nodes_index = [self._AllNodeNames.index(ii) for ii in self._AllNodeNames]
+        self._nodes_index = [self._AllNodeNames.index(
+            ii) for ii in self._AllNodeNames]
         self._name_index_dict = {
             ii: self._AllNodeNames.index(ii) for ii in self._AllNodeNames
         }
@@ -370,7 +380,8 @@ class FeederSimulator(object):
 
         if self.tap_setting is not None:
             # Doesn't work with AutoTrans or 3-winding transformers.
-            dss.Text.Command(f"batchedit transformer..* wdg=2 tap={self.tap_setting}")
+            dss.Text.Command(
+                f"batchedit transformer..* wdg=2 tap={self.tap_setting}")
 
         if self.open_lines is not None:
             for l in self.open_lines:
@@ -445,7 +456,8 @@ class FeederSimulator(object):
 
     def setup_vbase(self):
         """Load base voltages into feeder."""
-        self._Vbase_allnode = np.zeros((self._node_number), dtype=np.complex128)
+        self._Vbase_allnode = np.zeros(
+            (self._node_number), dtype=np.complex128)
         self._Vbase_allnode_dict = {}
         for ii, node in enumerate(self._AllNodeNames):
             self._circuit.SetActiveBus(node)
@@ -662,7 +674,8 @@ class FeederSimulator(object):
             and self._state != OpenDSSState.UNLOADED
         ), f"{self._state}"
         name_voltage_dict = get_voltages(self._circuit)
-        res_feeder_voltages = np.zeros((len(self._AllNodeNames)), dtype=np.complex128)
+        res_feeder_voltages = np.zeros(
+            (len(self._AllNodeNames)), dtype=np.complex128)
         for voltage_name in name_voltage_dict.keys():
             res_feeder_voltages[self._name_index_dict[voltage_name]] = (
                 name_voltage_dict[voltage_name]
@@ -696,8 +709,8 @@ class FeederSimulator(object):
             assert entry.obj_property.lower() in map(
                 lambda x: x.lower(), properties
             ), f"{entry.obj_property} not in {properties} for {element_name}"
-            dss.Text.Command(f"{entry.obj_name}.{
-                             entry.obj_property}={entry.val}")
+            dss.Text.Command(
+                f"{entry.obj_name}.{entry.obj_property}={entry.val}")
 
     def create_inverter(self, pvsystem_set: Set[str]):
         """Create new inverter from set of pvsystem.
@@ -740,7 +753,8 @@ class FeederSimulator(object):
                     """Controlling mulitple pvsystems manually results in unstable
                     behavior when the number of phases differ"""
                 )
-            pvlist = ", ".join(pv_name.split(".")[1] for pv_name in pvsystem_set)
+            pvlist = ", ".join(pv_name.split(".")[1]
+                               for pv_name in pvsystem_set)
         dss.Text.Command(f"New {name} PVsystemList=[{pvlist}]")
         self._inverter_counter += 1
         self._inverters.add(name)
@@ -761,8 +775,8 @@ class FeederSimulator(object):
         assert len(x) == len(y), "Length of curves do not match"
         x_str = ",".join(str(i) for i in x)
         y_str = ",".join(str(i) for i in y)
-        dss.Text.Command(f"New {name} npts={
-                         npts} Yarray=({y_str}) Xarray=({x_str})")
+        dss.Text.Command(
+            f"New {name} npts={npts} Yarray=({y_str}) Xarray=({x_str})")
         self._xycurve_counter += 1
         return name
 
@@ -772,34 +786,34 @@ class FeederSimulator(object):
             vvc_curve = self.create_xy_curve(
                 inv_control.vvcontrol.voltage, inv_control.vvcontrol.reactive_response
             )
-            dss.Text.Command(f"{inverter}.vvc_curve1={
-                             vvc_curve.split('.')[1]}")
             dss.Text.Command(
-                f"{inverter}.deltaQ_factor={
-                    inv_control.vvcontrol.deltaq_factor}"
+                f"{inverter}.vvc_curve1={vvc_curve.split('.')[1]}")
+            factor = inv_control.vvcontrol.deltaq_factor
+            dss.Text.Command(
+                f"{inverter}.deltaQ_factor={factor}"
             )
+            tol = inv_control.vvcontrol.varchangetolerance
             dss.Text.Command(
-                f"{inverter}.VarChangeTolerance={
-                    inv_control.vvcontrol.varchangetolerance}"
+                f"{inverter}.VarChangeTolerance={tol}"
             )
+            tol = inv_control.vvcontrol.voltagechangetolerance
             dss.Text.Command(
-                f"{inverter}.VoltageChangeTolerance={
-                    inv_control.vvcontrol.voltagechangetolerance}"
+                f"{inverter}.VoltageChangeTolerance={tol}"
             )
+            power = inv_control.vvcontrol.vv_refreactivepower
             dss.Text.Command(
-                f"{inverter}.VV_RefReactivePower={
-                    inv_control.vvcontrol.vv_refreactivepower}"
+                f"{inverter}.VV_RefReactivePower={power}"
             )
         if inv_control.vwcontrol is not None:
             vw_curve = self.create_xy_curve(
                 inv_control.vwcontrol.voltage,
                 inv_control.vwcontrol.power_response,
             )
-            dss.Text.Command(f"{inverter}.voltwatt_curve={
-                             vw_curve.split('.')[1]}")
             dss.Text.Command(
-                f"{inverter}.deltaP_factor={
-                    inv_control.vwcontrol.deltap_factor}"
+                f"{inverter}.voltwatt_curve={vw_curve.split('.')[1]}")
+            factor = inv_control.vwcontrol.deltap_factor
+            dss.Text.Command(
+                f"{inverter}.deltaP_factor={factor}"
             )
         if inv_control.mode == InverterControlMode.voltvar_voltwatt:
             dss.Text.Command(f"{inverter}.CombiMode = VV_VW")
@@ -913,9 +927,9 @@ class FeederSimulator(object):
                 # dicts are insert-ordered in >=3.7
                 names = list(dict.fromkeys(bus_names))
                 if len(names) != 2:
+                    temp_str = f"Line {line} has {len(names)}"
                     logging.info(
-                        f"Line {line} has {
-                            len(names)} terminals, skipping in incidence matrix"
+                        f"{temp_str} terminals, skipping in incidence matrix"
                     )
                     continue
             from_bus, to_bus = names
@@ -930,9 +944,9 @@ class FeederSimulator(object):
                 bus_names = map(lambda x: x.split(".")[0], names)
                 names = list(dict.fromkeys(bus_names))
                 if len(names) != 2:
+                    temp_str = f"Transformer {transformer} has {len(names)}"
                     logging.info(
-                        f"Transformer {transformer} has {
-                            len(names)} terminals, skipping in incidence matrix"
+                        f"{temp_str} terminals, skipping in incidence matrix"
                     )
                     continue
             from_bus, to_bus = names

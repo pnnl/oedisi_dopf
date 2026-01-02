@@ -150,8 +150,8 @@ def download_results():
             logger.info(f"making a request to url - {url}")
 
             response = requests.get(url)
-            logger.info(f"Response from {hostname} has {
-                        len(response.content)} bytes")
+            logger.info(
+                f"Response from {hostname} has {len(response.content)} bytes")
             with open(f"{hostname}.feather", "wb") as out_file:
                 out_file.write(response.content)
 
@@ -185,8 +185,9 @@ def run_simulation():
     component_map, broker_ip, api_port = read_settings()
     feeder_host, feeder_port = _get_feeder_info(component_map)
     logger.info(f"{broker_ip}, {api_port}")
-    initstring = f"-f {len(component_map)-1} --name=mainbroker --loglevel=trace --local_interface={
-        broker_ip} --localport=23404"
+    n = len(component_map)-1
+    initstring = f"-f {n} --name=mainbroker --loglevel=trace "
+    initstring += f"--local_interface={broker_ip} --localport=23404"
     logger.info(f"Broker initaialization string: {initstring}")
     broker = h.helicsCreateBroker("zmq", "", initstring)
 

@@ -1,7 +1,7 @@
 from fastapi import FastAPI, BackgroundTasks, UploadFile, Request
 from fastapi.exceptions import HTTPException
 from fastapi.responses import JSONResponse
-from feeder_federate import run_simulator
+from sender_cosim import run_simulator
 import traceback
 import asyncio
 import logging
@@ -72,8 +72,9 @@ async def sensor_post(sensor_list: list[str]):
         os.makedirs(sensor_dir, exist_ok=True)
         with open(sensor_path, "w") as f:
             json.dump(sensor_list, f, indent=2)
-        response = ServerReply(detail=f"Wrote {len(sensor_list)} sensors to {
-                               sensor_path}").dict()
+        response = ServerReply(
+            detail=f"Wrote {len(sensor_list)} sensors to {sensor_path}"
+        ).dict()
         return JSONResponse(response, 200)
     except Exception as e:
         err = traceback.format_exc()

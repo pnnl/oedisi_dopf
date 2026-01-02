@@ -2,6 +2,7 @@ setuptools==72.1.0
 helics==3.4.0
 helics-apps==3.4.0
 pydantic>=1.9, <3.0
+python-multipart
 uvicorn
 fastapi
 pyarrow

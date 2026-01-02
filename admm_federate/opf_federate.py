@@ -476,7 +476,7 @@ class OPFFederate(object):
         stats["admm_iteration"] = self.itr
         stats["vup"] = v_err
         stats["sdn"] = math.sqrt(p_err**2 + q_err**2)
-        logger.debug(f"Errors : {stats["vup"]}, {stats["sdn"]}")
+        logger.debug(f"Errors : {stats['vup']}, {stats['sdn']}")
 
         if all([v_err != 0, p_err != 0, q_err != 0]):
             v_settled = stats["vup"] <= self.static.vup_tol
