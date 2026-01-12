@@ -21,6 +21,7 @@ SMART_DS = {
 }
 MODELS = ["ieee123", "SFO/P1U", "SFO/P6U", "SFO/P9U"]
 LEVELS = ["low", "medium", "high", "extreme"]
+BASE_PORT = 5600
 
 
 def generate_feeder(MODEL: str, LEVEL: str, OUTPUTS: str) -> Component:
@@ -42,6 +43,7 @@ def generate_feeder(MODEL: str, LEVEL: str, OUTPUTS: str) -> Component:
     return Component(
         name="feeder",
         type="Feeder",
+        container_port=BASE_PORT+1,
         parameters={
             "use_smartds": smart_ds,
             "use_sparse_admittance": True,
@@ -57,13 +59,15 @@ def generate_feeder(MODEL: str, LEVEL: str, OUTPUTS: str) -> Component:
     )
 
 
-def generate_recorder(port: str, src: str, OUTPUTS: str) -> (Component, Link):
+def generate_recorder(port: str, src: str, OUTPUTS: str, offset: int) -> (Component, Link):
     component = Component(
         name=f"recorder_{port}",
         type="Recorder",
+        container_port=BASE_PORT+offset,
         parameters={
             "feather_filename": f"{OUTPUTS}/{port}.feather",
             "csv_filename": f"{OUTPUTS}/{port}.csv",
+            "number_of_timesteps": 5,
         },
     )
     link = Link(
@@ -72,7 +76,7 @@ def generate_recorder(port: str, src: str, OUTPUTS: str) -> (Component, Link):
     return (component, link)
 
 
-def generate_sensor(port: str, src: str) -> (Component, Link):
+def generate_sensor(port: str, src: str, offset: int) -> (Component, Link):
     if "power_real" in port:
         file = "sensors/real_ids.json"
     if "power_imag" in port:
@@ -82,6 +86,7 @@ def generate_sensor(port: str, src: str) -> (Component, Link):
     component = Component(
         name=f"sensor_{port}",
         type="Sensor",
+        container_port=BASE_PORT+offset,
         parameters={
             "additive_noise_stddev": 0.01,
             "multiplicative_noise_stddev": 0.001,
@@ -105,17 +110,22 @@ def generate(MODEL: str, LEVEL: str) -> None:
     system = WiringDiagram(name=f"{ALGO}_{MODEL}", components=[], links=[])
     feeder = generate_feeder(MODEL, LEVEL, OUTPUTS)
     system.components.append(feeder)
+    port_offset = len(system.components)
 
     algo = Component(
         name="lindistflow",
         type="OptimalPowerFlow",
+        container_port=BASE_PORT+port_offset,
         parameters={"deltat": 0.1, "relaxed": False, "control_type": "real"},
     )
     system.components.append(algo)
+    port_offset = len(system.components)
 
     port = "voltage_real"
-    component, link = generate_recorder(port, feeder.name, OUTPUTS)
+    component, link = generate_recorder(
+        port, feeder.name, OUTPUTS, port_offset)
     system.components.append(component)
+    port_offset = len(system.components)
     system.links.append(link)
 
     system.links.append(
@@ -124,8 +134,10 @@ def generate(MODEL: str, LEVEL: str) -> None:
     )
 
     port = "voltage_imag"
-    component, link = generate_recorder(port, feeder.name, OUTPUTS)
+    component, link = generate_recorder(
+        port, feeder.name, OUTPUTS, port_offset)
     system.components.append(component)
+    port_offset = len(system.components)
     system.links.append(link)
 
     system.links.append(
@@ -134,8 +146,10 @@ def generate(MODEL: str, LEVEL: str) -> None:
     )
 
     port = "power_real"
-    component, link = generate_recorder(port, feeder.name, OUTPUTS)
+    component, link = generate_recorder(
+        port, feeder.name, OUTPUTS, port_offset)
     system.components.append(component)
+    port_offset = len(system.components)
     system.links.append(link)
 
     system.links.append(
@@ -144,8 +158,10 @@ def generate(MODEL: str, LEVEL: str) -> None:
     )
 
     port = "power_imag"
-    component, link = generate_recorder(port, feeder.name, OUTPUTS)
+    component, link = generate_recorder(
+        port, feeder.name, OUTPUTS, port_offset)
     system.components.append(component)
+    port_offset = len(system.components)
     system.links.append(link)
 
     system.links.append(
@@ -154,23 +170,27 @@ def generate(MODEL: str, LEVEL: str) -> None:
     )
 
     port = "voltage_mag"
-    component, link = generate_recorder(port, algo.name, OUTPUTS)
+    component, link = generate_recorder(port, algo.name, OUTPUTS, port_offset)
     system.components.append(component)
+    port_offset = len(system.components)
     system.links.append(link)
 
     port = "voltage_angle"
-    component, link = generate_recorder(port, algo.name, OUTPUTS)
+    component, link = generate_recorder(port, algo.name, OUTPUTS, port_offset)
     system.components.append(component)
+    port_offset = len(system.components)
     system.links.append(link)
 
     port = "power_mag"
-    component, link = generate_recorder(port, algo.name, OUTPUTS)
+    component, link = generate_recorder(port, algo.name, OUTPUTS, port_offset)
     system.components.append(component)
+    port_offset = len(system.components)
     system.links.append(link)
 
     port = "power_angle"
-    component, link = generate_recorder(port, algo.name, OUTPUTS)
+    component, link = generate_recorder(port, algo.name, OUTPUTS, port_offset)
     system.components.append(component)
+    port_offset = len(system.components)
     system.links.append(link)
 
     port = "pv_set"
@@ -180,13 +200,15 @@ def generate(MODEL: str, LEVEL: str) -> None:
     )
 
     port = "solver_stats"
-    component, link = generate_recorder(port, algo.name, OUTPUTS)
+    component, link = generate_recorder(port, algo.name, OUTPUTS, port_offset)
     system.components.append(component)
+    port_offset = len(system.components)
     system.links.append(link)
 
     port = "estimated_power"
-    component, link = generate_recorder(port, algo.name, OUTPUTS)
+    component, link = generate_recorder(port, algo.name, OUTPUTS, port_offset)
     system.components.append(component)
+    port_offset = len(system.components)
     system.links.append(link)
 
     port = "available_power"
@@ -194,8 +216,10 @@ def generate(MODEL: str, LEVEL: str) -> None:
         Link(source=feeder.name, source_port=port,
              target=algo.name, target_port=port)
     )
-    component, link = generate_recorder(port, feeder.name, OUTPUTS)
+    component, link = generate_recorder(
+        port, feeder.name, OUTPUTS, port_offset)
     system.components.append(component)
+    port_offset = len(system.components)
     system.links.append(link)
 
     port = "injections"

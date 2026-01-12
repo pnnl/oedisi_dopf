@@ -1,0 +1,11 @@
+helics
+helics-apps
+pydantic
+pyarrow
+python-multipart
+numpy
+xarray
+pandas
+fastapi
+uvicorn
+oedisi>=2.0.2,<3

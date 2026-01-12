@@ -1,13 +1,11 @@
 import logging
 import helics as h
 import numpy as np
-from pydantic import BaseModel
 import pandas as pd
-from typing import List
 import json
-import csv
 import pyarrow as pa
 from datetime import datetime
+from oedisi.types.common import BrokerConfig
 from oedisi.types.data_types import MeasurementArray
 
 logger = logging.getLogger(__name__)
@@ -16,7 +14,7 @@ logger.setLevel(logging.DEBUG)
 
 
 class Recorder:
-    def __init__(self, name, feather_filename, csv_filename, input_mapping, t_steps):
+    def __init__(self, name, feather_filename, csv_filename, input_mapping, t_steps, broker_config):
         self.rng = np.random.default_rng(12345)
         self.t_steps = t_steps
         deltat = 0.01
@@ -35,6 +33,9 @@ class Recorder:
         h.helicsFederateSetTimeProperty(
             self.vfed, h.HELICS_PROPERTY_TIME_PERIOD, 1)
         # h.helicsFederateSetFlagOption(self.vfed, h.helics_flag_wait_for_current_time_update, True)
+
+        h.helicsFederateInfoSetBroker(fedinfo, broker_config.broker_ip)
+        h.helicsFederateInfoSetBrokerPort(fedinfo, broker_config.broker_port)
 
         logger.info("Value federate created")
 
@@ -69,6 +70,11 @@ class Recorder:
                 # Check that the data is a MeasurementArray type
                 logger.debug("Step 2: updating measurments")
                 logger.debug(f"is valid: {self.sub.is_valid()}")
+                if not self.sub.is_updated():
+                    pass
+                    continue
+
+                logger.debug(self.sub.json)
                 measurement = MeasurementArray.parse_obj(self.sub.json)
 
                 measurement_dict = {
@@ -110,7 +116,7 @@ class Recorder:
         h.helicsCloseLibrary()
 
 
-if __name__ == "__main__":
+def run_simulator(broker_config: BrokerConfig):
     with open("static_inputs.json") as f:
         config = json.load(f)
         name = config["name"]
@@ -121,5 +127,10 @@ if __name__ == "__main__":
     with open("input_mapping.json") as f:
         input_mapping = json.load(f)
 
-    sfed = Recorder(name, feather_path, csv_path, input_mapping, t_steps)
+    sfed = Recorder(name, feather_path, csv_path,
+                    input_mapping, t_steps, broker_config)
     sfed.run()
+
+
+if __name__ == "__main__":
+    run_simulator(BrokerConfig(broker_ip="127.0.0.1"))
