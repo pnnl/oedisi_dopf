@@ -1,0 +1,23 @@
+{
+  "title": "ComponentParameters",
+  "type": "object",
+  "properties": {
+    "name": {
+      "title": "Name",
+      "type": "string"
+    },
+    "max_itr": {
+      "title": "Max Itr",
+      "type": "integer"
+    },
+    "t_steps": {
+      "title": "T Steps",
+      "type": "integer"
+    }
+  },
+  "required": [
+    "name",
+    "max_itr",
+    "t_steps"
+  ]
+}

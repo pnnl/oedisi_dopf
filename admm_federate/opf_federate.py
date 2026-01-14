@@ -32,6 +32,7 @@ import time
 import networkx as nx
 import math
 
+from pydantic import BaseModel
 logger = logging.getLogger(__name__)
 logger.addHandler(logging.StreamHandler())
 logger.setLevel(logging.DEBUG)
@@ -86,6 +87,22 @@ def xarray_to_voltages_pol(data, **kwargs):
     ang = VoltagesAngle(
         **xarray_to_dict(np.arctan2(data.imag, data.real)), **kwargs)
     return mag, ang
+
+
+class ComponentParameters(BaseModel):
+    t_steps: int
+    max_itr: int
+    control_type: str
+    switches: list[str]
+    source_bus: str
+    source_line: str
+    relaxed: bool
+    rho_sup: float
+    rho_vup: float
+    rho_sdn: float
+    rho_vdn: float
+    vup_tol: float
+    sdn_tol: float
 
 
 class StaticConfig(object):
@@ -184,6 +201,9 @@ class OPFFederate(object):
 
         # h.helicsFederateInfoSetTimeProperty(self.info, h.helics_property_time_delta, self.static.deltat)
 
+        h.helicsFederateInfoSetBroker(self.info, broker_config.broker_ip)
+        h.helicsFederateInfoSetBrokerPort(self.info, broker_config.broker_port)
+
         self.fed = h.helicsCreateValueFederate(self.static.name, self.info)
         # h.helicsFederateSetFlagOption(self.fed, h.helics_flag_slow_responding, True)
         h.helicsFederateSetTimeProperty(
@@ -191,9 +211,6 @@ class OPFFederate(object):
 
         # h.helicsFederateSetTimeProperty(self.fed, h.HELICS_PROPERTY_TIME_OFFSET, 0.1)
         # h.helicsFederateSetFlagOption(self.fed, h.HELICS_FLAG_UNINTERRUPTIBLE, True)
-
-        h.helicsFederateInfoSetBroker(self.fed, broker_config.broker_ip)
-        h.helicsFederateInfoSetBrokerPort(self.fed, broker_config.broker_port)
 
     def register_subscription(self) -> None:
         self.sub.topology = self.fed.register_subscription(
@@ -561,7 +578,11 @@ class OPFFederate(object):
         logger.info(f"Federate disconnected: {datetime.now()}")
 
 
-def run_simulator(broker_config: BrokerConfig):
+def run_simulator(broker_config: BrokerConfig) -> None:
+    #    schema = ComponentParameters.schema_json(indent=2)
+    #    with open("./admm_federate/admm_schema.json", "w") as f:
+    #        f.write(schema)
+    #
     sfed = OPFFederate(broker_config)
     sfed.run()
 

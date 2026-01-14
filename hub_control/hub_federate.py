@@ -13,7 +13,7 @@ from oedisi.types.data_types import (
 )
 import xarray as xr
 import numpy as np
-
+from pydantic import BaseModel
 logger = logging.getLogger(__name__)
 logger.addHandler(logging.StreamHandler())
 logger.setLevel(logging.DEBUG)
@@ -44,6 +44,12 @@ def xarray_to_eqarray(data):
     """Convert xarray to dict with values and ids for JSON serialization."""
     coords = {key: list(data.coords[key].data) for key in data.coords.keys()}
     return {"values": list(data.data), **coords}
+
+
+class ComponentParameters(BaseModel):
+    name: str
+    max_itr: int
+    t_steps: int
 
 
 class StaticConfig(object):
@@ -94,14 +100,14 @@ class HubFederate(object):
         self.info.core_type = h.HELICS_CORE_TYPE_ZMQ
         self.info.core_init = "--federates=1"
 
+        h.helicsFederateInfoSetBroker(self.info, broker_config.broker_ip)
+        h.helicsFederateInfoSetBrokerPort(self.info, broker_config.broker_port)
+
         # h.helicsFederateInfoSetTimeProperty(self.info, h.helics_property_time_delta, 0.01)
         self.fed = h.helicsCreateValueFederate(self.static.name, self.info)
         # h.helicsFederateSetFlagOption(self.fed, h.helics_flag_slow_responding, True)
         h.helicsFederateSetTimeProperty(
             self.fed, h.HELICS_PROPERTY_TIME_PERIOD, 1)
-
-        h.helicsFederateInfoSetBroker(self.fed, broker_config.broker_ip)
-        h.helicsFederateInfoSetBrokerPort(self.fed, broker_config.broker_port)
 
     def register_subscription(self) -> None:
         self.sub.c0 = self.fed.register_subscription(
@@ -195,6 +201,10 @@ class HubFederate(object):
 
 
 def run_simulator(broker_config: BrokerConfig):
+    #    schema = ComponentParameters.schema_json(indent=2)
+    #    with open("./hub_control/hub_control_schema.json", "w") as f:
+    #        f.write(schema)
+    #
     sfed = HubFederate(broker_config)
     sfed.run()
 

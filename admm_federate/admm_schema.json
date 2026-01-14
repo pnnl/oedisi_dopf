@@ -1,0 +1,76 @@
+{
+  "title": "ComponentParameters",
+  "type": "object",
+  "properties": {
+    "t_steps": {
+      "title": "T Steps",
+      "type": "integer"
+    },
+    "max_itr": {
+      "title": "Max Itr",
+      "type": "integer"
+    },
+    "control_type": {
+      "title": "Control Type",
+      "type": "string"
+    },
+    "switches": {
+      "title": "Switches",
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "source_bus": {
+      "title": "Source Bus",
+      "type": "string"
+    },
+    "source_line": {
+      "title": "Source Line",
+      "type": "string"
+    },
+    "relaxed": {
+      "title": "Relaxed",
+      "type": "boolean"
+    },
+    "rho_sup": {
+      "title": "Rho Sup",
+      "type": "number"
+    },
+    "rho_vup": {
+      "title": "Rho Vup",
+      "type": "number"
+    },
+    "rho_sdn": {
+      "title": "Rho Sdn",
+      "type": "number"
+    },
+    "rho_vdn": {
+      "title": "Rho Vdn",
+      "type": "number"
+    },
+    "vup_tol": {
+      "title": "Vup Tol",
+      "type": "number"
+    },
+    "sdn_tol": {
+      "title": "Sdn Tol",
+      "type": "number"
+    }
+  },
+  "required": [
+    "t_steps",
+    "max_itr",
+    "control_type",
+    "switches",
+    "source_bus",
+    "source_line",
+    "relaxed",
+    "rho_sup",
+    "rho_vup",
+    "rho_sdn",
+    "rho_vdn",
+    "vup_tol",
+    "sdn_tol"
+  ]
+}

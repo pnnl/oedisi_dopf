@@ -7,77 +7,57 @@ import json
 import os
 
 from fastapi import FastAPI, BackgroundTasks, HTTPException
-from hub_federate import run_simulator
-from fastapi.responses import JSONResponse
+from fastapi.responses import FileResponse, JSONResponse
 import uvicorn
 
 from oedisi.componentframework.system_configuration import ComponentStruct
 from oedisi.types.common import ServerReply, HeathCheck, DefaultFileNames
 from oedisi.types.common import BrokerConfig
 
+from hub_federate import run_simulator
+
+logger = logging.getLogger("uvicorn.error")
 app = FastAPI()
 
 
-@cache
-def kubernetes_service():
-    if "KUBERNETES_SERVICE_NAME" in os.environ:
-        return os.environ["KUBERNETES_SERVICE_NAME"]  # works with kurenetes
-    elif "SERVICE_NAME" in os.environ:
-        return os.environ["SERVICE_NAME"]  # works with minikube
-    else:
-        return None
-
-
-def build_url(host: str, port: int, enpoint: list):
-
-    if kubernetes_service():
-        logging.info("Containers running in docker-compose environment")
-        url = f"http://{host}.{kubernetes_service()}:{port}/"
-    else:
-        logging.info("Containers running in kubernetes environment")
-        url = f"http://{host}:{port}/"
-    url = url + "/".join(enpoint)
-    logging.info(f"Built url {url}")
-    return url
-
-
 @app.get("/")
-async def read_root():
+def read_root():
     hostname = socket.gethostname()
     host_ip = socket.gethostbyname(hostname)
-    response = HeathCheck(
-        hostname=hostname,
-        host_ip=host_ip
-    ).dict()
+
+    response = HeathCheck(hostname=hostname, host_ip=host_ip).dict()
+
     return JSONResponse(response, 200)
+
+
+def find_filenames(path_to_dir=os.getcwd(), suffix=".feather"):
+    filenames = os.listdir(path_to_dir)
+    return [filename for filename in filenames if filename.endswith(suffix)]
+
+
+@app.get("/download")
+def download_results():
+    file_list = find_filenames()
+    if file_list:
+        return FileResponse(
+            path=file_list[0], filename=file_list[0], media_type="feather"
+        )
+    else:
+        raise HTTPException(status_code=404, detail="No feather file found")
 
 
 @app.post("/run")
 async def run_model(broker_config: BrokerConfig, background_tasks: BackgroundTasks):
-    logging.info(broker_config)
-    feeder_host = broker_config.feeder_host
-    feeder_port = broker_config.feeder_port
-    url = build_url(feeder_host, feeder_port, ['sensor'])
-    logging.info(f"Making a request to url - {url}")
+    logger.info(broker_config)
+    print(broker_config)
     try:
-        reply = requests.get(url)
-        sensor_data = reply.json()
-        if not sensor_data:
-            msg = "empty sensor list"
-            raise HTTPException(404, msg)
-        logging.info(f"Received sensor data {sensor_data}")
-        logging.info("Writing sensor data to sensors.json")
-        with open("sensors.json", "w") as outfile:
-            json.dump(sensor_data, outfile)
-
+        logger.info("Adding task to background tasks")
         background_tasks.add_task(run_simulator, broker_config)
-        response = ServerReply(
-            detail=f"Task sucessfully added."
-        ).dict()
+        response = ServerReply(detail="Task sucessfully added.").dict()
         return JSONResponse(response, 200)
     except Exception as e:
         err = traceback.format_exc()
-        raise HTTPException(500, str(err))
+        HTTPException(500, str(err))
 
 
 @app.post("/configure")

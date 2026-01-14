@@ -1,6 +1,7 @@
 import logging
 import helics as h
 import json
+from pydantic import BaseModel
 from pathlib import Path
 from datetime import datetime
 from oedisi.types.common import BrokerConfig
@@ -49,6 +50,12 @@ def xarray_to_powers_cart(data, **kwargs):
     real = PowersReal(**xarray_to_dict(data.real), **kwargs)
     imag = PowersImaginary(**xarray_to_dict(data.imag), **kwargs)
     return real, imag
+
+
+class ComponentParameters(BaseModel):
+    name: str
+    max_itr: int
+    t_steps: int
 
 
 class StaticConfig(object):
@@ -106,14 +113,14 @@ class HubFederate(object):
         self.info.core_type = h.HELICS_CORE_TYPE_ZMQ
         self.info.core_init = "--federates=1"
 
+        h.helicsFederateInfoSetBroker(self.info, broker_config.broker_ip)
+        h.helicsFederateInfoSetBrokerPort(self.info, broker_config.broker_port)
+
         # h.helicsFederateInfoSetTimeProperty(self.info, h.helics_property_time_delta, 0.01)
         self.fed = h.helicsCreateValueFederate(self.static.name, self.info)
         # h.helicsFederateSetFlagOption(self.fed, h.helics_flag_slow_responding, True)
         h.helicsFederateSetTimeProperty(
             self.fed, h.HELICS_PROPERTY_TIME_PERIOD, 1)
-
-        h.helicsFederateInfoSetBroker(self.fed, broker_config.broker_ip)
-        h.helicsFederateInfoSetBrokerPort(self.fed, broker_config.broker_port)
 
     def register_subscription(self) -> None:
         self.sub.p0 = self.fed.register_subscription(
@@ -315,6 +322,10 @@ class HubFederate(object):
 
 
 def run_simulator(broker_config: BrokerConfig):
+    #    schema = ComponentParameters.schema_json(indent=2)
+    #    with open("./hub_power/hub_power_schema.json", "w") as f:
+    #        f.write(schema)
+    #
     sfed = HubFederate(broker_config)
     sfed.run()
 
