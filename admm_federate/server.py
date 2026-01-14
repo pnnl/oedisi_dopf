@@ -1,5 +1,5 @@
 from oedisi.types.common import BrokerConfig
-from opf_federate import OPFFederate
+from opf_federate import run_simulator
 from fastapi import FastAPI, BackgroundTasks, HTTPException
 from fastapi.responses import JSONResponse
 import uvicorn
@@ -32,9 +32,8 @@ def read_root():
 @app.post("/run")
 async def run_model(broker_config: BrokerConfig, background_tasks: BackgroundTasks):
     print(broker_config)
-    federate = OPFFederate(broker_config)
     try:
-        background_tasks.add_task(federate.run)
+        background_tasks.add_task(run_simulator, broker_config)
         response = ServerReply(detail="Task sucessfully added.").model_dump()
         return JSONResponse(response, 200)
     except Exception as _:

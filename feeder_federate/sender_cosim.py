@@ -496,12 +496,12 @@ def go_cosim(
 
         logger.debug("Step 2: Collecting Commands")
         change_obj_cmds = CommandList.parse_obj(sub_command_set.json)
-        sim.change_obj(change_obj_cmds.__root__)
+        sim.change_obj(change_obj_cmds.root)
 
         logger.debug("Step 3: Collecting Inverter Controls")
         inverter_controls = InverterControlList.parse_obj(
             sub_invcontrol.json)
-        for inv_control in inverter_controls.__root__:
+        for inv_control in inverter_controls.root:
             sim.apply_inverter_control(inv_control)
 
         logger.debug("Step 4: Collecting PV Controls")

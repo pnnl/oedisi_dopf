@@ -6,14 +6,14 @@ authors = ["pnnl"]
 readme = "README.md"
 
 [tool.poetry.dependencies]
-python = ">=3.12, <3.13"
+python = "^3.13"
 helics-apps = "^3.4.0"
 helics = "^3.4.0"
 pydantic = ">=1.9, <3.0"
 cvxpy = "^1.5"
 pandas = "^2.2.2"
 'OpenDSSDirect.py' = "^0.7.0"
-oedisi = ">=2.0, <3.0"
+oedisi = ">=2.0, <=3.0"
 scikit-learn = "*"
 jupyter = "*"
 boto3 = "*"
