@@ -15,7 +15,7 @@ from oedisi.types.data_types import (
 )
 import xarray as xr
 import numpy as np
-
+from pydantic import BaseModel
 logger = logging.getLogger(__name__)
 logger.addHandler(logging.StreamHandler())
 logger.setLevel(logging.DEBUG)
@@ -55,6 +55,12 @@ def xarray_to_powers_cart(data, **kwargs):
     return real, imag
 
 
+class ComponentParameters(BaseModel):
+    name: str
+    max_itr: int
+    t_steps: int
+
+
 class StaticConfig(object):
     name: str
     max_itr: int
@@ -69,7 +75,7 @@ class Subscriptions(object):
     v4: VoltagesMagnitude
 
 
-class EstimatorFederate(object):
+class HubFederate(object):
     def __init__(self, broker_config) -> None:
         self.sub = Subscriptions()
         self.load_static_inputs()
@@ -106,13 +112,13 @@ class EstimatorFederate(object):
         self.info.core_init = "--federates=1"
 
         # h.helicsFederateInfoSetTimeProperty(self.info, h.helics_property_time_delta, 0.01)
-        self.fed = h.helicsCreateValueFederate(self.static.name, self.info)
         # h.helicsFederateSetFlagOption(self.fed, h.helics_flag_slow_responding, True)
+        h.helicsFederateInfoSetBroker(self.info, broker_config.broker_ip)
+        h.helicsFederateInfoSetBrokerPort(self.info, broker_config.broker_port)
+
+        self.fed = h.helicsCreateValueFederate(self.static.name, self.info)
         h.helicsFederateSetTimeProperty(
             self.fed, h.HELICS_PROPERTY_TIME_PERIOD, 1)
-
-        h.helicsFederateInfoSetBroker(self.fed, broker_config.broker_ip)
-        h.helicsFederateInfoSetBrokerPort(self.fed, broker_config.broker_port)
 
     def register_subscription(self) -> None:
         self.sub.v0 = self.fed.register_subscription(
@@ -239,6 +245,10 @@ class EstimatorFederate(object):
 
 
 def run_simulator(broker_config: BrokerConfig):
+    #    schema = ComponentParameters.schema_json(indent=2)
+    #    with open("./hub_voltage/hub_voltage_schema.json", "w") as f:
+    #        f.write(schema)
+    #
     sfed = HubFederate(broker_config)
     sfed.run()
 

@@ -157,6 +157,24 @@ def link_feeder(system: WiringDiagram, feeder: Component) -> None:
     system.links.append(link)
 
 
+def link_feeder_voltage(system: WiringDiagram, feeder: Component, src: int) -> None:
+    system.links.append(
+        Link(source=f"{feeder.name}", source_port="voltage_real",
+             target=f"{ALGO}_{src}", target_port="sub_v")
+    )
+
+
+def link_feeder_power(system: WiringDiagram, feeder: Component, src: int) -> None:
+    system.links.append(
+        Link(source=f"{feeder.name}", source_port="power_real",
+             target=f"{ALGO}_{src}", target_port="sub_p")
+    )
+    system.links.append(
+        Link(source=f"{feeder.name}", source_port="power_imag",
+             target=f"{ALGO}_{src}", target_port="sub_q")
+    )
+
+
 def link_hub_voltage(system: WiringDiagram, hub: Component, src: int) -> None:
     system.links.append(
         Link(source=f"{ALGO}_{src}", source_port="pub_v",
@@ -315,37 +333,37 @@ def generate(MODEL: str, LEVEL: str) -> None:
         sub_areas[area] = area_set
 
     max_itr = 10
-    hub_voltage = Component(
-        name="hub_voltage",
-        type="VoltageHub",
-        host="hub_voltage",
-        container_port=5900,
-        parameters={
-            "max_itr": max_itr,
-            "number_of_timesteps": T_STEPS,
-            "deltat": DELTA_T
-        },
-    )
-    system.components.append(hub_voltage)
-
-    hub_power = Component(
-        name="hub_power",
-        type="PowerHub",
-        host="hub_voltage",
-        container_port=5901,
-        parameters={
-            "max_itr": max_itr,
-            "number_of_timesteps": T_STEPS,
-            "deltat": DELTA_T
-        },
-    )
-    system.components.append(hub_power)
-
+#    hub_voltage = Component(
+#        name="hub_voltage",
+#        type="VoltageHub",
+#        host="hub_voltage",
+#        container_port=5900,
+#        parameters={
+#            "max_itr": max_itr,
+#            "number_of_timesteps": T_STEPS,
+#            "deltat": DELTA_T
+#        },
+#    )
+#    system.components.append(hub_voltage)
+#
+#    hub_power = Component(
+#        name="hub_power",
+#        type="PowerHub",
+#        host="hub_voltage",
+#        container_port=5901,
+#        parameters={
+#            "max_itr": max_itr,
+#            "number_of_timesteps": T_STEPS,
+#            "deltat": DELTA_T
+#        },
+#    )
+#    system.components.append(hub_power)
+#
     hub_control = Component(
         name="hub_control",
         type="ControlHub",
         host="hub_control",
-        container_port=5902,
+        container_port=5900,
         parameters={
             "max_itr": max_itr,
             "number_of_timesteps": T_STEPS,
@@ -362,8 +380,8 @@ def generate(MODEL: str, LEVEL: str) -> None:
 
     for k, v in sub_areas.items():
         print(k, v)
-        link_hub_voltage(system, hub_voltage, k)
-        link_hub_power(system, hub_power, k)
+        link_feeder_voltage(system, feeder, k)
+        link_feeder_power(system, feeder, k)
         link_hub_control(system, hub_control, k)
 
     rho_vup = [1e3, 1e3, 1e3, 1e3, 1e3]
@@ -373,7 +391,7 @@ def generate(MODEL: str, LEVEL: str) -> None:
             name=f"{ALGO}_{k}",
             type="OptimalPowerFlow",
             host=f"admm_{k}",
-            container_port=5902+k,
+            container_port=5903+k,
             parameters={
                 "vup_tol": 0.01,
                 "sdn_tol": 0.01,

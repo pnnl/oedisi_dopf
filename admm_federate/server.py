@@ -1,10 +1,10 @@
-from fastapi import FastAPI, BackgroundTasks, HTTPException
-from opf_federate import run_simulator
 from oedisi.types.common import BrokerConfig
+from opf_federate import run_simulator
+from fastapi import FastAPI, BackgroundTasks, HTTPException
 from fastapi.responses import JSONResponse
-import traceback
 import uvicorn
 import socket
+import traceback
 import json
 import os
 
@@ -17,11 +17,15 @@ app = FastAPI()
 @app.get("/")
 def read_root():
     hostname = socket.gethostname()
-    host_ip = socket.gethostbyname(hostname)
-    response = HeathCheck(
-        hostname=hostname,
-        host_ip=host_ip
-    ).dict()
+    host_ip = "127.0.0.1"
+    try:
+        host_ip = socket.gethostbyname(socket.gethostname())
+    except socket.gaierror:
+        try:
+            host_ip = socket.gethostbyname(socket.gethostname() + ".local")
+        except socket.gaierror:
+            pass
+    response = HeathCheck(hostname=hostname, host_ip=host_ip).model_dump()
     return JSONResponse(response, 200)
 
 
@@ -30,11 +34,9 @@ async def run_model(broker_config: BrokerConfig, background_tasks: BackgroundTas
     print(broker_config)
     try:
         background_tasks.add_task(run_simulator, broker_config)
-        response = ServerReply(
-            detail="Task sucessfully added."
-        ).dict()
+        response = ServerReply(detail="Task sucessfully added.").model_dump()
         return JSONResponse(response, 200)
-    except Exception as e:
+    except Exception as _:
         err = traceback.format_exc()
         HTTPException(500, str(err))
 
@@ -50,9 +52,9 @@ async def configure(component_struct: ComponentStruct):
     json.dump(links, open(DefaultFileNames.INPUT_MAPPING.value, "w"))
     json.dump(params, open(DefaultFileNames.STATIC_INPUTS.value, "w"))
     response = ServerReply(
-        detail=f"Sucessfully updated configuration files."
-    ).dict()
+        detail="Sucessfully updated configuration files.").model_dump()
     return JSONResponse(response, 200)
 
+
 if __name__ == "__main__":
-    uvicorn.run(app, host="0.0.0.0", port=int(os.environ['PORT']))
+    uvicorn.run(app, host="0.0.0.0", port=int(os.environ["PORT"]))

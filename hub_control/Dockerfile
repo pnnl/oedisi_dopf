@@ -5,5 +5,5 @@ RUN mkdir ControlHub
 COPY  . ./ControlHub
 WORKDIR ./ControlHub
 RUN pip install -r requirements.txt
-EXPOSE 5902/tcp
+EXPOSE 5900/tcp
 CMD ["python", "server.py"]

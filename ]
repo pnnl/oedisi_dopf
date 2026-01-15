@@ -150,8 +150,8 @@ def download_results():
             logger.info(f"making a request to url - {url}")
 
             response = requests.get(url)
-            n = len(response.content)
-            logger.info(f"Response from {hostname} has {n} bytes")
+            logger.info(f"Response from {hostname} has {
+                        len(response.content)} bytes")
             with open(f"{hostname}.feather", "wb") as out_file:
                 out_file.write(response.content)
 

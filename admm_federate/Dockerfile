@@ -5,5 +5,5 @@ RUN mkdir OptimalPowerFlow
 COPY  . ./OptimalPowerFlow
 WORKDIR ./OptimalPowerFlow
 RUN pip install -r requirements.txt
-EXPOSE 5902/tcp
+EXPOSE 5903/tcp
 CMD ["python", "server.py"]

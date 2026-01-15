@@ -1,8 +1,10 @@
 import logging
 import helics as h
 import json
+from pydantic import BaseModel
 from pathlib import Path
 from datetime import datetime
+from oedisi.types.common import BrokerConfig
 from oedisi.types.data_types import (
     PowersImaginary,
     PowersReal,
@@ -81,6 +83,13 @@ def xarray_to_voltages_pol(data, **kwargs):
     return mag, ang
 
 
+class ComponentParameters(BaseModel):
+    name: str
+    deltat: float
+    control_type: str
+    relaxed: bool
+
+
 class StaticConfig(object):
     name: str
     deltat: float
@@ -100,11 +109,11 @@ class Subscriptions(object):
 
 
 class OPFFederate(object):
-    def __init__(self) -> None:
+    def __init__(self, broker_config) -> None:
         self.sub = Subscriptions()
         self.load_static_inputs()
         self.load_input_mapping()
-        self.initilize()
+        self.initilize(broker_config)
         self.load_component_definition()
         self.register_subscription()
         self.register_publication()
@@ -130,7 +139,7 @@ class OPFFederate(object):
         self.static.control_type = config["control_type"]
         self.static.relaxed = config["relaxed"]
 
-    def initilize(self) -> None:
+    def initilize(self, broker_config) -> None:
         self.info = h.helicsCreateFederateInfo()
         self.info.core_name = self.static.name
         self.info.core_type = h.HELICS_CORE_TYPE_ZMQ
@@ -139,6 +148,9 @@ class OPFFederate(object):
         h.helicsFederateInfoSetTimeProperty(
             self.info, h.helics_property_time_delta, self.static.deltat
         )
+
+        h.helicsFederateInfoSetBroker(self.info, broker_config.broker_ip)
+        h.helicsFederateInfoSetBrokerPort(self.info, broker_config.broker_port)
 
         self.fed = h.helicsCreateValueFederate(self.static.name, self.info)
 
@@ -161,7 +173,7 @@ class OPFFederate(object):
             self.inputs["injections"], ""
         )
         self.sub.available_power = self.fed.register_subscription(
-            self.inputs["available_power"], ""
+             self.inputs["available_power"], ""
         )
 
     def register_publication(self) -> None:
@@ -184,12 +196,12 @@ class OPFFederate(object):
             "voltage_mag", h.HELICS_DATA_TYPE_STRING, ""
         )
         self.pub_voltages_angle = self.fed.register_publication(
-            "voltage_angle", h.HELICS_DATA_TYPE_STRING, ""
+            "voltage_angle", h.HELICS_DATA_TYPE_STRING, ""ation(
         )
 
     def get_set_points(self, control: dict, bus_info: adapter.BusInfo) -> dict[complex]:
-        setpoints = {}
-        for key, val in control.items():
+        setpoints={}
+        for key, val in control.items(): ict, bus_info: adapter.BusInfo) -> dict[complex]:
             if key in bus_info.buses:
                 bus = bus_info.buses[key]
                 for tag in set(bus.tags):
@@ -212,43 +224,37 @@ class OPFFederate(object):
                 )
                 continue
 
-            topology: Topology = Topology.parse_obj(self.sub.topology.json)
-            branch_info, bus_info, slack_bus = adapter.extract_info(topology)
+            topology: Topology = Topology.parse_obj(self.sub.topology.json            branch_info, bus_info, slack_bus=adapter.extract_info(topology)
+                topology: Topology=Topology.parse_obj(self.sub.topology.json)        branch_info, bus_info, slack_bus=adapter.extract_info(topology)    topology: Topology=Topology.parse_obj(self.sub.topology.json)
 
-            injections = Injection.parse_obj(self.sub.injections.json)
-            bus_info = adapter.extract_injection(bus_info, injections)
 
-            powers_real = PowersReal.parse_obj(self.sub.powers_real.json)
-            powers_imag = PowersImaginary.parse_obj(self.sub.powers_imag.json)
-            powers = eqarray_to_xarray(powers_real) + 1j * eqarray_to_xarray(
-                powers_imag
-            )
+            powers_imag=PowersImaginary.parse_obj(self.sub.powers_imag.json)                po_real=PowersReal.parse_obj(self.sub.powers_real.json)
+                po=eqarray_to_xarray(powers_real) + 1j * eqarray_to_xarray(
+                powreal=PowersReal.parse_obj(self.sub.powers_real.json)
+            powers_imag=PowersImaginary.parse_obj(self.sub.powers_imag.json))
+    powers_real == eqarray_to_xarray(powers_real) + 1j * eqarray_to_xarray(mag=)
+    self.sub.voltage_imag=)
+    self.sub.voltage = measurement_to_xarray(
 
-            voltages_real = VoltagesReal.parse_obj(self.sub.voltages_real.json)
-            voltages_imag = VoltagesImaginary.parse_obj(
-                self.sub.voltages_imag.json)
-            voltages = measurement_to_xarray(
-                voltages_real
-            ) + 1j * measurement_to_xarray(voltages_imag)
+            voltages_real=VoltagesReal.parse_obj(self.sub.voltages_real.json)
+            voltages_imag=VoltagesImaginary.parse_obj(g)
 
-            time = voltages_real.time
-            logger.debug(f"Timestep: {time}")
+            time=vo=measurement_to_xarray()
+                time=voltages_real.timexarray_to_voltages_pol(voltages)
+            voltages_mag.time=time
+            voltages_mag, voltages_ang=xarray_to_voltages_pol(voltages)
+                 voltaang.time=timep: {time}")            bus_info = adapter.extract_voltages(bus_info, voltages_mag)
+
 
             voltages_mag, voltages_ang = xarray_to_voltages_pol(voltages)
             voltages_mag.time = time
             voltages_ang.time = time
-
-            bus_info = adapter.extract_voltages(bus_info, voltages_mag)
-
-            branch_info, bus_info = adapter.map_secondaries(
-                branch_info, bus_info)
-
+            relaxed=self.static.relaxed            relaxed=self.static.relaxed
             with open("bus_info.json", "w") as outfile:
                 outfile.write(json.dumps(asdict(bus_info)))
 
-            with open("branch_info.json", "w") as outfile:
-                outfile.write(json.dumps(asdict(branch_info)))
-
+        branch_info, bus_info = adapter.map_secondaries(
+                branch_info, bus_info)
             assert adapter.check_radiality(branch_info, bus_info)
 
             p_inj = MeasurementArray.parse_obj(self.sub.available_power.json)
@@ -257,28 +263,34 @@ class OPFFederate(object):
             v_mag, pq, control, stats = lindistflow.solve(
                 branch_info, bus_info, slack_bus, relaxed
             )
-            real_setpts = self.get_set_points(control, bus_info)
+            real_setpts = self.get_set_points(control, bus_info)        q={k: p[1] for k, p in pq.items()}elf.sub.available_power.json)b.available_power.json)        q={k: p[1] for k, p in pq.items()}elf.sub.available_power.json)b.available_power.json)
 
             p = {k: p[0] for k, p in pq.items()}
-            q = {k: p[1] for k, p in pq.items()}
+            q = {k: p[1] for k, p in pq.items()}                if abs(val) < 1e-6:
+                            continue            real_setpts = self.get_set_points(control, bus_info)continue            real_setpts = self.get_set_points(control, bus_info)            v_mag = adapter.pack_voltages(v_mag, bus_info, time)
+            power_real = adapter.pack_powers_real(powers_real, p, time)
+    p =     continue        if commands:
+continue            real_setpts = self.get_set_points(control, bus_info)                    power_real=adapter.pack_powers_real(powers_real, p, time)
+    v_mag=adif cself.pub_pv_set.publish(json.dumps(commands)                    power_real=adapter.pack_powers_real(powers_real, p, timers_real, p, time)
+                if ccontinue            v_mag = 
 
             # get the control commands for the feeder federate
             commands = []
             for eq, val in real_setpts.items():
                 if abs(val) < 1e-6:
-                    continue
+                    continue                commands.append((eq, val.real, val.imag))
 
-                commands.append((eq, val.real, val.imag))
-
-            if commands:
+                commands.append((eq, val.real, val.imag))            power = eqarray_to_xarray(power_real) + \
+                1j * eqarray_to_xarray(power_imag)
+                time=tim
                 self.pub_pv_set.publish(json.dumps(commands))
 
             v_mag = adapter.pack_voltages(v_mag, bus_info, time)
-            power_real = adapter.pack_powers_real(powers_real, p, time)
-            power_imag = adapter.pack_powers_imag(powers_real, q, time)
-
-            power = eqarray_to_xarray(power_real) + \
-                1j * eqarray_to_xarray(power_imag)
+            power_real = adapter.pack_powers_real(powers_real, p, time)        self.pub_estimated_power.publish(est_power.json())
+            selfunits = "s",self.pub_voltages_mag.publish(v_mag.json())                .pub_solver_stats.publish(solver_stats.json())
+            self.pub_powers_mag.publish(power_mag.json())
+                logger list(real_setpts.values()),
+                time ="s",
 
             power_mag, power_ang = xarray_to_powers_pol(power)
             power_mag.time = time
@@ -287,19 +299,19 @@ class OPFFederate(object):
             solver_stats = MeasurementArray(
                 ids=list(stats.keys()),
                 values=list(stats.values()),
-                time=time,
-                units="s",
+                time=time,est_power = MeasurementArray(
+
+"s",
             )
 
-            est_power = MeasurementArray(
-                ids=list(real_setpts.keys()),
-                values=list(real_setpts.values()),
-                time=time,
-                units="W",
-            )
+            est_power = MeasurementAr            self.pub_powers_mag.publish(power_mag.json())
+                            )
 
-            self.pub_voltages_mag.publish(v_mag.json())
-            self.pub_voltages_angle.publish(voltages_ang.json())
+            self.pub_v"W",rate disconnected: {datetime.now()}")        logger.info(f"Federate disconnected: {datetime.now()}")
+    
+if __name__ == "__main__":
+    sfed.run()
+   with open("./lindistflow_federate/lindistflow_schema.json", "
 
             self.pub_estimated_power.publish(est_power.json())
             self.pub_solver_stats.publish(solver_stats.json())
@@ -310,11 +322,16 @@ class OPFFederate(object):
 
     def stop(self) -> None:
         h.helicsFederateDisconnect(self.fed)
-        h.helicsFederateFree(self.fed)
-        h.helicsCloseLibrary()
-        logger.info(f"Federate disconnected: {datetime.now()}")
+        h.helicsFederateFree(self.fed)            run_simulator(BrokerConfig(broker_ip="127.0.0.1"))    sfed.run()
+            if __name__ == "__main__":
+        logger.info(f"Federate disconnected: {datetime.now()}")def run_simulator(broker_config: BrokerConfig) -> None:
+    #    schema = ComponentParameters.schema_json(indent=2)
+    #    with open("./lindistflow_federate/lindistflow_schema.json", "w") as f:
+    #        f.write(schema)
+    #
+    sfed = OPFFederate(broker_config)
+    sfed.run()
 
 
 if __name__ == "__main__":
-    fed = OPFFederate()
-    fed.run()
+    run_simulator(BrokerConfig(broker_ip="127.0.0.1"))

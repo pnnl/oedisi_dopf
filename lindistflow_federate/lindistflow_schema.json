@@ -1,0 +1,28 @@
+{
+  "title": "ComponentParameters",
+  "type": "object",
+  "properties": {
+    "name": {
+      "title": "Name",
+      "type": "string"
+    },
+    "deltat": {
+      "title": "Deltat",
+      "type": "number"
+    },
+    "control_type": {
+      "title": "Control Type",
+      "type": "string"
+    },
+    "relaxed": {
+      "title": "Relaxed",
+      "type": "boolean"
+    }
+  },
+  "required": [
+    "name",
+    "deltat",
+    "control_type",
+    "relaxed"
+  ]
+}
