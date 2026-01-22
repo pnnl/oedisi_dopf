@@ -1,0 +1,8 @@
+{
+  "mappings": [
+    {
+      "source": "helics_topic/input",
+      "target": "example_input"
+    }
+  ]
+}

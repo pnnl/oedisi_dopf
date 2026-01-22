@@ -1,0 +1,19 @@
+[build-system]
+requires = ["setuptools", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "hub-topology"
+version = "0.1.0"
+description = "hub_topology"
+authors = [{ name = "openEDI", email = "info@example.com" }]
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+"pytest"
+]
+
+[project.optional-dependencies]
+
+[tool.setuptools.packages.find]
+where = ["component"]

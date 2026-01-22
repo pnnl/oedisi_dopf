@@ -1,0 +1,26 @@
+{
+  "name": "example-component",
+  "description": "hub_topology",
+  "version": "0.1.0",
+  "inputs": [
+    {
+      "name": "example_input",
+      "type": "float",
+      "description": "Example input value"
+    }
+  ],
+  "outputs": [
+    {
+      "name": "example_output",
+      "type": "float",
+      "description": "Example output value"
+    }
+  ],
+  "configuration": {
+    "example_param": {
+      "type": "float",
+      "default": 1.0,
+      "description": "Example configuration parameter"
+    }
+  }
+}
